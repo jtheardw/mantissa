@@ -120,11 +120,12 @@ impl Node {
             match self.state.get(&(nx, ny)) {
                 Some(p) => {
                     if p.1 != white {
-                        moves.push_back(Move::pawn_move(&self, (x,y), (nx, ny)));
                         if (white && ny == 7) || (!white && ny == 0) {
                             for p in [b'q', b'r', b'n', b'b'].iter() {
                                 moves.push_back(Move::pawn_promote_move(&self, (x,y), (nx,ny), *p));
                             }
+                        } else {
+                            moves.push_back(Move::pawn_move(&self, (x,y), (nx, ny)));
                         }
                     };
                 },
@@ -138,13 +139,17 @@ impl Node {
             if (adv == 2) && !((white && y == 1) || (!white && y == 6)) {break;}
             match self.state.get(&(nx, ny)) {
                 Some(_) => {break;},
-                None => moves.push_back(Move::pawn_move(&self, (x,y), (nx, ny)))
-            };
-            if (white && ny == 7) || (!white && ny == 0) {
-                for p in [b'q', b'r', b'n', b'b'].iter() {
-                    moves.push_back(Move::pawn_promote_move(&self, (x,y), (nx,ny), *p));
+                None => {
+                    if (white && ny == 7) || (!white && ny == 0) {
+                        for p in [b'q', b'r', b'n', b'b'].iter() {
+                            moves.push_back(Move::pawn_promote_move(&self, (x,y), (nx,ny), *p));
+                        }
+                    } else {
+                        moves.push_back(Move::pawn_move(&self, (x,y), (nx, ny)));
+                    }
                 }
-            }
+            };
+
         };
 
         // en passant
@@ -280,6 +285,15 @@ impl Node {
         }
 
         return moves;
+    }
+
+    pub fn is_check(&self, white: bool) -> bool {
+        for (coord, (p, w)) in self.state.iter() {
+            if *p == b'k' && *w == white {
+                return self.is_attacked(*coord, white);
+            }
+        }
+        return false;
     }
 
     fn is_attacked(&self, coord: (i32, i32), white: bool) -> bool {
@@ -710,6 +724,31 @@ impl Node {
         return moves;
     }
 
+    fn rook_moves_value(&self, coord: (i32, i32), w: bool) -> i32 {
+        let (x, y) = coord;
+        let mut moves = 0;
+
+        // up=left, up-right, dn-left, dn-right
+        for (sx, sy) in [(-1, 0), (1, 0), (0, -1), (0, -1)].iter() {
+            let mut d = 1;
+            while d < 3 {
+                let (nx, ny) = (x + (sx * d), y + (sy * d));
+                if (nx < 0 || nx >= 8) || (ny < 0 || ny >= 8) {
+                    break;
+                }
+                match self.state.get(&(nx, ny)) {
+                    Some(p) => {
+                        moves += (p.1 != w) as i32;
+                        break;
+                    },
+                    None => { moves += 1; }
+                }
+                d += 1;
+            }
+        }
+        return moves;
+    }
+
     pub fn mobility_value(&self) -> i32 {
         let mut move_val = 0;
         for (coord, (p, w)) in self.state.iter() {
@@ -718,9 +757,9 @@ impl Node {
             let piece_moves = match p {
                 b'k' => self.king_moves_value(coord, w),
                 b'q' => self.bishop_moves_value(coord, w),
-                b'b' => self.bishop_moves_value(coord, w),
+                b'b' => self.bishop_moves_value(coord, w) + self.rook_moves_value(coord, w),
                 b'n' => self.knight_moves_value(coord, w),
-                b'r' => 0,
+                b'r' => self.rook_moves_value(coord, w),
                 b'p' => 0,
                 _ => panic!("erroneous piece! {}", p.to_string())
             };
@@ -728,6 +767,92 @@ impl Node {
             move_val += if w {moves * PAWN_VALUE} else {-moves * PAWN_VALUE};
         }
         return move_val
+    }
+
+    pub fn piece_synergy_values(&self) -> i32 {
+        let mut piece_bonus: i32 = 0;
+        // king, queen, rook, bishop, knight, pawn
+        let order = [b'k', b'q', b'r', b'b', b'n', b'p'];
+        let mut w_piece_count = [0; 6];
+        let mut b_piece_count = [0; 6];
+
+        for ((x, y), (p, w)) in self.state.iter() {
+            let idx = match p {
+                b'k' => 0,
+                b'q' => 1,
+                b'r' => 2,
+                b'b' => 3,
+                b'n' => 4,
+                b'p' => 5,
+                _ => 0
+            };
+            if *w {
+                w_piece_count[idx] += 1;
+            } else {
+                b_piece_count[idx] += 1;
+            }
+            if *p == b'q' {
+                if self.history.len() < 12 {
+                    // queen moved early
+                    let qpl = if *w {*y > 0} else {*y < 7};
+                    if qpl {
+                        piece_bonus -= if *w {1} else {-1} * (PAWN_VALUE / 3);
+                    }
+                }
+            }
+            if *p == b'r' {
+                if self.history.len() < 12 {
+                    // rook moved early
+                    let rpl = if *w {*y > 0} else {*y < 7};
+                    if rpl {
+                        piece_bonus -= if *w {1} else {-1} * (PAWN_VALUE / 3);
+                    }
+                }
+            }
+        }
+
+        // synergies
+        for (w, arr) in [(true, w_piece_count), (false, b_piece_count)].iter() {
+            let scale = if *w {1} else {-1};
+            for i in 0..arr.len() {
+                let p = order[i];
+                if p == b'b' {
+                    if arr[i] >= 2 {
+                        piece_bonus += (PAWN_VALUE / 2);
+                    }
+                }
+                if p == b'k' {
+                    // few friendly pawns means weak knights
+                    if arr[5] < 3 {
+                        piece_bonus -= (PAWN_VALUE / 2);
+                    }
+                }
+            }
+        }
+        return piece_bonus;
+    }
+
+    pub fn backwards_pawns_value(&self) -> i32 {
+        let mut white_pawns: Vec<i32> = Vec::new();
+        let mut black_pawns: Vec<i32> = Vec::new();
+        for ((x, y), (p, w)) in self.state.iter() {
+            if *p == b'p' {
+                if *w {white_pawns.push(*y);}  else {black_pawns.push(*y);}
+            }
+        }
+
+        let white_min = match white_pawns.iter().min() {
+            Some(min) => *min,
+            None => 0
+        };
+        let black_min = match black_pawns.iter().min() {
+            Some(min) => *min,
+            None => 0
+        };
+
+        return PAWN_VALUE *
+            (white_pawns.iter().filter(|&n| *n == white_min).count() as i32 -
+             black_pawns.iter().filter(|&n| *n == black_min).count() as i32);
     }
 
     pub fn doubled_pawns_value(&self) -> i32 {

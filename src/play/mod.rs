@@ -12,6 +12,7 @@ static mut evaled: u64 = 0;
 pub unsafe fn choose_move(node: &mut Node, maximize: bool, compute_time: u128) -> (Move, f64) {
     let mut m_depth = 3;
     let mut q_depth = 4;
+    evaled = 0;
 
     let start_time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_millis(),
@@ -52,6 +53,8 @@ unsafe fn evaluate_position(node: &Node) -> i32 {
     val -= node.doubled_pawns_value() / 2;
     val -= node.isolated_pawns_value() / 2;
     val += rng.gen_range(-100, 101);
+    val -= node.backwards_pawns_value() / 4;
+    val += node.piece_synergy_values();
     return val;
 }
 
@@ -121,12 +124,28 @@ unsafe fn minimax_search(node: &mut Node, start_time: u128, compute_time: u128, 
         if mv.is_err { return (mv, 0) }
         if maximize {
             if new_val > val || best_move.is_null {
+                if val < -100000 {
+                    node.do_move(&pot_move);
+                    if node.is_check(maximize) {
+                        node.undo_move(&pot_move);
+                        continue;
+                    }
+                    node.undo_move(&pot_move);
+                }
                 best_move = pot_move;
                 val = new_val;
             }
             alpha = cmp::max(alpha, val);
         } else {
             if new_val < val || best_move.is_null {
+                if val > 100000 {
+                    node.do_move(&pot_move);
+                    if node.is_check(maximize) {
+                        node.undo_move(&pot_move);
+                        continue;
+                    }
+                    node.undo_move(&pot_move);
+                }
                 best_move = pot_move;
                 val = new_val;
             }
