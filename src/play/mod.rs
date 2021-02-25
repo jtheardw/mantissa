@@ -124,7 +124,7 @@ unsafe fn minimax_search(node: &mut Node, start_time: u128, compute_time: u128, 
         if mv.is_err { return (mv, 0) }
         if maximize {
             if new_val > val || best_move.is_null {
-                if val < -100000 {
+                if val.abs() >= 100000 {
                     node.do_move(&pot_move);
                     if node.is_check(maximize) {
                         node.undo_move(&pot_move);
@@ -138,7 +138,7 @@ unsafe fn minimax_search(node: &mut Node, start_time: u128, compute_time: u128, 
             alpha = cmp::max(alpha, val);
         } else {
             if new_val < val || best_move.is_null {
-                if val > 100000 {
+                if val.abs() >= 100000 {
                     node.do_move(&pot_move);
                     if node.is_check(maximize) {
                         node.undo_move(&pot_move);

@@ -13,14 +13,18 @@ fn print_deq(deq : &VecDeque<play::nodes::Move>) {
 
 struct Game {
     pub board: play::nodes::Node,
-    white_turn: bool
+    white_turn: bool,
+    zobrist_table: ([[u64; 12]; 64], (u64, u64))
 }
 
 impl Game {
-    fn get_basic_game() -> Game {
+    fn get_basic_game(zobrist_table: ([[u64; 12]; 64], (u64, u64))) -> Game {
+        let mut board = play::nodes::Node::default_board();
+        board.zobrist_table = zobrist_table;
         Game{
-            board: play::nodes::Node::default_board(),
-            white_turn: true
+            board: board,
+            white_turn: true,
+            zobrist_table: zobrist_table
         }
     }
 
@@ -49,15 +53,26 @@ impl Game {
             let promote_to = move_bytes[4];
             mv = play::nodes::Move::pawn_promote_move(&self.board, start, end, promote_to);
         } else {
-            if self.board.is_ep(start, end) {
-                mv = play::nodes::Move::ep_pawn_move(&self.board, start, end);
-            } else {
-                mv = play::nodes::Move::sliding_move(&self.board, start, end);
-            }
+            match self.board.state.get(&start) {
+                Some(p) => {
+                    if p.0 == b'p' {
+                        if self.board.is_ep(start, end) {
+                            mv = play::nodes::Move::ep_pawn_move(&self.board, start, end);
+                        } else {
+                            mv = play::nodes::Move::pawn_move(&self.board, start, end);
+                        }
+                    } else {
+                        mv = play::nodes::Move::sliding_move(&self.board, start, end);
+                    }
+                },
+                None => panic!("no piece at location to move!")
+            };
         }
         self.board.do_move(&mv);
         self.white_turn = !self.white_turn;
-        // println!("board state:\n{}", self.board.get_str())
+        eprintln!("received move {}", mv);
+        eprintln!("board state:\n{}", self.board.get_str());
+        eprintln!("ep file: {}", self.board.ep);
     }
 
     unsafe fn make_move(& mut self, compute_time: u128) -> play::nodes::Move {
@@ -102,6 +117,9 @@ fn get_calc_time(time: i32) -> u128 {
     if time < 60 * 10 * 1000 {
         calc_time = time / 40;
     }
+    if calc_time > 10000 {
+        calc_time = 10000;
+    }
     if calc_time < 1000 {
         calc_time = 1000;
     }
@@ -109,14 +127,15 @@ fn get_calc_time(time: i32) -> u128 {
 }
 
 unsafe fn play() {
-    let mut game : Game = Game::get_basic_game();
+    let zobrist = play::nodes::Node::init_zobrist();
+    let mut game : Game = Game::get_basic_game(zobrist);
     loop {
         let mut inp : String = String::new();
         io::stdin()
             .read_line(&mut inp)
             .expect("Failed to read line");
 
-        let mut params = inp.split_whitespace();
+        let mut params = inp.trim().split_whitespace();
         let cmd = match params.next() {
             Some(p) => p,
             None => {continue;}
@@ -135,13 +154,13 @@ unsafe fn play() {
         }
         if cmd == "setoption" {}
         if cmd == "ucinewgame" {
-            game = Game::get_basic_game();
+            game = Game::get_basic_game(zobrist);
         }
         if cmd == "position" {
             match params.next() {
                 Some(p) => {
                     if p == "startpos" {
-                        game = Game::get_basic_game();
+                        game = Game::get_basic_game(zobrist);
                         if params.next() == Some("moves") {
                             loop {
                                 match params.next() {

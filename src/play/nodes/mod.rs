@@ -12,17 +12,17 @@ const KNIGHT_VALUE: i32 = 3100;
 const PAWN_VALUE: i32 = 1000;
 
 pub struct Node {
-    state: HashMap<(i32, i32), (u8, bool)>, // location -> piece
+    pub state: HashMap<(i32, i32), (u8, bool)>, // location -> piece
     piece_map: HashMap<(u8, bool), (i32, i32)>, // piece -> location
     pub white_turn: bool,
-    ep: i32,                     // en passant file
+    pub ep: i32,                     // en passant file
     cr: (bool, bool, bool, bool), // Castling Rights: white qs, white ks, black qs, black ks
     ep_stack: Vec<i32>,          // en passant stack for undo
     pub cap_stack: Vec<u8>,  // capture stack for undo
     cr_stack: Vec<(bool, bool, bool, bool)>, // castling rights stack for undo
     promote_stack: Vec<bool>,                 // was there a promotion (for undoing)
     pub material: i32,
-    zobrist_table: [[u64; 12]; 64],
+    pub zobrist_table: ([[u64; 12]; 64], (u64, u64)),
     hash: u64,
     history: Vec<u64>
 }
@@ -65,7 +65,7 @@ impl Node {
         return s;
     }
 
-    fn init_zobrist() -> [[u64; 12]; 64] {
+    pub fn init_zobrist() -> ([[u64; 12]; 64], (u64, u64)) {
         let mut rng = rand::thread_rng();
         let mut zobrist_table : [[u64; 12]; 64] = [[0; 12]; 64];
         for i in 0..64 {
@@ -73,8 +73,10 @@ impl Node {
                 zobrist_table[i][j] = rng.gen();
             }
         }
+        let whose_turn: (u64, u64) = (rng.gen(), rng.gen());
         // println!("zob {:?}", zobrist_table);
-        return zobrist_table;
+        eprintln!("TABLE INITIALIZED.");
+        return (zobrist_table, whose_turn);
     }
 
     pub fn get_hash(&self) -> u64 {
@@ -88,24 +90,25 @@ impl Node {
             let i = i as usize;
             let to_xor = match self.state.get(&(x, y)) {
                 Some(p) => match p {
-                    (b'k', true) => self.zobrist_table[i][0],
-                    (b'q', true) => self.zobrist_table[i][1],
-                    (b'b', true) => self.zobrist_table[i][2],
-                    (b'n', true) => self.zobrist_table[i][3],
-                    (b'r', true) => self.zobrist_table[i][4],
-                    (b'p', true) => self.zobrist_table[i][5],
-                    (b'k', false) => self.zobrist_table[i][6],
-                    (b'q', false) => self.zobrist_table[i][7],
-                    (b'b', false) => self.zobrist_table[i][8],
-                    (b'n', false) => self.zobrist_table[i][9],
-                    (b'r', false) => self.zobrist_table[i][10],
-                    (b'p', false) => self.zobrist_table[i][11],
+                    (b'k', true) => self.zobrist_table.0[i][0],
+                    (b'q', true) => self.zobrist_table.0[i][1],
+                    (b'b', true) => self.zobrist_table.0[i][2],
+                    (b'n', true) => self.zobrist_table.0[i][3],
+                    (b'r', true) => self.zobrist_table.0[i][4],
+                    (b'p', true) => self.zobrist_table.0[i][5],
+                    (b'k', false) => self.zobrist_table.0[i][6],
+                    (b'q', false) => self.zobrist_table.0[i][7],
+                    (b'b', false) => self.zobrist_table.0[i][8],
+                    (b'n', false) => self.zobrist_table.0[i][9],
+                    (b'r', false) => self.zobrist_table.0[i][10],
+                    (b'p', false) => self.zobrist_table.0[i][11],
                     _ => 0
                 },
                 None => 0
             };
             h ^= to_xor
         }
+        h ^= if self.white_turn {self.zobrist_table.1.0} else {self.zobrist_table.1.1};
         return h
     }
 
@@ -402,35 +405,24 @@ impl Node {
             };
             move_queue.append(& mut piece_moves)
         }
-        // for cmove in move_queue.iter() {
-        //     let before = self.get_str();
-        //     let before_turn = self.white_turn;
-        //     self.do_move(&cmove);
-        //     let inter = self.get_str();
-        //     let inter_turn = self.white_turn;
-        //     self.undo_move(&cmove);
-        //     if self.get_str() != before {
-        //         panic!("BAD MOVE REWIND ON MOVE {} BEFORE:\n{}\nW {}\nINTER\n{}\nW {}\nAFTER\n{}\nW {}", cmove, before, before_turn, inter, inter_turn, self.get_str(), self.white_turn);
-        //     }
-        // }
 
         return move_queue;
     }
 
     fn get_zr_xor(&self, c : usize, p : u8, w: bool) -> u64 {
         match (p, w) {
-            (b'k', true) => self.zobrist_table[c][0],
-            (b'q', true) => self.zobrist_table[c][1],
-            (b'b', true) => self.zobrist_table[c][2],
-            (b'n', true) => self.zobrist_table[c][3],
-            (b'r', true) => self.zobrist_table[c][4],
-            (b'p', true) => self.zobrist_table[c][5],
-            (b'k', false) => self.zobrist_table[c][6],
-            (b'q', false) => self.zobrist_table[c][7],
-            (b'b', false) => self.zobrist_table[c][8],
-            (b'n', false) => self.zobrist_table[c][9],
-            (b'r', false) => self.zobrist_table[c][10],
-            (b'p', false) => self.zobrist_table[c][11],
+            (b'k', true) => self.zobrist_table.0[c][0],
+            (b'q', true) => self.zobrist_table.0[c][1],
+            (b'b', true) => self.zobrist_table.0[c][2],
+            (b'n', true) => self.zobrist_table.0[c][3],
+            (b'r', true) => self.zobrist_table.0[c][4],
+            (b'p', true) => self.zobrist_table.0[c][5],
+            (b'k', false) => self.zobrist_table.0[c][6],
+            (b'q', false) => self.zobrist_table.0[c][7],
+            (b'b', false) => self.zobrist_table.0[c][8],
+            (b'n', false) => self.zobrist_table.0[c][9],
+            (b'r', false) => self.zobrist_table.0[c][10],
+            (b'p', false) => self.zobrist_table.0[c][11],
             _ => 0
         }
     }
@@ -531,6 +523,7 @@ impl Node {
         self.cr = match self.cr_stack.pop() {Some(p) => p, None => panic!("empty cr stack!")};
         self.material += if self.white_turn {material_delta} else {-material_delta};
         self.white_turn = !self.white_turn;
+        self.hash ^= (self.zobrist_table.1.0 ^ self.zobrist_table.1.1);
     }
 
     pub fn do_move(&mut self, cmove: &Move) {
@@ -561,7 +554,7 @@ impl Node {
             // en passant
             cap_status = b'p';
             self.state.remove(&(cmove.end.0, cmove.start.1));
-            material_delta = PAWN_VALUE;
+            material_delta += PAWN_VALUE;
         } else {
             cap_status = match self.state.remove(&cmove.end) {
                 Some(tup) => tup.0,
@@ -642,6 +635,7 @@ impl Node {
         self.cr = ncr;
         self.material += if self.white_turn {material_delta} else {-material_delta};
         self.white_turn = !self.white_turn;
+        self.hash ^= (self.zobrist_table.1.0 ^ self.zobrist_table.1.1);
     }
 
     pub fn is_ep(&self, start: (i32, i32), end: (i32, i32)) -> bool {
@@ -818,13 +812,13 @@ impl Node {
                 let p = order[i];
                 if p == b'b' {
                     if arr[i] >= 2 {
-                        piece_bonus += (PAWN_VALUE / 2);
+                        piece_bonus += if *w {1} else {-1} * (PAWN_VALUE / 2);
                     }
                 }
                 if p == b'k' {
                     // few friendly pawns means weak knights
                     if arr[5] < 3 {
-                        piece_bonus -= (PAWN_VALUE / 2);
+                        piece_bonus -= if *w {1} else {-1} * (PAWN_VALUE / 2);
                     }
                 }
             }
@@ -928,7 +922,7 @@ impl Node {
                     if (x == 3 || x == 4) && (y == 3 || y == 4) {
                         val += if *w {PAWN_VALUE} else {-PAWN_VALUE}
                     } else if *p == b'p' {
-                        let factor = (150) * if *w {y - 2} else {5 - y};
+                        let factor = (PAWN_VALUE / 10) * if *w {y - 2} else {y - 5};
                         val += factor;
                     }
                 }
@@ -942,7 +936,7 @@ impl Node {
         let cap_stack: Vec<u8> = Vec::new();
         let cr_stack: Vec<(bool, bool, bool, bool)> = Vec::new();
         let promote_stack: Vec<bool> = Vec::new();
-        let zobrist_table: [[u64; 12]; 64] = Node::init_zobrist();
+        let zobrist_table: ([[u64; 12]; 64], (u64, u64)) = ([[0; 12]; 64], (0, 0));
 
         let state: HashMap<(i32, i32), (u8, bool)> = [
             ((0, 0), (b'r', true)),
@@ -1173,7 +1167,7 @@ impl Move {
 
     pub fn null_move() -> Move {
         Move {
-            repr: "".to_string(),
+            repr: "null".to_string(),
             start: (0, 0),
             end: (0, 0),
             is_ep: false,
@@ -1188,7 +1182,7 @@ impl Move {
 
     pub fn err_move() -> Move {
         Move {
-            repr: "".to_string(),
+            repr: "err".to_string(),
             start: (0, 0),
             end: (0, 0),
             is_ep: false,
