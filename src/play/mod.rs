@@ -9,7 +9,7 @@ use nodes::Move;
 
 static mut evaled: u64 = 0;
 
-pub unsafe fn choose_move(node: &mut Node, maximize: bool, compute_time: u128) -> (Move, f64) {
+pub unsafe fn choose_move(node: &mut Node, maximize: bool, compute_time: u128, check_check: bool) -> (Move, f64) {
     let mut m_depth = 3;
     let mut q_depth = 4;
     evaled = 0;
@@ -24,7 +24,7 @@ pub unsafe fn choose_move(node: &mut Node, maximize: bool, compute_time: u128) -
     let mut z_table : HashMap<u64, (Move, i32, i32)> = HashMap::new();
 
     while (current_time - start_time) <= compute_time {
-        let res = minimax_search(node, start_time, compute_time, m_depth, q_depth, -1000000, 1000000, maximize, & mut z_table);
+        let res = minimax_search(node, start_time, compute_time, m_depth, q_depth, -1000000, 1000000, maximize, & mut z_table, check_check);
         if res.0.is_err {
             break;
         }
@@ -35,16 +35,20 @@ pub unsafe fn choose_move(node: &mut Node, maximize: bool, compute_time: u128) -
         };
         m_depth += 1;
     }
-    // println!("{}", m_depth);
-    // println!("eval'd {}", evaled);
+    eprintln!("{}", m_depth);
+    eprintln!("eval'd {}", evaled);
+    eprintln!("projected: {}", val);
     return (best_move, val as f64 / 1000.);
 }
 
 fn is_terminal(node: &Node) -> bool {
-    return node.material.abs() >= 100000;
+    return node.material.abs() >= 100000 || node.is_threefold();
 }
 
 unsafe fn evaluate_position(node: &Node) -> i32 {
+    if node.is_threefold() {
+        return 0;
+    }
     let mut rng = rand::thread_rng();
     evaled += 1;
     let mut val = node.material;
@@ -70,7 +74,7 @@ fn is_quiet(node: &mut Node) -> bool {
     return !loud;
 }
 
-unsafe fn minimax_search(node: &mut Node, start_time: u128, compute_time: u128, depth: i32, q_depth: i32, alpha: i32, beta: i32, maximize: bool, table: & mut HashMap<u64, (Move, i32, i32)>) -> (Move, i32) {
+unsafe fn minimax_search(node: &mut Node, start_time: u128, compute_time: u128, depth: i32, q_depth: i32, alpha: i32, beta: i32, maximize: bool, table: & mut HashMap<u64, (Move, i32, i32)>, check_check: bool) -> (Move, i32) {
     // check time
     let current_time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
             Ok(n) => n.as_millis(),
@@ -119,12 +123,12 @@ unsafe fn minimax_search(node: &mut Node, start_time: u128, compute_time: u128, 
     }
     for pot_move in moves_to_assess.drain(0..) {
         node.do_move(&pot_move);
-        let (mv, new_val) = minimax_search(node, start_time, compute_time, depth - 1, q_depth, alpha, beta, !maximize, table);
+        let (mv, new_val) = minimax_search(node, start_time, compute_time, depth - 1, q_depth, alpha, beta, !maximize, table, check_check);
         node.undo_move(&pot_move);
         if mv.is_err { return (mv, 0) }
         if maximize {
             if new_val > val || best_move.is_null {
-                if val.abs() >= 100000 {
+                if val.abs() >= 100000 || check_check {
                     node.do_move(&pot_move);
                     if node.is_check(maximize) {
                         node.undo_move(&pot_move);
@@ -138,7 +142,7 @@ unsafe fn minimax_search(node: &mut Node, start_time: u128, compute_time: u128, 
             alpha = cmp::max(alpha, val);
         } else {
             if new_val < val || best_move.is_null {
-                if val.abs() >= 100000 {
+                if val.abs() >= 100000 || check_check {
                     node.do_move(&pot_move);
                     if node.is_check(maximize) {
                         node.undo_move(&pot_move);

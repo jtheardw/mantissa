@@ -83,6 +83,10 @@ impl Node {
         return self.hash;
     }
 
+    pub fn is_threefold(&self) -> bool {
+        self.history.iter().filter(|&n| *n == self.hash).count() >= 2
+    }
+
     pub fn get_full_hash(&self) -> u64 {
         let mut h: u64 = 0;
         for i in 0..64 {

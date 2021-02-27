@@ -76,7 +76,13 @@ impl Game {
     }
 
     unsafe fn make_move(& mut self, compute_time: u128) -> play::nodes::Move {
-        let (best_move, val) = play::choose_move(& mut self.board, self.white_turn, compute_time);
+        let (best_move, val) = play::choose_move(& mut self.board, self.white_turn, compute_time, false);
+        self.board.do_move(&best_move);
+        let is_check = self.board.is_check(self.white_turn);
+        self.board.undo_move(&best_move);
+        if is_check {
+            return play::choose_move(& mut self.board, self.white_turn, compute_time, true).0;
+        }
         return best_move;
     }
 }
