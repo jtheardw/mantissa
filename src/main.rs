@@ -70,12 +70,10 @@ impl Game {
         }
         self.board.do_move(&mv);
         self.white_turn = !self.white_turn;
-        eprintln!("received move {}", mv);
-        eprintln!("board state:\n{}", self.board.get_str());
-        eprintln!("ep file: {}", self.board.ep);
     }
 
     unsafe fn make_move(& mut self, compute_time: u128) -> play::nodes::Move {
+        eprintln!("board state:\n{}", self.board.get_str());
         let (best_move, val) = play::choose_move(& mut self.board, self.white_turn, compute_time, false);
         self.board.do_move(&best_move);
         let is_check = self.board.is_check(self.white_turn);
@@ -83,37 +81,65 @@ impl Game {
         if is_check {
             return play::choose_move(& mut self.board, self.white_turn, compute_time, true).0;
         }
+        eprintln!("best move is {}", best_move);
         return best_move;
     }
 }
 
 fn main() {
-    // let mut node: play::nodes::Node = play::nodes::Node::default_board();
-    // let mut moves: VecDeque<play::nodes::Move> = node.moves();
-    // // println!("{}", moves.len().to_string());
-    // // print_deq(&moves);
-    // // for mv in moves.drain(0..) {
-    // //     let s: String = mv.repr.to_string();
-    // //     println!("{}", s);
-    // // }
-    // let move1 = match moves.pop_front() {Some(m) => m, None => panic!("Out of moves!")};
-    // node.do_move(&move1);
-    // let moves2: VecDeque<play::nodes::Move> = node.moves();
-    // // println!("{}", moves2.len().to_string());
-    // // print_deq(&moves2);
-
-    // node.undo_move(&move1);
-    // let moves3: VecDeque<play::nodes::Move> = node.moves();
-    // // println!("{}", moves3.len().to_string());
-    // // print_deq(&moves3);
-
-    // // println!("node mat {}", node.material);
     // unsafe {
-    //     let (best_move, val) = play::choose_move(& mut node, true, 4000);
-    //     println!("MV {}, {}", best_move, val);
+    //     play()
     // }
-    unsafe {
-        play()
+
+    bb_test();
+}
+
+fn bb_test() {
+    let nm = play::bb::BB::gen_knight_mask();
+    let rm = play::bb::BB::gen_rook_mask();
+    let bm = play::bb::BB::gen_bishop_mask();
+    let km = play::bb::BB::gen_king_mask();
+
+    // let bb = play::bb::BB::default_board(nm, rm, bm, km);
+    let r_magic = play::bb::BB::gen_rook_magic_table();
+    let b_magic = play::bb::BB::gen_bishop_magic_table();
+
+    let mut db = play::bb::BB::default_board(nm, rm, bm, km, r_magic, b_magic);
+
+    let mut nm = db.knight_moves(true);
+    println!("knight moves");
+    for mv in nm.drain(0..) {
+        println!("{}", mv);
+    }
+
+    let mut pm = db.pawn_moves(true);
+    println!("pawn moves");
+    for mv in pm.drain(0..) {
+        println!("{}", mv);
+    }
+
+    let mut rm = db.rook_moves(true);
+    println!("rook moves");
+    for mv in rm.drain(0..) {
+        println!("{}", mv);
+    }
+
+    let mut bm = db.bishop_moves(true);
+    println!("bishop moves");
+    for mv in bm.drain(0..) {
+        println!("{}", mv);
+    }
+
+    let mut km = db.king_moves(true);
+    println!("king moves");
+    for mv in km.drain(0..) {
+        println!("{}", mv);
+    }
+
+    let mut qm = db.queen_moves(true);
+    println!("queen moves");
+    for mv in qm.drain(0..) {
+        println!("{}", mv);
     }
 }
 

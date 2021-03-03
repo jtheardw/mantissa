@@ -1,18 +1,18 @@
-use rand::Rng;
 use std::cmp;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
 pub mod nodes;
+pub mod bb;
 use nodes::Node;
 use nodes::Move;
+use bb::BB;
 
 static mut evaled: u64 = 0;
 
 pub unsafe fn choose_move(node: &mut Node, maximize: bool, compute_time: u128, check_check: bool) -> (Move, f64) {
     let mut m_depth = 3;
     let mut q_depth = 4;
-    evaled = 0;
 
     let start_time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_millis(),
@@ -22,17 +22,39 @@ pub unsafe fn choose_move(node: &mut Node, maximize: bool, compute_time: u128, c
     let mut best_move : Move = Move::null_move();
     let mut val = if maximize {-200000} else {200000};
     let mut z_table : HashMap<u64, (Move, i32, i32)> = HashMap::new();
+    let mut aspire: bool = false;
 
     while (current_time - start_time) <= compute_time {
-        let res = minimax_search(node, start_time, compute_time, m_depth, q_depth, -1000000, 1000000, maximize, & mut z_table, check_check);
+        evaled = 0;
+        let mut alpha = -1000000;
+        let mut beta = 1000000;
+        if aspire {
+            alpha = val - 250;
+            beta = val + 250;
+        }
+        eprintln!("alpha {} beta {}", alpha, beta);
+        let res = minimax_search(node, start_time, compute_time, m_depth, q_depth, alpha, beta, maximize, & mut z_table, check_check);
         if res.0.is_err {
+            // timeout
             break;
         }
+        if res.0.is_null {
+            // null move
+            aspire = false;
+            continue;
+        }
+        if aspire && (res.1 <= alpha || res.1 >= beta) {
+            eprintln!("aspiration violated");
+            aspire = false;
+            continue;
+        }
         (best_move, val) = res;
+        eprintln!("{} eval'd {} this time got val {}", m_depth, evaled, val);
         current_time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
             Ok(n) => n.as_millis(),
             Err(_) => panic!("SystemTime failed!"),
         };
+        aspire = true;
         m_depth += 1;
     }
     eprintln!("{}", m_depth);
@@ -49,16 +71,18 @@ unsafe fn evaluate_position(node: &Node) -> i32 {
     if node.is_threefold() {
         return 0;
     }
-    let mut rng = rand::thread_rng();
     evaled += 1;
     let mut val = node.material;
-    val += node.mobility_value() / 10;
+    let (mob, kdv) = node.mobility_value();
+    val += mob / 10;
     val += node.center_value() / 3;
     val -= node.doubled_pawns_value() / 2;
     val -= node.isolated_pawns_value() / 2;
-    val += rng.gen_range(-100, 101);
     val -= node.backwards_pawns_value() / 4;
+    val -= kdv;
     val += node.piece_synergy_values();
+
+    val += if node.white_turn {200} else {-200};
     return val;
 }
 
@@ -112,19 +136,41 @@ unsafe fn minimax_search(node: &mut Node, start_time: u128, compute_time: u128, 
     let mut best_move = nodes::Move::null_move();
     let mut val = if maximize {-1000000} else {1000000};
     let mut moves_to_assess = node.moves();
+    let mut best_move_guess = false;
+    let mut first = false;
     if !first_move.is_null {
         if moves_to_assess.contains(&first_move) {
+            best_move_guess = true;
+            first = true;
             moves_to_assess.push_front(first_move);
         }
     }
 
     if moves_to_assess.len() == 0 {
+        if node.is_check(maximize) {
+            return (best_move, if maximize {node.material - 200000} else {node.material + 200000});
+        }
         return (best_move, 0);
     }
     for pot_move in moves_to_assess.drain(0..) {
         node.do_move(&pot_move);
-        let (mv, new_val) = minimax_search(node, start_time, compute_time, depth - 1, q_depth, alpha, beta, !maximize, table, check_check);
+        let mut mv : Move;
+        let mut new_val: i32;
+        if !best_move_guess || first {
+            (mv, new_val) = minimax_search(node, start_time, compute_time, depth - 1, q_depth, alpha, beta, !maximize, table, check_check);
+        } else {
+            if maximize {
+                (mv, new_val) = minimax_search(node, start_time, compute_time, depth - 1, q_depth, alpha, alpha + 1, !maximize, table, check_check);
+            } else {
+                (mv, new_val) = minimax_search(node, start_time, compute_time, depth - 1, q_depth, beta - 1, beta, !maximize, table, check_check);
+            }
+
+            if !mv.is_err && (alpha < new_val && beta > new_val) {
+                (mv, new_val) = minimax_search(node, start_time, compute_time, depth - 1, q_depth, alpha, beta, !maximize, table, check_check);
+            }
+        }
         node.undo_move(&pot_move);
+        first = false;
         if mv.is_err { return (mv, 0) }
         if maximize {
             if new_val > val || best_move.is_null {
@@ -156,9 +202,20 @@ unsafe fn minimax_search(node: &mut Node, start_time: u128, compute_time: u128, 
             beta = cmp::min(beta, val);
         }
         if alpha >= beta {
-            break;
+            if maximize {
+                return (best_move, beta);
+            } else {
+                return (best_move, alpha);
+            }
         }
     }
+    if best_move.is_null {
+        if node.is_check(maximize) {
+            return (best_move, if maximize {node.material - 200000} else {node.material + 200000});
+        }
+        return (best_move, 0);
+    }
+
     table.insert(node.get_hash(), (nodes::Move::copy_move(&best_move), val, depth));
     return (best_move, val);
 }

@@ -11,6 +11,37 @@ const BISHOP_VALUE: i32 = 3200;
 const KNIGHT_VALUE: i32 = 3100;
 const PAWN_VALUE: i32 = 1000;
 
+const KING_DANGER: [i32; 28] = [
+    0,
+    0,
+    0,
+    0,
+    50,
+    50,
+    100,
+    100,
+    200,
+    300,
+    400,
+    500,
+    600,
+    700,
+    900,
+    1100,
+    1200,
+    1250,
+    1300,
+    1340,
+    1380,
+    1410,
+    1440,
+    1470,
+    1490,
+    1510,
+    1520,
+    1525,
+];
+
 pub struct Node {
     pub state: HashMap<(i32, i32), (u8, bool)>, // location -> piece
     piece_map: HashMap<(u8, bool), (i32, i32)>, // piece -> location
@@ -74,7 +105,6 @@ impl Node {
             }
         }
         let whose_turn: (u64, u64) = (rng.gen(), rng.gen());
-        // println!("zob {:?}", zobrist_table);
         eprintln!("TABLE INITIALIZED.");
         return (zobrist_table, whose_turn);
     }
@@ -652,7 +682,6 @@ impl Node {
 
     fn king_moves_value(&self, coord: (i32, i32), w: bool) -> i32 {
         let (x, y) = coord;
-        let mut moves = 0;
         for (dx, dy) in [
             ( 0, 1),
             ( 0,-1),
@@ -665,15 +694,50 @@ impl Node {
         ].iter() {
             let (nx, ny) = (x + dx, y + dy);
             if (nx >= 8 || nx < 0) || (ny >= 8 || ny < 0) { continue; }
-            // println!("{} {} {} {} {}", white, x, y, nx, ny);
             match self.state.get(&(nx, ny)) {
                 Some(p) => {
-                    moves += ((p.1 != w) as i32);
+                    if (p.1 != w) {
+                        return 4;
+                    }
                 },
-                None => {moves += 1;}
+                None => {return 4;}
             };
         }
-        return moves;
+        return 0;
+    }
+
+    fn king_danger_value(&self, coord: (i32, i32), w: bool) -> i32 {
+        let (x, y) = coord;
+        let mut moves = 0;
+
+        for (sx, sy) in [
+            (-1, 1),
+            (1, 1),
+            (-1, -1),
+            (1, -1),
+            (0, 1),
+            (0, -1),
+            (1, 0),
+            (-1, 0)
+        ].iter() {
+            let mut d = 1;
+            while d < 8 {
+                let (nx, ny) = (x + (sx * d), y + (sy * d));
+                if (nx < 0 || nx >= 8) || (ny < 0 || ny >= 8) {
+                    break;
+                }
+                match self.state.get(&(nx, ny)) {
+                    Some(p) => {
+                        moves += (p.1 != w) as i32;
+                        break;
+                    },
+                    None => { moves += 1; }
+                }
+                d += 1;
+            }
+        }
+
+        return KING_DANGER[moves as usize];
     }
 
     fn knight_moves_value(&self, coord: (i32, i32), w: bool) -> i32 {
@@ -747,8 +811,10 @@ impl Node {
         return moves;
     }
 
-    pub fn mobility_value(&self) -> i32 {
+    pub fn mobility_value(&self) -> (i32, i32) {
         let mut move_val = 0;
+        let mut kdv_white = 0;
+        let mut kdv_black = 0;
         for (coord, (p, w)) in self.state.iter() {
             let coord = *coord;
             let w = *w;
@@ -761,10 +827,14 @@ impl Node {
                 b'p' => 0,
                 _ => panic!("erroneous piece! {}", p.to_string())
             };
+            if *p == b'k' {
+                let kdv = self.king_danger_value(coord, w);
+                if w {kdv_white = kdv;} else {kdv_black = kdv;}
+            }
             let moves = piece_moves;
             move_val += if w {moves * PAWN_VALUE} else {-moves * PAWN_VALUE};
         }
-        return move_val
+        return (move_val, kdv_white - kdv_black);
     }
 
     pub fn piece_synergy_values(&self) -> i32 {
@@ -794,7 +864,7 @@ impl Node {
                     // queen moved early
                     let qpl = if *w {*y > 0} else {*y < 7};
                     if qpl {
-                        piece_bonus -= if *w {1} else {-1} * (PAWN_VALUE / 3);
+                        piece_bonus -= if *w {1} else {-1} * (PAWN_VALUE);
                     }
                 }
             }
