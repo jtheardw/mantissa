@@ -1,4 +1,6 @@
 use std::cmp;
+use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::time::SystemTime;
 
 pub mod bb;
@@ -6,6 +8,7 @@ use bb::BB;
 use bb::Mv;
 
 static mut evaled: u64 = 0;
+static mut hits: u64 = 0;
 
 const LB: i32 = -10000000;
 const UB: i32 = 10000000;
@@ -24,20 +27,22 @@ pub fn get_time_millis() -> u128 {
 pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (Mv, f64) {
     let mut m_depth = 3;
     let mut q_depth = 6;
-
+    evaled = 0;
+    hits = 0;
     let start_time = get_time_millis();
     let mut current_time = start_time;
     let mut best_move : Mv = Mv::null_move();
     let mut best_val = 0;
+    let mut z_table: HashMap<u64, (Mv, i32, i32)> = HashMap::new();
     let mut aspire = false;
 
     while (current_time - start_time) <= compute_time {
         let mut alpha = LB;
         let mut beta = UB;
-        if aspire {
-            alpha = best_val - 250;
-            beta = best_val + 250;
-        }
+        // if aspire {
+        //     alpha = best_val - 250;
+        //     beta = best_val + 250;
+        // }
         let (ply_move, ply_val, node_type) = negamax_search(
             node,
             start_time,
@@ -46,18 +51,20 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
             q_depth,
             alpha,
             beta,
-            maximize
+            maximize,
+            &mut z_table
         );
 
         if ply_move.is_err {break;}
-        if ply_move.is_null || node_type != PV_NODE {aspire = false; continue;}
+        // if ply_move.is_null || node_type != PV_NODE {aspire = false; continue;}
 
-        (best_move, best_val) = (ply_move, ply_val);
-        eprintln!("{} eval'd {} this time got val {}", m_depth, evaled, best_val);
+        (best_move, best_val) = (ply_move, if node.white_turn {ply_val} else {-ply_val});
+        eprintln!("{} eval'd {} this time got val {} and recommends {}", m_depth, evaled, best_val, best_move);
         current_time = get_time_millis();
         aspire = true;
         m_depth += 1;
     }
+    eprintln!("{} tt hits", hits);
     eprintln!("{} ply evaluated", m_depth - 1);
     eprintln!("{} nodes evaluated", evaled);
     eprintln!("projected value: {}", best_val);
@@ -67,12 +74,43 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
 
 fn is_terminal(node: &BB) -> bool {
     // TODO better terminal
-    return node.material.abs() >= 100000;
+    return node.king[0] == 0 || node.king[1] == 0;
 }
 
 unsafe fn evaluate_position(node: &BB) -> i32 {
     evaled += 1;
-    return node.material * if node.white_turn {1} else {-1};
+    let mut val = 0;
+    val += node.material;
+    val += node.mobility_value() * 50;//(bb::PAWN_VALUE / 10);
+    val += node.center_value() * 300;
+    val += node.near_center_value() * 100;
+    val += node.pawn_defense_value() * 150;
+    val += node.double_bishop_bonus() * 500;
+    val += node.castled_bonus() * 400;
+
+    val -= node.doubled_pawns_value() * 500;
+    val -= node.isolated_pawns_value() * 500;
+    val -= node.backwards_pawns_value() * 100;
+    val -= node.early_queen_penalty() * 500;
+
+    return val * if node.white_turn {1} else {-1};
+}
+
+pub fn print_evaluate(node: &BB) {
+    eprintln!("Material: {}", node.material);
+    eprintln!("Mobility: {}", node.mobility_value() * 50);
+    eprintln!("doubled p: {}", node.doubled_pawns_value() * -500);
+    eprintln!("isolated p: {}", node.isolated_pawns_value() * -500);
+    eprintln!("backwards p: {}", node.backwards_pawns_value() * -100);
+    eprintln!("Center: {}", node.center_value() * 300);
+    eprintln!("Near Center: {}", node.near_center_value() * 100);
+    eprintln!("Double bishop: {}", node.double_bishop_bonus() * 500);
+    eprintln!("Pawn Defense: {}", node.pawn_defense_value() * 150);
+    eprintln!("Castle Bonus: {}", node.castled_bonus() * 400);
+    eprintln!("Early queen penalty: {}", node.early_queen_penalty() * -500);
+
+    let ep = if node.ep >= 0 {BB::idx_to_coord(node.ep)} else {(-1, -1)};
+    eprintln!("EP coord {} {}", ep.0, ep.1);
 }
 
 fn is_quiet(node: &mut BB) -> bool {
@@ -87,10 +125,46 @@ fn is_quiet(node: &mut BB) -> bool {
     return !loud;
 }
 
+fn moves_equivalent(mv1: &Mv, mv2: &Mv) -> bool {
+    return (mv1.start == mv2.start && mv1.end == mv2.end && mv1.piece == mv2.piece && mv1.promote_to == mv2.promote_to);
+}
+
+fn order_moves(mut moves: VecDeque<Mv>, best_move: Mv) -> VecDeque<Mv> {
+    if best_move.is_null { return moves; }
+    let mut found_move = false;
+    let mut new_q: VecDeque<Mv> = VecDeque::new();
+
+    new_q.push_front(best_move);
+    for mv in moves.drain(0..) {
+        if moves_equivalent(&mv, &best_move) {
+            found_move = true;
+        } else {
+            new_q.push_back(mv);
+        }
+    }
+    if !found_move {
+        new_q.pop_front();
+    }
+    return new_q;
+}
+
 unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, depth: i32,
-                         q_depth: i32, alpha: i32, beta: i32, maximize: bool) -> (Mv, i32, u8) {
+                         q_depth: i32, alpha: i32, beta: i32, maximize: bool,
+                         z_table: & mut HashMap<u64, (Mv, i32, i32)>) -> (Mv, i32, u8) {
     let current_time = get_time_millis();
     if current_time - start_time > compute_time { return (Mv::err_move(), 0, PV_NODE); }
+
+    let mut first_move = Mv::null_move();
+
+    match z_table.get(&node.hash) {
+        Some(p) => {
+            hits += 1;
+            let mv = p.0;
+            if p.2 >= depth { return (mv, p.1, PV_NODE); }
+            else {first_move = mv;}
+        },
+        None => {}
+    }
 
     let mut alpha = alpha;
     let mut beta = beta;
@@ -109,12 +183,19 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
         }
     }
 
+    let mut is_check = node.is_check(maximize);
     let mut best_move = Mv::null_move();
     let mut val = LB;
-    let mut moves = node.moves();
+    let mut moves = order_moves(node.moves(), first_move);
+
     for mv in moves.drain(0..) {
         node.do_move(&mv);
-        let res = negamax_search(node, start_time, compute_time, depth - 1, q_depth, -beta, -alpha, !maximize);
+        if is_check && node.is_check(maximize) {
+            // skip, illegal
+            node.undo_move(&mv);
+            continue;
+        }
+        let res = negamax_search(node, start_time, compute_time, depth - 1, q_depth, -beta, -alpha, !maximize, z_table);
         node.undo_move(&mv);
         let ret_move = res.0;
         if ret_move.is_err {
@@ -134,7 +215,19 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
         }
     }
 
-    return (best_move, val, if val < alpha {ALL_NODE} else {PV_NODE});
+    if best_move.is_null {
+        // some sort of mate
+        if is_check {
+            return (best_move, -1000000, PV_NODE);
+        } else {
+            return (best_move, 0, PV_NODE);
+        }
+    }
+
+    if val == alpha {
+        z_table.insert(node.hash, (best_move, val, depth));
+    }
+    return (best_move, val, if val <= alpha {ALL_NODE} else {PV_NODE});
 }
 
 unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, maximize: bool) -> (i32, u8) {
