@@ -96,12 +96,6 @@ impl Game {
         eprintln!("current eval:");
         play::print_evaluate(&self.board);
         let (best_move, val) = play::best_move(& mut self.board, self.white_turn, compute_time);
-        // self.board.do_move(&best_move);
-        // let is_check = self.board.is_check(self.white_turn);
-        // self.board.undo_move(&best_move);
-        // if is_check {
-        //     return play::choose_move(& mut self.board, self.white_turn, compute_time, true).0;
-        // }
         eprintln!("best move is {}", best_move);
         return best_move;
     }
@@ -183,16 +177,16 @@ unsafe fn bb_test() {
 }
 
 fn get_calc_time(time: i32) -> u128 {
-    let mut calc_time = 10000;
+    let mut calc_time = 15000;
      // ten minutes
     if time < 60 * 10 * 1000 {
-        calc_time = time / 40;
+        calc_time = time / 50;
     }
-    if calc_time > 10000 {
-        calc_time = 10000;
+    if calc_time > 15000 {
+        calc_time = 15000;
     }
-    if calc_time < 1000 {
-        calc_time = 1000;
+    if calc_time < 700 {
+        calc_time = 700;
     }
     return calc_time as u128;
 }
@@ -277,7 +271,7 @@ unsafe fn play() {
         }
         if cmd == "go" {
             let clock_key = if game.board.white_turn {"wtime"} else {"btime"};
-            let mut time = 10000;
+            let mut time = 15000;
             loop {
                 let p = match params.next() {
                     Some(p) => p,
