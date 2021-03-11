@@ -177,13 +177,13 @@ unsafe fn bb_test() {
 }
 
 fn get_calc_time(time: i32) -> u128 {
-    let mut calc_time = 15000;
+    let mut calc_time = 20000;
      // ten minutes
     if time < 60 * 10 * 1000 {
-        calc_time = time / 50;
+        calc_time = time / 35;
     }
-    if calc_time > 15000 {
-        calc_time = 15000;
+    if calc_time > 20000 {
+        calc_time = 20000;
     }
     if calc_time < 700 {
         calc_time = 700;
@@ -271,7 +271,7 @@ unsafe fn play() {
         }
         if cmd == "go" {
             let clock_key = if game.board.white_turn {"wtime"} else {"btime"};
-            let mut time = 15000;
+            let mut time = 20000;
             loop {
                 let p = match params.next() {
                     Some(p) => p,
