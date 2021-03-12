@@ -241,15 +241,30 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
         }
     }
 
+    let is_futile = depth == 1 && evaluate_position(&node) < (alpha - 3500);
+    let mut legal_move = false;
     for mv in moves.drain(0..) {
         let is_tactical_move = is_move_tactical(&node, &mv);
         node.do_move(&mv);
+
         if node.is_check(maximize) {
         // if (init || is_check) && node.is_check(maximize) {
             // skip, illegal
             node.undo_move(&mv);
             continue;
+        } else if is_futile {
+            legal_move = true;
+            if is_quiet(node) &&
+                !is_terminal(node) &&
+                !node.is_check(node.white_turn) &&
+                (mv.promote_to == 0) &&
+                !is_tactical_move {
+                    node.undo_move(&mv);
+                    continue;
+                }
         }
+
+        legal_move = true;
         let mut res: (Mv, i32, u8);
         let mut depth_to_search = depth - 1;
         if depth > 3 && num_moves > 4 {
@@ -262,6 +277,7 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
                     depth_to_search = depth - 2;
                 }
         }
+
         let quiet = is_quiet(node) && mv.promote_to == 0 && !mv.is_ep;
         if false && num_moves > 0 && !first_move.is_null {
             // pvs search bit
@@ -303,7 +319,7 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
         }
     }
 
-    if best_move.is_null {
+    if best_move.is_null && !legal_move {
         // some sort of mate
         if is_check {
             return (best_move, -1000000, ALL_NODE);
