@@ -271,7 +271,7 @@ unsafe fn play() {
         }
         if cmd == "go" {
             let clock_key = if game.board.white_turn {"wtime"} else {"btime"};
-            let mut time = 20000;
+            let mut time = 10000;
             loop {
                 let p = match params.next() {
                     Some(p) => p,
