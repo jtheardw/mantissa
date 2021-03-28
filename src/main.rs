@@ -177,13 +177,13 @@ unsafe fn bb_test() {
 }
 
 fn get_calc_time(time: i32) -> u128 {
-    let mut calc_time = 20000;
+    let mut calc_time = 30000;
      // ten minutes
     if time < 60 * 10 * 1000 {
         calc_time = time / 35;
     }
-    if calc_time > 20000 {
-        calc_time = 20000;
+    if calc_time > 30000 {
+        calc_time = 30000;
     }
     if calc_time < 700 {
         calc_time = 700;

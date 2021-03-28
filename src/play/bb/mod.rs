@@ -1145,12 +1145,12 @@ impl BB {
         let mut move_queue : VecDeque<Mv> = VecDeque::new();
         let self_side = self.white_turn as usize;
 
+        move_queue.append(& mut self.pawn_moves(self.white_turn));
         move_queue.append(& mut self.king_moves(self.white_turn));
         move_queue.append(& mut self.queen_moves(self.white_turn));
         move_queue.append(& mut self.rook_moves(self.white_turn));
         move_queue.append(& mut self.bishop_moves(self.white_turn));
         move_queue.append(& mut self.knight_moves(self.white_turn));
-        move_queue.append(& mut self.pawn_moves(self.white_turn));
 
         return move_queue;
     }
@@ -1813,7 +1813,7 @@ impl BB {
         for i in 0..2 {
             let white = i != 0;
             let side = i as usize;
-            center_pieces[side] = (CENTER_MASK & (self.pawn[side] | self.knight[side])).count_ones() as i32;
+            center_pieces[side] = (CENTER_MASK & self.pawn[side]).count_ones() as i32;
         }
         return center_pieces[1] - center_pieces[0];
     }
@@ -1837,7 +1837,7 @@ impl BB {
         for i in 0..2 {
             let white = i != 0;
             let side = i as usize;
-            center_pieces[side] = (NEAR_CENTER_MASK & (self.pawn[side] | self.knight[side])).count_ones() as i32;
+            center_pieces[side] = (NEAR_CENTER_MASK & (self.pawn[side])).count_ones() as i32;
         }
         return center_pieces[1] - center_pieces[0];
     }
