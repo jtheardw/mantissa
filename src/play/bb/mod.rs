@@ -863,7 +863,7 @@ impl BB {
         let mut no_caps: VecDeque<Mv> = VecDeque::new();
         let mut mv_q: VecDeque<Mv> = VecDeque::new();
         let def_pieces = self.get_defended_pieces(!self.white_turn);
-        for mv in mvs.drain(0..) {
+        for mv in mvs.drain(..) {
             let dst_bb = BB::idx_to_bb(mv.end);
             if (dst_bb & enemy_occ) != 0 {
                 // capture of some sort
@@ -1727,14 +1727,14 @@ impl BB {
 
         let mut num_attackers = queen_attackers + knight_attackers + bishop_attackers + rook_attackers;
 
-        if num_attackers > 6 { num_attackers = 6; }
+        if num_attackers > 7 { num_attackers = 7; }
 
         attack_value += 800 * queen_attacks;
         attack_value += 400 * rook_attacks;
         attack_value += 200 * knight_attacks;
         attack_value += 200 * bishop_attacks;
 
-        let atk_weights = [0, 50, 75, 85, 90, 94, 99];
+        let atk_weights = [0, 0, 50, 75, 85, 90, 94, 99];
         return ((atk_weights[num_attackers as usize] * attack_value) / 100) as i32;
     }
 
@@ -1929,7 +1929,7 @@ impl BB {
                     }
 
                     if neighbor_files & self.pawn[side] == 0 {
-                        isolated_pawns[side] += file_pawns.count_ones() as i32;
+                        isolated_pawns[side] += 1;
                     }
                 }
             }
@@ -2147,6 +2147,10 @@ impl BB {
 
     pub fn is_threefold(&self) -> bool {
         return self.history.iter().filter(|&n| *n == self.hash).count() >= 2;
+    }
+
+    pub fn is_repitition(&self) -> bool {
+        return self.history.iter().filter(|&n| *n == self.hash).count() > 0;
     }
 
     // for interface
