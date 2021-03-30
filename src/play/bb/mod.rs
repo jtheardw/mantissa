@@ -149,8 +149,8 @@ pub struct BB {
     // won't need a pawn mask
     castling_rights: u64,
     castled: [bool; 2],
-    rook_magic_table: [[u64; 4096]; 64],
-    bishop_magic_table: [[u64; 512]; 64],
+    rook_magic_table: Vec<Vec<u64>>,//[[u64; 4096]; 64],
+    bishop_magic_table: Vec<Vec<u64>>,//[[u64; 512]; 64],
 
     // for moves and such
     pub ep: i32,
@@ -208,14 +208,182 @@ impl BB {
         return s.chars().rev().collect();
     }
 
+    pub fn from_position(
+        fen: String,
+        knight_mask: [u64; 64],
+        rook_mask: [u64; 64],
+        bishop_mask: [u64; 64],
+        king_mask: [u64; 64],
+        zobrist_table: ([[u64; 12]; 64], (u64, u64))
+    ) -> BB {
+        let mut black_king: u64 = 0;
+        let mut white_king: u64 = 0;
+
+        let mut black_queen: u64 = 0;
+        let mut white_queen: u64 = 0;
+
+        let mut black_rook: u64 = 0;
+        let mut white_rook: u64 = 0;
+
+        let mut black_bishop: u64 = 0;
+        let mut white_bishop: u64 = 0;
+
+        let mut black_knight: u64 = 0;
+        let mut white_knight: u64 = 0;
+
+        let mut black_pawn: u64 = 0;
+        let mut white_pawn: u64 = 0;
+
+        let mut rank: i32 = 7;
+        let mut file: i32 = 0;
+
+        let mut fen_split = fen.split(' ');
+        let positions = match fen_split.next() {
+            Some(s) => String::from(s),
+            None => panic!("bad FEN string")
+        };
+
+        for c in positions.as_bytes().iter() {
+            let c = *c;
+            match c {
+                b'k' => {black_king |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'K' => {white_king |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'q' => {black_queen |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'Q' => {black_queen |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'r' => {black_rook |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'R' => {black_rook |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'b' => {black_bishop |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'B' => {black_bishop |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'n' => {black_knight |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'N' => {black_knight |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'p' => {black_pawn |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'P' => {black_pawn |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'/' => {rank -= 1; file = 0;},
+                b'1' => {file += 1},
+                b'2' => {file += 2},
+                b'3' => {file += 3},
+                b'4' => {file += 4},
+                b'5' => {file += 5},
+                b'6' => {file += 6},
+                b'7' => {file += 7},
+                b'8' => {file += 8},
+                _ => {}
+            };
+        }
+
+        let mut white_turn = true;
+
+        match fen_split.next() {
+            Some(s) => {if s == "b" {white_turn = false;}},
+            None => panic!("bad FEN string")
+        };
+
+        let cr_str = match fen_split.next() {
+            Some(s) => s,
+            None => panic!("bad FEN string")
+        };
+
+        let mut cr: u64 = 0;
+        let wk_mask = BB::coord_to_bb((4, 0));
+        let bk_mask = BB::coord_to_bb((4, 7));
+        let wrk_mask = BB::coord_to_bb((7, 0));
+        let brk_mask = BB::coord_to_bb((7, 7));
+        let wrq_mask = BB::coord_to_bb((0, 0));
+        let brq_mask = BB::coord_to_bb((0, 7));
+
+        if cr_str != "-" {
+            for c in String::from(cr_str).as_bytes().iter() {
+                let c = *c;
+                match c {
+                    b'k' => {cr |= (bk_mask | brk_mask);},
+                    b'K' => {cr |= (wk_mask | wrk_mask);},
+                    b'q' => {cr |= (bk_mask | brq_mask);},
+                    b'Q' => {cr |= (wk_mask | wrq_mask);},
+                    _ => panic!("bad CR")
+                };
+            }
+        }
+
+        let ep_str = match fen_split.next() {
+            Some(s) => s,
+            None => panic!("bad fen str")
+        };
+
+        let mut ep: i32 = -1;
+        if ep_str != "-" {
+            let ep_str = String::from(ep_str);
+            let ep_chars = ep_str.as_bytes();
+            let file = ep_chars[0] - b'a';
+            let rank = ep_chars[1] - b'1';
+            ep = BB::coord_to_idx((file as i32, rank as i32));
+        }
+
+        let king = [black_king, white_king];
+        let queen = [black_queen, white_queen];
+        let rook = [black_rook, white_rook];
+        let bishop = [black_bishop, white_bishop];
+        let knight = [black_knight, white_knight];
+        let pawn = [black_pawn, white_pawn];
+
+        let black_composite = black_king | black_queen | black_rook | black_bishop | black_knight | black_pawn;
+        let white_composite = white_king | white_queen | white_rook | white_bishop | white_knight | white_pawn;
+        let composite = [black_composite, white_composite];
+
+        let rook_magic_table = BB::gen_rook_magic_table();
+        let bishop_magic_table = BB::gen_bishop_magic_table();
+
+        let mut bb = BB{
+            white_turn: true,
+
+            king: king,
+            queen: queen,
+            rook: rook,
+            bishop: bishop,
+            knight: knight,
+            pawn: pawn,
+            composite: composite,
+
+            knight_mask: knight_mask,
+            rook_mask: rook_mask,
+            bishop_mask: bishop_mask,
+            king_mask: king_mask,
+
+            castling_rights: cr,
+            castled: [false, false],
+            rook_magic_table: rook_magic_table,
+            bishop_magic_table: bishop_magic_table,
+
+            ep: ep,
+
+            cr_stack: Vec::new(),
+            cap_stack: Vec::new(),
+            ep_stack: Vec::new(),
+            history: Vec::new(),
+            pawn_history: Vec::new(),
+
+            material: 0,
+            hash: 0,
+            pawn_hash: 0,
+            zobrist_table: zobrist_table,
+            phase: 0,
+        };
+        bb.hash = bb.get_full_hash();
+        bb.pawn_hash = bb.get_full_pawn_hash();
+        return bb;
+    }
+
     // constructors
     pub fn default_board(
         knight_mask: [u64; 64],
         rook_mask: [u64; 64],
         bishop_mask: [u64; 64],
         king_mask: [u64; 64],
-        rook_magic_table: [[u64; 4096]; 64],
-        bishop_magic_table: [[u64; 512]; 64],
         zobrist_table: ([[u64; 12]; 64], (u64, u64))
     ) -> BB {
         let black_king = BB::coord_to_bb((4, 7));
@@ -257,6 +425,9 @@ impl BB {
         let black_composite = black_king | black_queen | black_rook | black_bishop | black_knight | black_pawn;
         let white_composite = white_king | white_queen | white_rook | white_bishop | white_knight | white_pawn;
         let composite = [black_composite, white_composite];
+
+        let rook_magic_table = BB::gen_rook_magic_table();
+        let bishop_magic_table = BB::gen_bishop_magic_table();
 
         let mut bb = BB{
             white_turn: true,
@@ -518,8 +689,8 @@ impl BB {
         return king_mask;
     }
 
-    pub fn gen_rook_magic_table() -> [[u64; 4096]; 64] {
-        let mut rook_magic: [[u64; 4096]; 64] = [[0; 4096]; 64];
+    pub fn gen_rook_magic_table() -> Vec<Vec<u64>> { //[[u64; 4096]; 64] {
+        let mut rook_magic: Vec<Vec<u64>> = vec![vec![0; 4096]; 64];// [[u64; 4096]; 64] = [[0; 4096]; 64];
         let mut rook_mask = BB::gen_rook_mask();
         for idx in 0..64 {
             let mut bb: u64 = 0;
@@ -587,8 +758,8 @@ impl BB {
         return bb;
     }
 
-    pub fn gen_bishop_magic_table() -> [[u64; 512]; 64] {
-        let mut bishop_magic: [[u64; 512]; 64] = [[0; 512]; 64];
+    pub fn gen_bishop_magic_table() -> Vec<Vec<u64>> {// [[u64; 512]; 64] {
+        let mut bishop_magic: Vec<Vec<u64>> = vec![vec![0; 512]; 64];// [[u64; 512]; 64] = [[0; 512]; 64];
         let mut bishop_mask = BB::gen_bishop_mask();
         for idx in 0..64 {
             let mut bb: u64 = 0;

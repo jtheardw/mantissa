@@ -14,13 +14,6 @@ mod play;
 struct Game {
     pub board: play::bb::BB,
     white_turn: bool,
-    // knight_mask: [u64; 64],
-    // rook_mask: [u64; 64],
-    // bishop_mask: [u64; 64],
-    // king_mask: [u64; 64],
-    // rook_magic_table: [[u64; 4096]; 64],
-    // bishop_magic_table: [[u64; 512]; 64],
-    // zobrist_table: ([[u64; 12]; 64], (u64, u64))
 }
 
 impl Game {
@@ -29,8 +22,6 @@ impl Game {
         rook_mask: [u64; 64],
         bishop_mask: [u64; 64],
         king_mask: [u64; 64],
-        rook_magic_table: [[u64; 4096]; 64],
-        bishop_magic_table: [[u64; 512]; 64],
         zobrist_table: ([[u64; 12]; 64], (u64, u64))
     ) -> Game {
 
@@ -39,8 +30,6 @@ impl Game {
             rook_mask,
             bishop_mask,
             king_mask,
-            rook_magic_table,
-            bishop_magic_table,
             zobrist_table
         );
         Game{
@@ -116,13 +105,9 @@ unsafe fn bb_test() {
     let bm = play::bb::BB::gen_bishop_mask();
     let km = play::bb::BB::gen_king_mask();
 
-    // let bb = play::bb::BB::default_board(nm, rm, bm, km);
-    let r_magic = play::bb::BB::gen_rook_magic_table();
-    let b_magic = play::bb::BB::gen_bishop_magic_table();
-
     let zobrist = play::bb::BB::init_zobrist();
 
-    let mut db = play::bb::BB::default_board(nm, rm, bm, km, r_magic, b_magic, zobrist);
+    let mut db = play::bb::BB::default_board(nm, rm, bm, km, zobrist);
 
     let mut nm = db.knight_moves(true);
     println!("knight moves");
@@ -197,10 +182,6 @@ unsafe fn play() {
     let bm = play::bb::BB::gen_bishop_mask();
     let km = play::bb::BB::gen_king_mask();
 
-    // let bb = play::bb::BB::default_board(nm, rm, bm, km);
-    let r_magic = play::bb::BB::gen_rook_magic_table();
-    let b_magic = play::bb::BB::gen_bishop_magic_table();
-
     let zobrist = play::bb::BB::init_zobrist();
 
     let mut game : Game = Game::get_basic_game(
@@ -208,10 +189,9 @@ unsafe fn play() {
         rm,
         bm,
         km,
-        r_magic,
-        b_magic,
         zobrist
     );
+
     loop {
         let mut inp : String = String::new();
         io::stdin()
@@ -241,8 +221,6 @@ unsafe fn play() {
                                         rm,
                                         bm,
                                         km,
-                                        r_magic,
-                                        b_magic,
                                         zobrist);
         }
         if cmd == "position" {
@@ -253,8 +231,6 @@ unsafe fn play() {
                                                     rm,
                                                     bm,
                                                     km,
-                                                    r_magic,
-                                                    b_magic,
                                                     zobrist);
                         if params.next() == Some("moves") {
                             loop {

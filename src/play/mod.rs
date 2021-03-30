@@ -16,7 +16,6 @@ use pht::PHTEntry;
 
 static mut evaled: u64 = 0;
 static mut hits: u64 = 0;
-static mut eval_hits: u64 = 0;
 static mut pawn_hits: u64 = 0;
 
 const LB: i32 = -10000000;
