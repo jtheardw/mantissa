@@ -10,8 +10,14 @@ pub mod tt;
 use tt::TT;
 use tt::TTEntry;
 
+pub mod pht;
+use pht::PHT;
+use pht::PHTEntry;
+
 static mut evaled: u64 = 0;
 static mut hits: u64 = 0;
+static mut eval_hits: u64 = 0;
+static mut pawn_hits: u64 = 0;
 
 const LB: i32 = -10000000;
 const UB: i32 = 10000000;
@@ -28,12 +34,14 @@ pub fn get_time_millis() -> u128 {
 }
 
 static mut tt: TT = TT {tt: Vec::new(), bits: 0, mask: 0, valid: false};
+static mut pht: PHT = PHT {pht: Vec::new(), bits: 0, mask: 0, valid: false};
 
 pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (Mv, f64) {
     let mut m_depth = 3;
     let mut q_depth = 6;
     evaled = 0;
     hits = 0;
+    pawn_hits = 0;
     let start_time = get_time_millis();
     let mut current_time = start_time;
     let mut best_move : Mv = Mv::null_move();
@@ -43,6 +51,11 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
         tt = TT::get_tt(24);
     } else {
         eprintln!("tt saved");
+    }
+    if !pht.valid {
+        pht = PHT::get_pht(22);
+    } else {
+        eprintln!("pht saved");
     }
     let mut k_table: [[Mv; 3]; 64] = [[Mv::null_move(); 3]; 64];
     let mut aspire = false;
@@ -83,6 +96,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
         m_depth += 1;
     }
     eprintln!("{} tt hits", hits);
+    eprintln!("{} pht hits", pawn_hits);
     eprintln!("{} ply evaluated", m_depth - 1);
     eprintln!("{} nodes evaluated", evaled);
     eprintln!("projected value: {}", best_val);
@@ -110,40 +124,62 @@ fn is_move_tactical(node: &BB, mv: &Mv) -> bool {
 unsafe fn evaluate_position(node: &BB) -> i32 {
     evaled += 1;
     let mut val = 0;
+
+    // pawn values
+    let pht_entry = pht.get(node.pawn_hash);
+    if pht_entry.valid {
+        val += pht_entry.val;
+        pawn_hits += 1;
+    } else {
+        let pp = node.passed_pawns_value() * 500;
+        let cp = node.center_value() * 500;
+        let ncp = node.near_center_value() * 50;
+        let ip = node.isolated_pawns_value() * -300;
+        let dp = node.doubled_pawns_value() * -400;
+        let bp = node.backwards_pawns_value() * -100;
+        let pv = pp + ip + dp + bp + cp + ncp;
+        val += pv;
+        pht.set(node.pawn_hash, pv);
+    }
     val += node.material;
     val += node.mobility_value() * 70;//(bb::PAWN_VALUE / 10);
-    val += node.center_value() * 300;
-    val += node.near_center_value() * 50;
     val += node.pawn_defense_value() * 100;
     val += node.double_bishop_bonus() * 500;
     val += node.castled_bonus() * 500;
-    val += node.pawn_advancement_value() * 20;
+    // val += node.pawn_advancement_value() * 20;
     val += node.get_all_pt_bonus();
+    // val += node.passed_pawns_value() * 400;
 
-    val -= node.doubled_pawns_value() * 400;
-    val -= node.isolated_pawns_value() * 300;
-    val -= node.backwards_pawns_value() * 100;
+    // val -= node.doubled_pawns_value() * 400;
+    // val -= node.isolated_pawns_value() * 300;
+    // val -= node.backwards_pawns_value() * 100;
     val -= node.early_queen_penalty() * 300;
     val -= node.king_danger_value();
 
     return val * if node.white_turn {1} else {-1};
 }
 
-pub fn print_evaluate(node: &BB) {
+pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Material: {}", node.material);
     eprintln!("Mobility: {}", node.mobility_value() * 70);
     eprintln!("doubled p: {}", node.doubled_pawns_value() * -400);
     eprintln!("isolated p: {}", node.isolated_pawns_value() * -300);
     eprintln!("backwards p: {}", node.backwards_pawns_value() * -100);
-    eprintln!("Center: {}", node.center_value() * 300);
+    eprintln!("passed p: {}", node.passed_pawns_value() * 400);
+    eprintln!("Center: {}", node.center_value() * 500);
     eprintln!("Near Center: {}", node.near_center_value() * 50);
     eprintln!("Double bishop: {}", node.double_bishop_bonus() * 500);
     eprintln!("Pawn Defense: {}", node.pawn_defense_value() * 100);
-    eprintln!("Pawn Advancement: {}", node.pawn_advancement_value() * 20);
     eprintln!("Castle Bonus: {}", node.castled_bonus() * 500);
     eprintln!("Early queen penalty: {}", node.early_queen_penalty() * -300);
     eprintln!("All pt bonus: {}", node.get_all_pt_bonus());
     eprintln!("King danger value: {}", -node.king_danger_value());
+    if pht.valid {
+        let pht_entry = pht.get(node.pawn_hash);
+        if pht_entry.valid {
+            eprintln!("pawn entry: {}", pht_entry.val);
+        }
+    }
     eprintln!("Phase {} / 256", node.get_phase());
 }
 
@@ -221,21 +257,21 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
         hits += 1;
         let mv = tt_entry.mv;
         first_move = mv;
-        // if tt_entry.depth >= depth {
-        //     let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize]), first_move);
-        //     match moves.pop_front() {
-        //         Some(fm) => {
-        //             if moves_equivalent(&first_move, &fm) {
-        //                 return (mv, tt_entry.value, tt_entry.node_type);
-        //             } else {
-        //                 // weird collision
-        //                 first_move = Mv::null_move();
-        //             }
-        //         },
-        //         None => {first_move = Mv::null_move();}
-        //     };
+        if tt_entry.depth > depth && tt_entry.node_type == PV_NODE {
+            let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize]), first_move);
+            match moves.pop_front() {
+                Some(fm) => {
+                    if moves_equivalent(&first_move, &fm) {
+                        return (mv, tt_entry.value, tt_entry.node_type);
+                    } else {
+                        // weird collision
+                        first_move = Mv::null_move();
+                    }
+                },
+                None => {first_move = Mv::null_move();}
+            };
 
-        // }
+        }
     } else if depth > 6 {
         let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize]), first_move);
         let mut best_val = -10000000;

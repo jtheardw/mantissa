@@ -160,10 +160,12 @@ pub struct BB {
     pub cap_stack: Vec<u8>,
     cr_stack: Vec<u64>,
     history: Vec<u64>,
+    pawn_history: Vec<u64>,
 
     // eval
     pub material: i32,
     pub hash: u64,
+    pub pawn_hash: u64,
     pub zobrist_table: ([[u64; 12]; 64], (u64, u64)),
     pub phase: i32,
 }
@@ -283,13 +285,16 @@ impl BB {
             cap_stack: Vec::new(),
             ep_stack: Vec::new(),
             history: Vec::new(),
+            pawn_history: Vec::new(),
 
             material: 0,
             hash: 0,
+            pawn_hash: 0,
             zobrist_table: zobrist_table,
             phase: 0,
         };
         bb.hash = bb.get_full_hash();
+        bb.pawn_hash = bb.get_full_pawn_hash();
         return bb;
     }
 
@@ -363,6 +368,16 @@ impl BB {
         return h;
     }
 
+    pub fn get_full_pawn_hash(&self) -> u64 {
+        let mut h: u64 = 0;
+        for color in 0..2 {
+            let side = color as usize;
+            let white = color != 0;
+            h ^= self.get_bb_hash(self.pawn[side], b'p', white);
+        }
+        return h;
+    }
+
     fn get_zr_xor(&self, c : usize, p : u8, w: bool) -> u64 {
         match (p, w) {
             (b'k', true) => self.zobrist_table.0[c][0],
@@ -382,10 +397,24 @@ impl BB {
     }
 
     fn update_hash(&mut self, piece: u8, white: bool, start: i32, end: i32, capture: u8, promotion: u8) {
-        self.hash ^= self.get_zr_xor(start as usize, piece, white);
-        self.hash ^= self.get_zr_xor(end as usize, if promotion != 0 {promotion} else {piece}, white);
+        let start_h = self.get_zr_xor(start as usize, piece, white);
+        self.hash ^= start_h;
+        let end_h = self.get_zr_xor(end as usize, if promotion != 0 {promotion} else {piece}, white);
+        self.hash ^= end_h;
         if capture != 0 {
-            self.hash ^= self.get_zr_xor(end as usize, capture, !white);
+            let capture_h = self.get_zr_xor(end as usize, capture, !white);
+            self.hash ^= capture_h;
+            if capture == b'p' {
+                self.pawn_hash ^= capture_h;
+            }
+        }
+
+        if piece == b'p' {
+            // update the pawn hash
+            self.pawn_hash ^= start_h;
+            if promotion == 0 {
+                self.pawn_hash ^= end_h;
+            }
         }
     }
 
@@ -1193,6 +1222,7 @@ impl BB {
         self.ep_stack.push(self.ep);
         self.cr_stack.push(self.castling_rights);
         self.history.push(self.hash);
+        self.pawn_history.push(self.pawn_hash);
 
         let start_point: u64 = BB::idx_to_bb(mv.start);
         let end_point: u64 = BB::idx_to_bb(mv.end);
@@ -1216,6 +1246,7 @@ impl BB {
             // remove the enemy pawn
             self.pawn[enemy_side] ^= BB::idx_to_bb(actual_pawn_idx);
             self.hash ^= self.get_zr_xor(actual_pawn_idx as usize, b'p', !self.white_turn);
+            self.pawn_hash ^= self.get_zr_xor(actual_pawn_idx as usize, b'p', !self.white_turn);
             material_delta += PAWN_VALUE;
 
         } else if (end_point & self.composite[enemy_side]) != 0 {
@@ -1327,7 +1358,7 @@ impl BB {
 
         // TODO update hash
         self.white_turn = !self.white_turn;
-        self.hash ^= (self.zobrist_table.1.0 ^ self.zobrist_table.1.1)
+        self.hash ^= (self.zobrist_table.1.0 ^ self.zobrist_table.1.1);
     }
 
     pub fn undo_move(&mut self, mv: &Mv) {
@@ -1441,6 +1472,10 @@ impl BB {
             Some(p) => p,
             None => panic!("History stack empty!")
         };
+        self.pawn_hash = match self.pawn_history.pop() {
+            Some(p) => p,
+            None => panic!("Pawn History stack empty!")
+        }
     }
 
     fn rook_attacks(&self, white: bool) -> u64 {
@@ -1543,7 +1578,7 @@ impl BB {
 
     fn queen_attacks(&self, white: bool) -> u64 {
         let mut attacks: u64 = 0;
-        let mut start_idx = -1;
+        let mut start_idx: i32 = -1;
         let mut queen_loc_bb = self.queen[white as usize];
         let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
 
@@ -1567,46 +1602,140 @@ impl BB {
         return attacks;
     }
 
-    // evaluators
+    fn queen_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32) {
+        let mut attacks: i32 = 0;
+        let mut attackers: i32 = 0;
+        let mut start_idx: i32 = -1;
+        let mut loc_bb = self.queen[white as usize];
+        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
 
+        let mut c = 0;
+        while loc_bb != 0 && c < 64 {
+            c = loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += c;
+            loc_bb = loc_bb >> c;
+
+            // treat a queen as a rook bishop combo
+            // lookup from the magic table
+            let rook_occ_bb = self.rook_mask[start_idx as usize] & all_composite;
+            let rook_hash = BB::rook_magic_hash(rook_occ_bb, start_idx as usize);
+            let rook_bb = self.rook_magic_table[start_idx as usize][rook_hash as usize];
+
+            let bishop_occ_bb = self.bishop_mask[start_idx as usize] & all_composite;
+            let bishop_hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
+            let bishop_bb = self.bishop_magic_table[start_idx as usize][bishop_hash as usize];
+
+            let piece_attacks = ((rook_bb | bishop_bb) & king_bb).count_ones() as i32;
+            if piece_attacks > 0 {
+                attackers += 1;
+            }
+            attacks += piece_attacks;
+        }
+        return (attackers, attacks);
+    }
+
+    fn bishop_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32) {
+        let mut attacks: i32 = 0;
+        let mut attackers: i32 = 0;
+        let mut start_idx: i32 = -1;
+        let mut loc_bb = self.bishop[white as usize];
+        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+
+        let mut c = 0;
+        while loc_bb != 0 && c < 64 {
+            c = loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += c;
+            loc_bb = loc_bb >> c;
+
+            let bishop_occ_bb = self.bishop_mask[start_idx as usize] & all_composite;
+            let bishop_hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
+            let bishop_bb = self.bishop_magic_table[start_idx as usize][bishop_hash as usize];
+
+            let piece_attacks = (bishop_bb & king_bb).count_ones() as i32;
+            if piece_attacks > 0 {
+                attackers += 1;
+            }
+            attacks += piece_attacks
+
+        }
+        return (attackers, attacks);
+    }
+
+    fn rook_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32) {
+        let mut attacks: i32 = 0;
+        let mut attackers: i32 = 0;
+        let mut start_idx: i32 = -1;
+        let mut loc_bb = self.rook[white as usize];
+        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+
+        let mut c = 0;
+        while loc_bb != 0 && c < 64 {
+            c = loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += c;
+            loc_bb = loc_bb >> c;
+
+            let rook_occ_bb = self.rook_mask[start_idx as usize] & all_composite;
+            let rook_hash = BB::rook_magic_hash(rook_occ_bb, start_idx as usize);
+            let rook_bb = self.rook_magic_table[start_idx as usize][rook_hash as usize];
+
+            let piece_attacks = (rook_bb & king_bb).count_ones() as i32;
+            if piece_attacks > 0 {
+                attackers += 1;
+            }
+            attacks += piece_attacks;
+        }
+        return (attackers, attacks);
+    }
+
+    fn knight_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32) {
+        let mut attacks: i32 = 0;
+        let mut attackers: i32 = 0;
+        let mut start_idx: i32 = -1;
+        let mut knight_loc_bb = self.knight[white as usize];
+
+        let mut kc = 0;
+        while knight_loc_bb != 0 && kc < 64 {
+            kc = knight_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += kc;
+            knight_loc_bb = knight_loc_bb >> kc;
+
+            let knight_bb = self.knight_mask[start_idx as usize];
+            let piece_attacks = (knight_bb & king_bb).count_ones() as i32;
+            if piece_attacks > 0 {
+                attackers += 1;
+            }
+            attacks += piece_attacks;
+        }
+        return (attackers, attacks);
+    }
+
+    // evaluators
     fn king_danger_helper(&self, white: bool) -> i32 {
         let mut king_loc_bb = self.king[white as usize];
         if king_loc_bb == 0 {
             return 0;
         }
-        let mut num_attacker_types: i32 = 0;
-        let mut attack_value: u32 = 0;
+        let mut attack_value: i32 = 0;
 
         let king_idx = king_loc_bb.trailing_zeros() as i32;
 
         let king_bb = king_loc_bb | self.king_mask[king_idx as usize];
-        let queen_attacks = self.queen_attacks(!white) & king_bb;
-        let knight_attacks = self.knight_attacks(!white) & king_bb;
-        let bishop_attacks = self.bishop_attacks(!white) & king_bb;
-        let rook_attacks = self.rook_attacks(!white) & king_bb;
+        let (queen_attackers, queen_attacks) = self.queen_kdf_attacks(!white, king_bb);
+        let (knight_attackers, knight_attacks) = self.knight_kdf_attacks(!white, king_bb);
+        let (bishop_attackers, bishop_attacks) = self.bishop_kdf_attacks(!white, king_bb);
+        let (rook_attackers, rook_attacks) = self.rook_kdf_attacks(!white, king_bb);
 
-        if queen_attacks != 0 {
-            num_attacker_types += 1;
-            attack_value += 800 * queen_attacks.count_ones();
-        }
+        let mut num_attackers = queen_attackers + knight_attackers + bishop_attackers + rook_attackers;
 
-        if rook_attacks != 0 {
-            num_attacker_types += 1;
-            attack_value += 400 * rook_attacks.count_ones();
-        }
+        if num_attackers > 6 { num_attackers = 6; }
 
-        if knight_attacks != 0 {
-            num_attacker_types += 1;
-            attack_value += 200 * knight_attacks.count_ones();
-        }
+        attack_value += 800 * queen_attacks;
+        attack_value += 400 * rook_attacks;
+        attack_value += 200 * knight_attacks;
+        attack_value += 200 * bishop_attacks;
 
-        if bishop_attacks != 0 {
-            num_attacker_types += 1;
-            attack_value += 200 * bishop_attacks.count_ones();
-        }
-
-        let atk_weights = [0, 10, 50, 75, 90];
-        return ((atk_weights[num_attacker_types as usize] * attack_value) / 100) as i32;
+        let atk_weights = [0, 50, 75, 85, 90, 94, 99];
+        return ((atk_weights[num_attackers as usize] * attack_value) / 100) as i32;
     }
 
     pub fn king_danger_value(&self) -> i32 {
@@ -1800,12 +1929,49 @@ impl BB {
                     }
 
                     if neighbor_files & self.pawn[side] == 0 {
-                        isolated_pawns[side] += 1;
+                        isolated_pawns[side] += file_pawns.count_ones() as i32;
                     }
                 }
             }
         }
         return isolated_pawns[1] - isolated_pawns[0];
+    }
+
+    pub fn passed_pawns_value(&self) -> i32 {
+        let mut passed_pawns: [i32; 2] = [0, 0];
+        for i in 0..2 {
+            let white = i != 0;
+            let side = i as usize;
+            for f in 0..8 {
+                let mask = FILE_MASKS[f as usize];
+                let file_pawns = mask & self.pawn[side];
+                if file_pawns != 0 {
+                    let mut enemy_mask: u64 = 0;
+                    if f > 0 {
+                        enemy_mask |= FILE_MASKS[(f - 1) as usize];
+                    }
+                    if f < 7 {
+                        enemy_mask |= FILE_MASKS[(f + 1) as usize];
+                    }
+                    enemy_mask |= mask;
+                    let mut rank_mask = 0;
+                    for r in 0..8 {
+                        let r = if white {7-r} else {r};
+                        if RANK_MASKS[r] & file_pawns == 0 {
+                            rank_mask |= RANK_MASKS[r]
+                        } else {
+                            break;
+                        }
+                    }
+                    enemy_mask &= rank_mask;
+
+                    if enemy_mask & self.pawn[!white as usize] == 0 {
+                        passed_pawns[side] += 1;
+                    }
+                }
+            }
+        }
+        return passed_pawns[1] - passed_pawns[0];
     }
 
     pub fn center_value(&self) -> i32 {
