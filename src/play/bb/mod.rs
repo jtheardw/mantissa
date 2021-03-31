@@ -9,9 +9,9 @@ pub mod board_eval;
 
 const KING_VALUE: i32 = 200000;
 const QUEEN_VALUE: i32 = 9000;
-const ROOK_VALUE: i32 = 5100;
+const ROOK_VALUE: i32 = 5300;
 const BISHOP_VALUE: i32 = 3200;
-const KNIGHT_VALUE: i32 = 3100;
+const KNIGHT_VALUE: i32 = 3000;
 const PAWN_VALUE: i32 = 1000;
 
 // Credit to Pradyumna Kannan for magic numbers
