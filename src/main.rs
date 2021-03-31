@@ -31,6 +31,11 @@ impl Game {
         }
     }
 
+    fn reset(& mut self) {
+        self.board.reset();
+        self.white_turn = true;
+    }
+
     fn receive_move(& mut self, mv: String) {
         // translate
         let move_bytes = mv.as_bytes();
@@ -130,21 +135,13 @@ unsafe fn play() {
         }
         if cmd == "setoption" {}
         if cmd == "ucinewgame" {
-            game = Game::get_basic_game(nm,
-                                        rm,
-                                        bm,
-                                        km,
-                                        zobrist);
+            game.reset();
         }
         if cmd == "position" {
             match params.next() {
                 Some(p) => {
                     if p == "startpos" {
-                        game = Game::get_basic_game(nm,
-                                                    rm,
-                                                    bm,
-                                                    km,
-                                                    zobrist);
+                        game.reset();
                         if params.next() == Some("moves") {
                             loop {
                                 match params.next() {

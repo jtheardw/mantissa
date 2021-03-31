@@ -197,6 +197,66 @@ impl BB {
         bb & (1 << idx)
     }
 
+    pub fn reset(& mut self) {
+
+        let black_king = BB::coord_to_bb((4, 7));
+        let white_king = BB::coord_to_bb((4, 0));
+        self.king = [black_king, white_king];
+
+        let black_queen = BB::coord_to_bb((3, 7));
+        let white_queen = BB::coord_to_bb((3, 0));
+        self.queen = [black_queen, white_queen];
+
+        let black_rook = BB::coord_to_bb((0, 7)) | BB::coord_to_bb((7,7));
+        let white_rook = BB::coord_to_bb((0, 0)) | BB::coord_to_bb((7,0));
+        self.rook = [black_rook, white_rook];
+
+        let black_bishop = BB::coord_to_bb((2, 7)) | BB::coord_to_bb((5,7));
+        let white_bishop = BB::coord_to_bb((2, 0)) | BB::coord_to_bb((5,0));
+        self.bishop = [black_bishop, white_bishop];
+
+        let black_knight = BB::coord_to_bb((1, 7)) | BB::coord_to_bb((6,7));
+        let white_knight = BB::coord_to_bb((1, 0)) | BB::coord_to_bb((6,0));
+        self.knight = [black_knight, white_knight];
+
+        let black_pawn = {
+            let mut bp = 0;
+            for x in 0..8 {
+                bp |= BB::coord_to_bb((x, 6));
+            }
+            bp
+        };
+        let white_pawn = {
+            let mut wp = 0;
+            for x in 0..8 {
+                wp |= BB::coord_to_bb((x, 1));
+            }
+            wp
+        };
+        self.pawn = [black_pawn, white_pawn];
+
+        let black_composite = black_king | black_queen | black_rook | black_bishop | black_knight | black_pawn;
+        let white_composite = white_king | white_queen | white_rook | white_bishop | white_knight | white_pawn;
+        self.composite = [black_composite, white_composite];
+
+        self.white_turn = true;
+        self.castling_rights = 0xFFFFFFFFFFFFFFFF;
+        self.castled = [false, false];
+        self.ep = -1;
+
+        // stacks
+        self.ep_stack = Vec::new();
+        self.cap_stack = Vec::new();
+        self.cr_stack = Vec::new();
+        self.history = Vec::new();
+        self.pawn_history = Vec::new();
+
+        // eval
+        self.material = 0;
+        self.hash = self.get_full_hash();
+        self.pawn_hash = self.get_full_pawn_hash();
+    }
+
     pub fn bb_str(bb: u64) -> String {
         let mut s = String::new();
         let mut b = bb;
@@ -1943,6 +2003,16 @@ impl BB {
         return self.king_danger_helper(true) - self.king_danger_helper(false);
     }
 
+    pub fn rook_on_seventh_bonus(&self) -> i32 {
+        let white_bonus = (self.rook[1] & RANK_MASKS[6]).count_ones() as i32;
+        // has to be a good reason to bonus 7th rank
+        let white_cond = (self.king[0] & RANK_MASKS[7]) != 0 || (self.pawn[0] & RANK_MASKS[6]) != 0;
+
+        let black_bonus = (self.rook[0] & RANK_MASKS[1]).count_ones() as i32;
+        let black_cond = (self.king[1] & RANK_MASKS[0]) != 0 || (self.pawn[1] & RANK_MASKS[1] != 0);
+        return if white_cond {white_bonus} else {0} - if black_cond {black_bonus} else {0};
+    }
+
     fn rook_mobility(&self, white: bool) -> i32 {
         let mut moves: u32 = 0;
         let mut start_idx = -1;
@@ -2284,7 +2354,6 @@ impl BB {
     pub fn castled_bonus(&self) -> i32 {
         return self.castled[1] as i32 - self.castled[0] as i32;
     }
-
 
     pub fn get_all_pt_bonus(&self) -> i32 {
         return self.get_pawn_pt_bonus() + self.get_knight_pt_bonus() + self.get_bishop_pt_bonus() + self.get_king_pt_bonus();

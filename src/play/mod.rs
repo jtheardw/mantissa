@@ -176,9 +176,10 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
     val += node.mobility_value() * 70;//(bb::PAWN_VALUE / 10);
     val += node.pawn_defense_value() * 100;
     val += node.double_bishop_bonus() * 500;
-    val += node.castled_bonus() * 500;
+    val += node.castled_bonus() * (500 * (256 - node.get_phase()) / 256); // should decay as game advances
     val += node.pawn_advancement_value() * 40;
     val += node.get_all_pt_bonus();
+    val += node.rook_on_seventh_bonus() * 150;
 
     // slight tempo bonus
     val += if node.white_turn {100} else {-100};
@@ -201,11 +202,12 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Double bishop: {}", node.double_bishop_bonus() * 500);
     eprintln!("Pawn Defense: {}", node.pawn_defense_value() * 100);
     eprintln!("Pawn advancement: {}", node.pawn_advancement_value() * 40);
-    eprintln!("Castle Bonus: {}", node.castled_bonus() * 500);
+    eprintln!("Castle Bonus: {}", node.castled_bonus() * (500 * (256 - node.get_phase()) / 256));
     eprintln!("Early queen penalty: {}", node.early_queen_penalty() * -300);
     eprintln!("All pt bonus: {}", node.get_all_pt_bonus());
     eprintln!("King danger value: {}", -node.king_danger_value());
     eprintln!("Tempo: {}", if node.white_turn {100} else {-100});
+    eprintln!("Rook on 7th: {}", node.rook_on_seventh_bonus() * 150);
     if pht.valid {
         let pht_entry = pht.get(node.pawn_hash);
         if pht_entry.valid {
@@ -377,7 +379,7 @@ unsafe fn negamax_search(node: &mut BB,
         }
     }
 
-    let is_futile = depth == 1 && evaluate_position(&node) < (alpha - 3500);
+    let is_futile = (depth == 1 && evaluate_position(&node) < (alpha - 3500)); // || (depth == 2 && evaluate_position(&node) < (alpha - 5500));
     let mut legal_move = false;
     for mv in moves.drain(..) {
         let is_tactical_move = is_move_tactical(&node, &mv);
