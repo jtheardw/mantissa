@@ -12,9 +12,8 @@ use tt::TT;
 pub mod pht;
 use pht::PHT;
 
-static mut evaled: u64 = 0;
-static mut hits: u64 = 0;
-static mut pawn_hits: u64 = 0;
+static mut EVALED: u64 = 0;
+static mut HITS: u64 = 0;
 
 const LB: i32 = -10000000;
 const UB: i32 = 10000000;
@@ -50,28 +49,27 @@ pub unsafe fn print_pv(node: & mut BB, depth: i32) {
 }
 
 pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (Mv, f64) {
-    let mut m_depth = 3;
-    evaled = 0;
-    hits = 0;
-    pawn_hits = 0;
-    let start_time = get_time_millis();
-    let mut current_time = start_time;
+    EVALED = 0;
+    HITS = 0;
+
+    let mut m_depth: i32 = 1;
+    let start_time: u128 = get_time_millis();
+    let mut current_time: u128 = start_time;
+
+    // initialize some values
     let mut best_move : Mv = Mv::null_move();
-    let mut best_val = 0;
-    let mut z_table: HashMap<u64, (Mv, i32, i32)> = HashMap::new();
+    let mut best_val: i32 = 0;
+
+    // initialize tables
     if !tt.valid {
         tt = TT::get_tt(24);
-    } else {
-        eprintln!("tt saved");
     }
     if !pht.valid {
         pht = PHT::get_pht(22);
-    } else {
-        eprintln!("pht saved");
     }
     let mut k_table: [[Mv; 3]; 64] = [[Mv::null_move(); 3]; 64];
-    let mut aspire = false;
 
+    let mut aspire = false;
     while (current_time - start_time) <= compute_time {
         let mut alpha = LB;
         let mut beta = UB;
@@ -91,31 +89,40 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
             maximize,
             true,
             true,
-            &mut z_table,
             &mut k_table
         );
 
+        // kind of a misnomer, this means we ran out of time
         if ply_move.is_err {break;}
+        // we ended up outside of our aspiration window
         if ply_move.is_null || node_type != PV_NODE {aspire = false; continue;}
 
+        // we maintain that positive is always white advantage here so we have to flip
         (best_move, best_val) = (ply_move, if node.white_turn {ply_val} else {-ply_val});
-        eprintln!("{} eval'd {} this time got val {} and recommends {} with piece {}", m_depth, evaled, best_val, best_move, best_move.piece);
+
+        // for debug
+        eprintln!("{} eval'd {} this time got val {} and recommends {} with piece {}", m_depth, EVALED, best_val, best_move, best_move.piece);
+
         if best_val.abs() == 1000000 {
+            // checkmate
             break;
         }
+
         current_time = get_time_millis();
         aspire = true;
         m_depth += 1;
     }
-    eprintln!("{} tt hits", hits);
-    eprintln!("{} pht hits", pawn_hits);
+
+    eprintln!("{} tt hits", HITS);
     eprintln!("{} ply evaluated", m_depth - 1);
-    eprintln!("{} nodes evaluated", evaled);
+    eprintln!("{} nodes evaluated", EVALED);
     eprintln!("projected value: {}", best_val);
-    eprintln!("elapsed time: {}", current_time - start_time);
-    println!("info depth {} score cp {}", m_depth - 1, (best_val / 10) * if maximize {1} else {-1});
+    eprintln!("elapsed time: {}", get_time_millis() - start_time);
     eprintln!("expected PV:");
     print_pv(node, m_depth - 1);
+
+    // update info for spectators, &c
+    println!("info depth {} score cp {}", m_depth - 1, (best_val / 10) * if maximize {1} else {-1});
     return (best_move, best_val as f64 / 1000.);
 }
 
@@ -137,14 +144,13 @@ fn is_move_tactical(node: &BB, mv: &Mv) -> bool {
 }
 
 unsafe fn evaluate_position(node: &BB) -> i32 {
-    evaled += 1;
+    EVALED += 1;
     let mut val = 0;
 
     // pawn values
     let pht_entry = pht.get(node.pawn_hash);
     if pht_entry.valid {
         val += pht_entry.val;
-        pawn_hits += 1;
     } else {
         let pp = node.passed_pawns_value() * 500;
         let cp = node.center_value() * 300;
@@ -208,7 +214,12 @@ fn is_quiet(node: &mut BB) -> bool {
 }
 
 fn moves_equivalent(mv1: &Mv, mv2: &Mv) -> bool {
-    return (mv1.start == mv2.start && mv1.end == mv2.end && mv1.piece == mv2.piece && mv1.promote_to == mv2.promote_to && mv1.ep_tile == mv2.ep_tile && mv1.is_ep == mv2.is_ep);
+    return  mv1.start == mv2.start
+            && mv1.end == mv2.end
+            && mv1.piece == mv2.piece
+            && mv1.promote_to == mv2.promote_to
+            && mv1.ep_tile == mv2.ep_tile
+            && mv1.is_ep == mv2.is_ep;
 }
 
 fn order_moves(mut moves: VecDeque<Mv>, best_move: Mv) -> VecDeque<Mv> {
@@ -216,7 +227,7 @@ fn order_moves(mut moves: VecDeque<Mv>, best_move: Mv) -> VecDeque<Mv> {
     let mut found_move = false;
     let mut new_q: VecDeque<Mv> = VecDeque::new();
 
-    for mv in moves.drain(0..) {
+    for mv in moves.drain(..) {
         if moves_equivalent(&mv, &best_move) {
             found_move = true;
         } else {
@@ -240,12 +251,19 @@ fn update_k_table(k_table: & mut [[Mv; 3]; 64], mv: Mv, ply: i32) {
     if k_table[ply][2].is_null {k_table[ply][2] = mv; return;}
 
     // otherwise replace one.  Let's choose arbitrarily
-    k_table[ply][(mv.start % 3) as usize] = mv;
+    k_table[ply][(get_time_millis() % 3) as usize] = mv;
 }
 
-unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, depth: i32,
-                         ply: i32, alpha: i32, beta: i32, maximize: bool, nmr_ok: bool, init: bool,
-                         z_table: & mut HashMap<u64, (Mv, i32, i32)>,
+unsafe fn negamax_search(node: &mut BB,
+                         start_time: u128,
+                         compute_time: u128,
+                         depth: i32,
+                         ply: i32,
+                         alpha: i32,
+                         beta: i32,
+                         maximize: bool,
+                         nmr_ok: bool,
+                         init: bool,
                          k_table: & mut [[Mv; 3]; 64],
 ) -> (Mv, i32, u8) {
     let current_time = get_time_millis();
@@ -263,7 +281,7 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
 
     let tt_entry = tt.get(node.hash);
     if tt_entry.valid {
-        hits += 1;
+        HITS += 1;
         let mv = tt_entry.mv;
         first_move = mv;
         if tt_entry.depth > depth && tt_entry.node_type == PV_NODE {
@@ -285,15 +303,16 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
 
         }
     } else if depth > 6 {
+        // internal iterative deepending
         let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize]), first_move);
-        let mut best_val = -10000000;
+        let mut best_val = LB;
         for mv in moves.drain(0..) {
             node.do_move(&mv);
             if node.is_check(maximize) {
                 node.undo_move(&mv);
                 continue
             }
-            let val = -negamax_search(node, start_time, compute_time, depth - 4, ply+1, -beta, -alpha, !maximize, true, false, z_table, k_table).1;
+            let val = -negamax_search(node, start_time, compute_time, depth - 4, ply+1, -beta, -alpha, !maximize, true, false, k_table).1;
             node.undo_move(&mv);
             if val > best_val {
                 best_val = val;
@@ -302,18 +321,19 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
         }
     }
 
-    let mut alpha = alpha;
-    let beta = beta;
-
     if depth <= 0 {
         if is_quiet(node) {
             let val = evaluate_position(&node);
-            return (Mv::null_move(), val, PV_NODE);
+            let node_type = if val > alpha {if val >= beta {CUT_NODE} else {PV_NODE}} else {ALL_NODE};
+            return (Mv::null_move(), val, node_type);
         } else {
             let (val, node_type) = quiescence_search(node, 8, alpha, beta, maximize);
             return (Mv::null_move(), val, node_type);
         }
     }
+
+    let mut alpha = alpha;
+    let beta = beta;
 
     let mut raised_alpha = false;
     let is_check = node.is_check(maximize);
@@ -324,9 +344,10 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
     let mut num_moves = 0;
 
     if !is_check && nmr_ok && !init {
+        // null move reductions
         let depth_to_search = depth - if depth > 6 {5} else {4};
         node.do_null_move();
-        let nmr_val = -negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -beta + 1, !maximize, false, false, z_table, k_table).1;
+        let nmr_val = -negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -beta + 1, !maximize, false, false, k_table).1;
         node.undo_null_move();
         if nmr_val >= beta {
             depth -= 4;
@@ -335,7 +356,7 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
 
     let is_futile = depth == 1 && evaluate_position(&node) < (alpha - 3500);
     let mut legal_move = false;
-    for mv in moves.drain(0..) {
+    for mv in moves.drain(..) {
         let is_tactical_move = is_move_tactical(&node, &mv);
         node.do_move(&mv);
 
@@ -371,16 +392,16 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
         let quiet = is_quiet(node) && mv.promote_to == 0 && !mv.is_ep;
         if true && num_moves > 0 && !first_move.is_null {
             // pvs search bit
-            res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -alpha - 1, -alpha, !maximize, true, false, z_table, k_table);
+            res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -alpha - 1, -alpha, !maximize, true, false, k_table);
             if -res.1 > alpha && -res.1 < beta { // failed high
-                res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -alpha, !maximize, true, false, z_table, k_table);
+                res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -alpha, !maximize, true, false, k_table);
             }
         } else {
-            res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -alpha, !maximize, true, false, z_table, k_table);
+            res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -alpha, !maximize, true, false, k_table);
         }
         if -res.1 >= beta && depth_to_search == depth - 2 {
             depth_to_search = depth - 1;
-            res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -alpha, !maximize, true, false, z_table, k_table);
+            res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -alpha, !maximize, true, false, k_table);
         }
 
         node.undo_move(&mv);
@@ -419,10 +440,7 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
         }
     }
 
-    // if true || raised_alpha {
-        // z_table.insert(node.hash, (best_move, val, depth));
     tt.set(node.hash, best_move, val, if !raised_alpha {ALL_NODE} else {PV_NODE}, depth);
-    // }
     return (best_move, val, if !raised_alpha {ALL_NODE} else {PV_NODE});
 }
 
