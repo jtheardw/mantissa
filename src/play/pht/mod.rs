@@ -25,7 +25,7 @@ impl PHTEntry {
 impl PHT {
     pub fn get_pht(bits: usize) -> PHT {
         let mut v: Vec<PHTEntry> = Vec::new();
-        for i in 0..(1 << bits) {
+        for _ in 0..(1 << bits) {
             v.push(PHTEntry::invalid_entry());
         }
         PHT {

@@ -8,11 +8,9 @@ use bb::Mv;
 
 pub mod tt;
 use tt::TT;
-use tt::TTEntry;
 
 pub mod pht;
 use pht::PHT;
-use pht::PHTEntry;
 
 static mut evaled: u64 = 0;
 static mut hits: u64 = 0;
@@ -53,7 +51,6 @@ pub unsafe fn print_pv(node: & mut BB, depth: i32) {
 
 pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (Mv, f64) {
     let mut m_depth = 3;
-    let mut q_depth = 6;
     evaled = 0;
     hits = 0;
     pawn_hits = 0;
@@ -306,7 +303,7 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
     }
 
     let mut alpha = alpha;
-    let mut beta = beta;
+    let beta = beta;
 
     if depth <= 0 {
         if is_quiet(node) {
@@ -319,13 +316,12 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
     }
 
     let mut raised_alpha = false;
-    let mut is_check = node.is_check(maximize);
+    let is_check = node.is_check(maximize);
     let mut best_move = Mv::null_move();
     let mut val = LB;
 
     let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize]), first_move);
     let mut num_moves = 0;
-    let mut search_pv = true;
 
     if !is_check && nmr_ok && !init {
         let depth_to_search = depth - if depth > 6 {5} else {4};
@@ -401,7 +397,6 @@ unsafe fn negamax_search(node: &mut BB, start_time: u128, compute_time: u128, de
         }
         if val > alpha {
             alpha = val;
-            // search_pv = false;
             raised_alpha = true;
         }
 
@@ -437,19 +432,23 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
     }
 
     let mut alpha = alpha;
-    let mut beta = beta;
+    let beta = beta;
     let mut raised_alpha = false;
-    let curr_val = evaluate_position(node);
-    if curr_val >= beta {
-        // beta cutoff
-        return (beta, CUT_NODE);
-    }
-    if curr_val > alpha {
-        raised_alpha = true;
-        alpha = curr_val;
+    if !node.is_check(maximize) {
+        let curr_val = evaluate_position(node);
+        if curr_val >= beta {
+            // beta cutoff
+            return (beta, CUT_NODE);
+        }
+        if curr_val > alpha {
+            raised_alpha = true;
+            alpha = curr_val;
+        }
     }
 
-    for mv in node.moves().drain(0..) {
+    let mut best_val = -10000000;
+    let mut best_mv: Mv = Mv::null_move();
+    for mv in node.moves().drain(..) {
         node.do_move(&mv);
         let res = quiescence_search(node, depth - 1, -beta, -alpha, !maximize);
         node.undo_move(&mv);
@@ -458,11 +457,18 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
         if val >= beta {
             return (beta, CUT_NODE);
         }
+        if val >= best_val {
+            best_val = val;
+            best_mv = mv;
+        }
         if val > alpha {
             raised_alpha = true;
             alpha = val;
         }
     }
 
-    return (alpha, if raised_alpha {PV_NODE} else {ALL_NODE});
+    // if we didn't find further captures, we don't want to erroneously return the
+    // min value, but we also need to be consistent with the fail-soft lower bound of non-QS
+    let node_val = if !best_mv.is_null {best_val} else {evaluate_position(node)};
+    return (node_val, if raised_alpha {PV_NODE} else {ALL_NODE});
 }

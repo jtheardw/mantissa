@@ -200,7 +200,7 @@ impl BB {
     pub fn bb_str(bb: u64) -> String {
         let mut s = String::new();
         let mut b = bb;
-        for i in 0..8 {
+        for _ in 0..8 {
             let rank = b & ((1 << 8) - 1);
             b = b >> 8;
             s.push_str(format!("{:08b}\n", rank).as_str());
@@ -313,10 +313,10 @@ impl BB {
             for c in String::from(cr_str).as_bytes().iter() {
                 let c = *c;
                 match c {
-                    b'k' => {cr |= (bk_mask | brk_mask);},
-                    b'K' => {cr |= (wk_mask | wrk_mask);},
-                    b'q' => {cr |= (bk_mask | brq_mask);},
-                    b'Q' => {cr |= (wk_mask | wrq_mask);},
+                    b'k' => {cr |= bk_mask | brk_mask;},
+                    b'K' => {cr |= wk_mask | wrk_mask;},
+                    b'q' => {cr |= bk_mask | brq_mask;},
+                    b'Q' => {cr |= wk_mask | wrq_mask;},
                     _ => panic!("bad CR")
                 };
             }
@@ -704,9 +704,8 @@ impl BB {
 
     pub fn gen_rook_magic_table() -> Vec<Vec<u64>> { //[[u64; 4096]; 64] {
         let mut rook_magic: Vec<Vec<u64>> = vec![vec![0; 4096]; 64];// [[u64; 4096]; 64] = [[0; 4096]; 64];
-        let mut rook_mask = BB::gen_rook_mask();
+        let rook_mask = BB::gen_rook_mask();
         for idx in 0..64 {
-            let mut bb: u64 = 0;
             let (rx, ry) = BB::idx_to_coord(idx);
             for i in 0..256 {
                 for j in 0..256 {
@@ -773,9 +772,8 @@ impl BB {
 
     pub fn gen_bishop_magic_table() -> Vec<Vec<u64>> {// [[u64; 512]; 64] {
         let mut bishop_magic: Vec<Vec<u64>> = vec![vec![0; 512]; 64];// [[u64; 512]; 64] = [[0; 512]; 64];
-        let mut bishop_mask = BB::gen_bishop_mask();
+        let bishop_mask = BB::gen_bishop_mask();
         for idx in 0..64 {
-            let mut bb: u64 = 0;
             let (bx, by) = BB::idx_to_coord(idx);
             for i in 0..256 {
                 for j in 0..256 {
@@ -970,20 +968,14 @@ impl BB {
         }
 
         // check if in check at relevant positions
-        let mut attacked = self.is_idx_attacked(king_idx, white) ||
+        let attacked = self.is_idx_attacked(king_idx, white) ||
             if queenside {
                 self.is_idx_attacked(king_idx - 1, white)
             } else {
                 self.is_idx_attacked(king_idx + 1, white)
             };
 
-        if attacked {
-            // illegal move because check
-            return false;
-        }
-
-        // all good
-        return true;
+        return !attacked;
     }
 
     // move generation
@@ -1129,7 +1121,12 @@ impl BB {
     }
 
     pub fn moves_equivalent(mv1: &Mv, mv2: &Mv) -> bool {
-        return (mv1.start == mv2.start && mv1.end == mv2.end && mv1.piece == mv2.piece && mv1.promote_to == mv2.promote_to && mv1.ep_tile == mv2.ep_tile && mv1.is_ep == mv2.is_ep);
+        return mv1.start == mv2.start
+            && mv1.end == mv2.end
+            && mv1.piece == mv2.piece
+            && mv1.promote_to == mv2.promote_to
+            && mv1.ep_tile == mv2.ep_tile
+            && mv1.is_ep == mv2.is_ep;
     }
 
     pub fn knight_moves(&self, white: bool) -> VecDeque<Mv> {
@@ -1253,7 +1250,7 @@ impl BB {
         let mut moves: VecDeque<Mv> = VecDeque::new();
         let mut start_idx = -1;
         let mut rook_loc_bb = self.rook[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut rc = 0;
         while rook_loc_bb != 0  && rc < 64 {
@@ -1286,7 +1283,7 @@ impl BB {
         let mut moves: VecDeque<Mv> = VecDeque::new();
         let mut start_idx = -1;
         let mut bishop_loc_bb = self.bishop[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut bc = 0;
         while bishop_loc_bb != 0  && bc < 64 {
@@ -1319,7 +1316,7 @@ impl BB {
         let mut moves: VecDeque<Mv> = VecDeque::new();
         let mut start_idx = -1;
         let mut queen_loc_bb = self.queen[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut qc = 0;
         while queen_loc_bb != 0 && qc < 64 {
@@ -1356,7 +1353,6 @@ impl BB {
 
     pub fn moves(&self) -> VecDeque<Mv> {
         let mut move_queue : VecDeque<Mv> = VecDeque::new();
-        let self_side = self.white_turn as usize;
 
         move_queue.append(& mut self.pawn_moves(self.white_turn));
         move_queue.append(& mut self.king_moves(self.white_turn));
@@ -1370,14 +1366,14 @@ impl BB {
 
     pub fn do_null_move(&mut self) {
         self.white_turn = !self.white_turn;
-        self.hash ^= (self.zobrist_table.1.0 ^ self.zobrist_table.1.1);
+        self.hash ^= self.zobrist_table.1.0 ^ self.zobrist_table.1.1;
         self.ep_stack.push(self.ep);
         self.ep = -1;
     }
 
     pub fn undo_null_move(&mut self) {
         self.white_turn = !self.white_turn;
-        self.hash ^= (self.zobrist_table.1.0 ^ self.zobrist_table.1.1);
+        self.hash ^= self.zobrist_table.1.0 ^ self.zobrist_table.1.1;
         self.ep = match self.ep_stack.pop() {Some(p) => p, None => panic!("empty ep stack")};
     }
 
@@ -1419,7 +1415,7 @@ impl BB {
         // check en passant first because it's quick
         if mv.is_ep {
             captured_piece = b'p';
-            let actual_pawn_idx: i32 = match (self.ep - mv.start) {
+            let actual_pawn_idx: i32 = match self.ep - mv.start {
                 7 => { mv.start - 1 }, // up and left
                 9 => { mv.start + 1 }, // up and right
                 -7 => { mv.start + 1 },// down and right
@@ -1542,7 +1538,7 @@ impl BB {
 
         // TODO update hash
         self.white_turn = !self.white_turn;
-        self.hash ^= (self.zobrist_table.1.0 ^ self.zobrist_table.1.1);
+        self.hash ^= self.zobrist_table.1.0 ^ self.zobrist_table.1.1;
     }
 
     pub fn undo_move(&mut self, mv: &Mv) {
@@ -1579,7 +1575,7 @@ impl BB {
 
         // restore captured_piece
         if mv.is_ep {
-            let actual_pawn_idx: i32 = match (self.ep - mv.start) {
+            let actual_pawn_idx: i32 = match self.ep - mv.start {
                 7 => { mv.start - 1 }, // up and left
                 9 => { mv.start + 1 }, // up and right
                 -7 => { mv.start + 1 },// down and right
@@ -1591,12 +1587,35 @@ impl BB {
             material_delta += PAWN_VALUE;
         } else if captured_piece != 0 {
             match captured_piece {
-                b'k' => { self.king[enemy_side] ^= end_point; material_delta += KING_VALUE; },
-                b'q' => { self.queen[enemy_side] ^= end_point; material_delta += QUEEN_VALUE; self.phase -= board_eval::QUEEN_PHASE;},
-                b'r' => { self.rook[enemy_side] ^= end_point; material_delta += ROOK_VALUE; self.phase -= board_eval::ROOK_PHASE;},
-                b'b' => { self.bishop[enemy_side] ^= end_point; material_delta += BISHOP_VALUE; self.phase -= board_eval::BISHOP_PHASE;},
-                b'n' => { self.knight[enemy_side] ^= end_point; material_delta += KNIGHT_VALUE; self.phase -= board_eval::KNIGHT_PHASE;},
-                b'p' => { self.pawn[enemy_side] ^= end_point; material_delta += PAWN_VALUE;                 self.phase -= board_eval::PAWN_PHASE;},
+                b'k' => {
+                    self.king[enemy_side] ^= end_point;
+                    material_delta += KING_VALUE;
+                },
+                b'q' => {
+                    self.queen[enemy_side] ^= end_point;
+                    material_delta += QUEEN_VALUE;
+                    self.phase -= board_eval::QUEEN_PHASE;
+                },
+                b'r' => {
+                    self.rook[enemy_side] ^= end_point;
+                    material_delta += ROOK_VALUE;
+                    self.phase -= board_eval::ROOK_PHASE;
+                },
+                b'b' => {
+                    self.bishop[enemy_side] ^= end_point;
+                    material_delta += BISHOP_VALUE;
+                    self.phase -= board_eval::BISHOP_PHASE;
+                },
+                b'n' => {
+                    self.knight[enemy_side] ^= end_point;
+                    material_delta += KNIGHT_VALUE;
+                    self.phase -= board_eval::KNIGHT_PHASE;
+                },
+                b'p' => {
+                    self.pawn[enemy_side] ^= end_point;
+                    material_delta += PAWN_VALUE;
+                    self.phase -= board_eval::PAWN_PHASE;
+                },
                 _ => panic!("captured piece type that doesn't exist!")
             };
         }
@@ -1666,7 +1685,7 @@ impl BB {
         let mut attacks = 0;
         let mut start_idx = -1;
         let mut rook_loc_bb = self.rook[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut rc = 0;
         while rook_loc_bb != 0  && rc < 64 {
@@ -1677,7 +1696,7 @@ impl BB {
             // lookup from the magic table
             let rook_occ_bb = self.rook_mask[start_idx as usize] & all_composite;
             let hash = BB::rook_magic_hash(rook_occ_bb, start_idx as usize);
-            let mut rook_bb = self.rook_magic_table[start_idx as usize][hash as usize];
+            let rook_bb = self.rook_magic_table[start_idx as usize][hash as usize];
 
             // can't hit your own guys
             attacks |= rook_bb;
@@ -1689,7 +1708,7 @@ impl BB {
         let mut attacks: u64 = 0;
         let mut start_idx = -1;
         let mut bishop_loc_bb = self.bishop[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut bc = 0;
         while bishop_loc_bb != 0  && bc < 64 {
@@ -1700,7 +1719,7 @@ impl BB {
             // lookup from the magic table
             let bishop_occ_bb = self.bishop_mask[start_idx as usize] & all_composite;
             let hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
-            let mut bishop_bb = self.bishop_magic_table[start_idx as usize][hash as usize];
+            let bishop_bb = self.bishop_magic_table[start_idx as usize][hash as usize];
 
             attacks |= bishop_bb;
         }
@@ -1730,7 +1749,6 @@ impl BB {
         // this will also miss counting some due to overlap
         // but I think slight inaccuracy is worth the perf improvement
         let pawn_loc_bb = self.pawn[white as usize];
-        let all_composite = self.composite[0] | self.composite[1];
         let capture_composite = self.composite[!white as usize];
 
         let pawn_capture_bb = if white {
@@ -1744,7 +1762,6 @@ impl BB {
 
     fn king_attacks(&self, white: bool) -> u64 {
         // ignores castling
-        let mut moves: u32 = 0;
         let mut start_idx: i32 = -1;
         let mut king_loc_bb = self.king[white as usize];
 
@@ -1764,7 +1781,7 @@ impl BB {
         let mut attacks: u64 = 0;
         let mut start_idx: i32 = -1;
         let mut queen_loc_bb = self.queen[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut qc = 0;
         while queen_loc_bb != 0 && qc < 64 {
@@ -1781,7 +1798,7 @@ impl BB {
             let bishop_occ_bb = self.bishop_mask[start_idx as usize] & all_composite;
             let bishop_hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
             let bishop_bb = self.bishop_magic_table[start_idx as usize][bishop_hash as usize];
-            attacks |= (rook_bb | bishop_bb);
+            attacks |= rook_bb | bishop_bb;
         }
         return attacks;
     }
@@ -1791,7 +1808,7 @@ impl BB {
         let mut attackers: i32 = 0;
         let mut start_idx: i32 = -1;
         let mut loc_bb = self.queen[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut c = 0;
         while loc_bb != 0 && c < 64 {
@@ -1823,7 +1840,7 @@ impl BB {
         let mut attackers: i32 = 0;
         let mut start_idx: i32 = -1;
         let mut loc_bb = self.bishop[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut c = 0;
         while loc_bb != 0 && c < 64 {
@@ -1850,7 +1867,7 @@ impl BB {
         let mut attackers: i32 = 0;
         let mut start_idx: i32 = -1;
         let mut loc_bb = self.rook[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut c = 0;
         while loc_bb != 0 && c < 64 {
@@ -1895,7 +1912,7 @@ impl BB {
 
     // evaluators
     fn king_danger_helper(&self, white: bool) -> i32 {
-        let mut king_loc_bb = self.king[white as usize];
+        let king_loc_bb = self.king[white as usize];
         if king_loc_bb == 0 {
             return 0;
         }
@@ -1930,7 +1947,7 @@ impl BB {
         let mut moves: u32 = 0;
         let mut start_idx = -1;
         let mut rook_loc_bb = self.rook[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut rc = 0;
         while rook_loc_bb != 0  && rc < 64 {
@@ -1955,7 +1972,7 @@ impl BB {
         let mut moves: u32 = 0;
         let mut start_idx = -1;
         let mut bishop_loc_bb = self.bishop[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut bc = 0;
         while bishop_loc_bb != 0  && bc < 64 {
@@ -1988,7 +2005,7 @@ impl BB {
             knight_loc_bb = knight_loc_bb >> kc;
 
             // only include moves that don't hit your own guys
-            let mut knight_bb = self.knight_mask[start_idx as usize] & !self.composite[white as usize];
+            let knight_bb = self.knight_mask[start_idx as usize] & !self.composite[white as usize];
             moves += knight_bb.count_ones();
         }
         return moves as i32;
@@ -2041,7 +2058,7 @@ impl BB {
         let mut moves: u32 = 0;
         let mut start_idx = -1;
         let mut queen_loc_bb = self.queen[white as usize];
-        let all_composite = (self.composite[!white as usize] | self.composite[white as usize]);
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
 
         let mut qc = 0;
         while queen_loc_bb != 0 && qc < 64 {
@@ -2082,7 +2099,6 @@ impl BB {
     pub fn doubled_pawns_value(&self) -> i32 {
         let mut doubled_pawns: [i32; 2] = [0, 0];
         for i in 0..2 {
-            let white = i != 0;
             let side = i as usize;
             for f in 0..8 {
                 let mask = FILE_MASKS[f as usize];
@@ -2098,7 +2114,6 @@ impl BB {
     pub fn isolated_pawns_value(&self) -> i32 {
         let mut isolated_pawns: [i32; 2] = [0, 0];
         for i in 0..2 {
-            let white = i != 0;
             let side = i as usize;
             for f in 0..8 {
                 let mask = FILE_MASKS[f as usize];
@@ -2161,7 +2176,6 @@ impl BB {
     pub fn center_value(&self) -> i32 {
         let mut center_pieces: [i32; 2] = [0, 0];
         for i in 0..2 {
-            let white = i != 0;
             let side = i as usize;
             center_pieces[side] = (CENTER_MASK & self.pawn[side]).count_ones() as i32;
         }
@@ -2185,7 +2199,6 @@ impl BB {
     pub fn near_center_value(&self) -> i32 {
         let mut center_pieces: [i32; 2] = [0, 0];
         for i in 0..2 {
-            let white = i != 0;
             let side = i as usize;
             center_pieces[side] = (NEAR_CENTER_MASK & (self.pawn[side])).count_ones() as i32;
         }
@@ -2218,7 +2231,7 @@ impl BB {
         let mut bpw = backwards_pawns[1] - 2;
         let mut bpb = backwards_pawns[0] - 2;
         if bpw < 0 {bpw = 0;}
-        if bpb < 0 {bpw = 0;}
+        if bpb < 0 {bpb = 0;}
         return bpw - bpb;
     }
 
@@ -2242,7 +2255,7 @@ impl BB {
             }
         }
 
-        let scale_numerator = (256 + (self.get_phase()));
+        let scale_numerator = 256 + self.get_phase();
         return ((pawn_advancement[1] - pawn_advancement[0]) * scale_numerator) / 256;
     }
 
@@ -2373,17 +2386,6 @@ pub struct Mv {
 }
 
 impl Mv {
-    pub fn get_mv_repr(start: i32, end: i32, promote: u8) -> String {
-        let start = (start % 8, start >> 3);
-        let end = (end % 8, end >> 3);
-        let f1 = "abcdefgh".as_bytes()[start.0 as usize] as char;
-        let r1 = (start.1 + 1).to_string();
-        let f2 = "abcdefgh".as_bytes()[end.0 as usize] as char;
-        let r2 = (end.1 + 1).to_string();
-        let p = if promote != 0 {(promote as char).to_string()} else {"".to_string()};
-
-        return format!("{}{}{}{}{}", f1.to_string(), r1, f2.to_string(), r2, p);
-    }
 
     pub fn get_repr(&self) -> String {
         let start = (self.start % 8, self.start >> 3);

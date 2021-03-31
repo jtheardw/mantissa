@@ -1,15 +1,8 @@
 #![feature(exclusive_range_pattern)]
 #![feature(destructuring_assignment)]
 
-// use std::collections::VecDeque;
 use std::io;
 mod play;
-
-// fn print_deq(deq : &VecDeque<play::nodes::Move>) {
-//     for mv in deq.iter() {
-//         println!("{}", mv);
-//     }
-// }
 
 struct Game {
     pub board: play::bb::BB,
@@ -25,7 +18,7 @@ impl Game {
         zobrist_table: ([[u64; 12]; 64], (u64, u64))
     ) -> Game {
 
-        let mut board = play::bb::BB::default_board(
+        let board = play::bb::BB::default_board(
             knight_mask,
             rook_mask,
             bishop_mask,
@@ -38,26 +31,12 @@ impl Game {
         }
     }
 
-    fn file_to_number(file: char) -> i32 {
-        return match file {
-            'a' => 0,
-            'b' => 1,
-            'c' => 2,
-            'd' => 3,
-            'e' => 4,
-            'f' => 5,
-            'g' => 6,
-            'h' => 7,
-            _ => -1
-        }
-    }
-
     fn receive_move(& mut self, mv: String) {
         // translate
         let move_bytes = mv.as_bytes();
         let start = play::bb::BB::coord_to_idx(((move_bytes[0] - b'a') as i32, (move_bytes[1] - b'1') as i32));
         let end = play::bb::BB::coord_to_idx(((move_bytes[2] - b'a') as i32, (move_bytes[3] - b'1') as i32));
-        let mut mv : play::bb::Mv;
+        let mv: play::bb::Mv;
         if move_bytes.len() == 5 {
             // pawn promotion
             let promote_to = move_bytes[4];
@@ -81,10 +60,9 @@ impl Game {
     }
 
     unsafe fn make_move(& mut self, compute_time: u128) -> play::bb::Mv {
-        // eprintln!("board state:\n{}", self.board.get_str());
         eprintln!("current eval:");
         play::print_evaluate(&self.board);
-        let (best_move, val) = play::best_move(& mut self.board, self.white_turn, compute_time);
+        let (best_move, _) = play::best_move(& mut self.board, self.white_turn, compute_time);
         eprintln!("best move is {}", best_move);
         return best_move;
     }
@@ -94,71 +72,6 @@ fn main() {
     unsafe {
         play()
     }
-    // unsafe {
-    //     bb_test();
-    // }
-}
-
-unsafe fn bb_test() {
-    let nm = play::bb::BB::gen_knight_mask();
-    let rm = play::bb::BB::gen_rook_mask();
-    let bm = play::bb::BB::gen_bishop_mask();
-    let km = play::bb::BB::gen_king_mask();
-
-    let zobrist = play::bb::BB::init_zobrist();
-
-    let mut db = play::bb::BB::default_board(nm, rm, bm, km, zobrist);
-
-    let mut nm = db.knight_moves(true);
-    println!("knight moves");
-    for mv in nm.drain(0..) {
-        println!("{}", mv);
-    }
-
-    let mut pm = db.pawn_moves(true);
-    println!("pawn moves");
-    for mv in pm.drain(0..) {
-        println!("{}", mv);
-    }
-
-    let mut rm = db.rook_moves(true);
-    println!("rook moves");
-    for mv in rm.drain(0..) {
-        println!("{}", mv);
-    }
-
-    let mut bm = db.bishop_moves(true);
-    println!("bishop moves");
-    for mv in bm.drain(0..) {
-        println!("{}", mv);
-    }
-
-    let mut km = db.king_moves(true);
-    println!("king moves");
-    for mv in km.drain(0..) {
-        println!("{}", mv);
-    }
-
-    let mut qm = db.queen_moves(true);
-    println!("queen moves");
-    for mv in qm.drain(0..) {
-        println!("{}", mv);
-    }
-
-    // let mut nm = db.knight_moves(true);
-    // println!("knight moves");
-    // for mv in nm.drain(0..) {
-    //     db.do_move(&mv);
-    //     let mut nm = db.knight_moves(true);
-    //     db.undo_move(&mv);
-    //     for mv in nm.drain(0..) {
-    //         println!("{}", mv);
-    //     }
-    //     break;
-    // }
-
-    let (mv, val) = play::best_move(&mut db, true, 10000);
-    println!("best move {} val {}", mv, val);
 }
 
 fn get_calc_time(time: i32) -> u128 {

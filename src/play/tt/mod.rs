@@ -38,7 +38,7 @@ impl TTEntry {
 impl TT {
     pub fn get_tt(bits: usize) -> TT {
         let mut v: Vec<(TTEntry, TTEntry)> = Vec::new();
-        for i in 0..(1 << bits) {
+        for _ in 0..(1 << bits) {
             v.push((TTEntry::invalid_entry(), TTEntry::invalid_entry()));
         }
         TT {
