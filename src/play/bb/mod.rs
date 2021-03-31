@@ -208,6 +208,18 @@ impl BB {
         return s.chars().rev().collect();
     }
 
+    pub fn get_material(&self) -> i32 {
+        let mut mat = 0;
+        mat += (self.king[1].count_ones() as i32 - self.king[0].count_ones() as i32) * KING_VALUE;
+        mat += (self.queen[1].count_ones() as i32 - self.queen[0].count_ones() as i32) * QUEEN_VALUE;
+        mat += (self.rook[1].count_ones() as i32 - self.rook[0].count_ones() as i32) * ROOK_VALUE;
+        mat += (self.bishop[1].count_ones() as i32 - self.bishop[0].count_ones() as i32) * BISHOP_VALUE;
+        mat += (self.knight[1].count_ones() as i32 - self.knight[0].count_ones() as i32) * KNIGHT_VALUE;
+        mat += (self.pawn[1].count_ones() as i32 - self.pawn[0].count_ones() as i32) * PAWN_VALUE;
+
+        return mat;
+    }
+
     pub fn from_position(
         fen: String,
         knight_mask: [u64; 64],
@@ -250,19 +262,19 @@ impl BB {
                 b'K' => {white_king |= BB::coord_to_bb((file, rank)); file += 1;},
 
                 b'q' => {black_queen |= BB::coord_to_bb((file, rank)); file += 1;},
-                b'Q' => {black_queen |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'Q' => {white_queen |= BB::coord_to_bb((file, rank)); file += 1;},
 
                 b'r' => {black_rook |= BB::coord_to_bb((file, rank)); file += 1;},
-                b'R' => {black_rook |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'R' => {white_rook |= BB::coord_to_bb((file, rank)); file += 1;},
 
                 b'b' => {black_bishop |= BB::coord_to_bb((file, rank)); file += 1;},
-                b'B' => {black_bishop |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'B' => {white_bishop |= BB::coord_to_bb((file, rank)); file += 1;},
 
                 b'n' => {black_knight |= BB::coord_to_bb((file, rank)); file += 1;},
-                b'N' => {black_knight |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'N' => {white_knight |= BB::coord_to_bb((file, rank)); file += 1;},
 
                 b'p' => {black_pawn |= BB::coord_to_bb((file, rank)); file += 1;},
-                b'P' => {black_pawn |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'P' => {white_pawn |= BB::coord_to_bb((file, rank)); file += 1;},
 
                 b'/' => {rank -= 1; file = 0;},
                 b'1' => {file += 1},
@@ -339,7 +351,7 @@ impl BB {
         let bishop_magic_table = BB::gen_bishop_magic_table();
 
         let mut bb = BB{
-            white_turn: true,
+            white_turn: white_turn,
 
             king: king,
             queen: queen,
@@ -373,6 +385,7 @@ impl BB {
             zobrist_table: zobrist_table,
             phase: 0,
         };
+        bb.material = bb.get_material();
         bb.hash = bb.get_full_hash();
         bb.pawn_hash = bb.get_full_pawn_hash();
         return bb;

@@ -150,10 +150,10 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
         pawn_hits += 1;
     } else {
         let pp = node.passed_pawns_value() * 500;
-        let cp = node.center_value() * 500;
+        let cp = node.center_value() * 300;
         let ncp = node.near_center_value() * 50;
         let ip = node.isolated_pawns_value() * -300;
-        let dp = node.doubled_pawns_value() * -400;
+        let dp = node.doubled_pawns_value() * -300;
         let bp = node.backwards_pawns_value() * -100;
         let pv = pp + ip + dp + bp + cp + ncp;
         val += pv;
@@ -176,11 +176,11 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
 pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Material: {}", node.material);
     eprintln!("Mobility: {}", node.mobility_value() * 70);
-    eprintln!("doubled p: {}", node.doubled_pawns_value() * -400);
+    eprintln!("doubled p: {}", node.doubled_pawns_value() * -300);
     eprintln!("isolated p: {}", node.isolated_pawns_value() * -300);
     eprintln!("backwards p: {}", node.backwards_pawns_value() * -100);
     eprintln!("passed p: {}", node.passed_pawns_value() * 400);
-    eprintln!("Center: {}", node.center_value() * 500);
+    eprintln!("Center: {}", node.center_value() * 300);
     eprintln!("Near Center: {}", node.near_center_value() * 50);
     eprintln!("Double bishop: {}", node.double_bishop_bonus() * 500);
     eprintln!("Pawn Defense: {}", node.pawn_defense_value() * 100);
