@@ -182,7 +182,7 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
     val += node.rook_on_seventh_bonus() * 150;
 
     // slight tempo bonus
-    val += if node.white_turn {100} else {-100};
+    val += if node.white_turn {200} else {-200};
 
     val -= node.early_queen_penalty() * 300;
     val -= node.king_danger_value();
@@ -295,13 +295,14 @@ unsafe fn negamax_search(node: &mut BB,
 
     let mut first_move = Mv::null_move();
     let mut depth = depth;
-    let mut is_pv = is_pv;
+    let mut is_cut = false;
 
     let tt_entry = tt.get(node.hash);
     if tt_entry.valid {
         HITS += 1;
         let mv = tt_entry.mv;
         first_move = mv;
+        is_cut = tt_entry.node_type == CUT_NODE;
         // is_pv = tt_entry.node_type == PV_NODE;
         if tt_entry.depth >= depth {
             if tt_entry.node_type == PV_NODE
@@ -376,10 +377,13 @@ unsafe fn negamax_search(node: &mut BB,
         node.undo_null_move();
         if nmr_val >= beta {
             depth -= 4;
+            if depth <= 0 {
+                return (Mv::null_move(), evaluate_position(&node), CUT_NODE);
+            }
         }
     }
 
-    let is_futile = (depth == 1 && evaluate_position(&node) < (alpha - 3500)); // || (depth == 2 && evaluate_position(&node) < (alpha - 5500));
+    let is_futile = (depth == 1 && evaluate_position(&node) < (alpha - 3500)) || (depth == 2 && evaluate_position(&node) < (alpha - 5500));
     let mut legal_move = false;
     for mv in moves.drain(..) {
         let is_tactical_move = is_move_tactical(&node, &mv);
@@ -402,17 +406,6 @@ unsafe fn negamax_search(node: &mut BB,
 
         legal_move = true;
         let mut res: (Mv, i32, u8) = (Mv::null_move(), LB, PV_NODE);
-        // let mut depth_to_search = depth - 1;
-        // if depth > 3 && num_moves > 4 {
-        //     if !is_check &&
-        //         is_quiet(node) &&
-        //         !is_terminal(node) &&
-        //         !node.is_check(node.white_turn) &&
-        //         (mv.promote_to == 0) &&
-        //         !is_tactical_move {
-        //             depth_to_search = depth - 2;
-        //         }
-        // }
 
         let quiet = is_quiet(node) && mv.promote_to == 0 && !mv.is_ep;
 
@@ -429,7 +422,11 @@ unsafe fn negamax_search(node: &mut BB,
                 && !node.is_check(node.white_turn)
                 && (mv.promote_to == 0)
                 && !is_tactical_move {
-                    res = negamax_search(node, start_time, compute_time, depth - 2, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table);
+                    let mut depth_to_search = depth - 2;
+                    if num_moves > 10 && !is_pv {
+                        depth_to_search = depth - 1 - (depth / 3);
+                    }
+                    res = negamax_search(node, start_time, compute_time, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table);
                     if -res.1 <= alpha {
                         reduced = true;
                     }
@@ -445,19 +442,6 @@ unsafe fn negamax_search(node: &mut BB,
             }
 
         }
-        // if true && num_moves > 0 && !first_move.is_null {
-        //     // pvs search bit
-        //     res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -alpha - 1, -alpha, !maximize, true, false, k_table);
-        //     if -res.1 > alpha && -res.1 < beta { // failed high
-        //         res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -alpha, !maximize, true, false, k_table);
-        //     }
-        // } else {
-        //     res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -alpha, !maximize, true, false, k_table);
-        // }
-        // if -res.1 > alpha && depth_to_search == depth - 2 {
-        //     depth_to_search = depth - 1;
-        //     res = negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -alpha, !maximize, true, false, k_table);
-        // }
 
         node.undo_move(&mv);
         num_moves += 1;

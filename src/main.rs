@@ -88,8 +88,8 @@ fn get_calc_time(time: i32) -> u128 {
     if calc_time > 30000 {
         calc_time = 30000;
     }
-    if calc_time < 700 {
-        calc_time = 700;
+    if calc_time < 500 {
+        calc_time = 500;
     }
     return calc_time as u128;
 }
