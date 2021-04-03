@@ -52,7 +52,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
     EVALED = 0;
     HITS = 0;
 
-    let mut m_depth: i32 = 1;
+    let mut m_depth: i32 = 2;
     let start_time: u128 = get_time_millis();
     let mut current_time: u128 = start_time;
 
@@ -86,7 +86,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
         let (ply_move, ply_val, node_type) = negamax_search(
             node,
             start_time,
-            compute_time,
+            if m_depth > 2 {compute_time} else {10000},
             m_depth,
             0,
             alpha,
