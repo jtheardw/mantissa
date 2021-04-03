@@ -2276,33 +2276,22 @@ impl BB {
     }
 
     pub fn backwards_pawns_value(&self) -> i32 {
-        let mut backwards_pawns: [i32; 2] = [0, 0];
-        // white
-        for r in 0..8 {
-            let mask = RANK_MASKS[r as usize];
-            let rank_pawns = mask & self.pawn[1];
-            if rank_pawns != 0 {
-                backwards_pawns[1] = rank_pawns.count_ones() as i32;
-                break;
-            }
+        let white_pawn_attacks = ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9);
+
+        let black_pawn_attacks = ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7);
+
+        // brute force but we cache it anyway
+        let mut white_pawn_attack_proj = white_pawn_attacks;
+        let mut black_pawn_attack_proj = black_pawn_attacks;
+        for r in 0..5 {
+            white_pawn_attack_proj |= white_pawn_attack_proj << 8;
+            black_pawn_attack_proj |= black_pawn_attack_proj >> 8;
         }
 
-        // black
-        for r in 0..8 {
-            let r = 7 - r;
-            let mask = RANK_MASKS[r as usize];
-            let rank_pawns = mask & self.pawn[0];
-            if rank_pawns != 0 {
-                backwards_pawns[0] = rank_pawns.count_ones() as i32;
-                break;
-            }
-        }
+        let white_backwards_pawns = (self.pawn[1] << 8) & black_pawn_attacks & !white_pawn_attack_proj;
+        let black_backwards_pawns = (self.pawn[0] >> 8) & white_pawn_attacks & !black_pawn_attack_proj;
 
-        let mut bpw = backwards_pawns[1] - 2;
-        let mut bpb = backwards_pawns[0] - 2;
-        if bpw < 0 {bpw = 0;}
-        if bpb < 0 {bpb = 0;}
-        return bpw - bpb;
+        return white_backwards_pawns.count_ones() as i32 - black_backwards_pawns.count_ones() as i32;
     }
 
     pub fn pawn_advancement_value(&self) -> i32 {

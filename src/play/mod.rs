@@ -167,7 +167,7 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
         let ncp = node.near_center_value() * 50;
         let ip = node.isolated_pawns_value() * -300;
         let dp = node.doubled_pawns_value() * -300;
-        let bp = node.backwards_pawns_value() * -100;
+        let bp = node.backwards_pawns_value() * -300;
         let pv = pp + ip + dp + bp + cp + ncp;
         val += pv;
         pht.set(node.pawn_hash, pv);
@@ -182,7 +182,7 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
     val += node.rook_on_seventh_bonus() * 150;
 
     // slight tempo bonus
-    val += if node.white_turn {200} else {-200};
+    val += if node.white_turn {150} else {-150};
 
     val -= node.early_queen_penalty() * 300;
     val -= node.king_danger_value();
@@ -195,7 +195,7 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Mobility: {}", node.mobility_value() * 70);
     eprintln!("doubled p: {}", node.doubled_pawns_value() * -300);
     eprintln!("isolated p: {}", node.isolated_pawns_value() * -300);
-    eprintln!("backwards p: {}", node.backwards_pawns_value() * -100);
+    eprintln!("backwards p: {}", node.backwards_pawns_value() * -300);
     eprintln!("passed p: {}", node.passed_pawns_value() * 500);
     eprintln!("Center: {}", node.center_value() * 300);
     eprintln!("Near Center: {}", node.near_center_value() * 50);
@@ -206,7 +206,7 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Early queen penalty: {}", node.early_queen_penalty() * -300);
     eprintln!("All pt bonus: {}", node.get_all_pt_bonus());
     eprintln!("King danger value: {}", -node.king_danger_value());
-    eprintln!("Tempo: {}", if node.white_turn {100} else {-100});
+    eprintln!("Tempo: {}", if node.white_turn {150} else {-150});
     eprintln!("Rook on 7th: {}", node.rook_on_seventh_bonus() * 150);
     if pht.valid {
         let pht_entry = pht.get(node.pawn_hash);
@@ -377,13 +377,10 @@ unsafe fn negamax_search(node: &mut BB,
         node.undo_null_move();
         if nmr_val >= beta {
             depth -= 4;
-            if depth <= 0 {
-                return (Mv::null_move(), evaluate_position(&node), CUT_NODE);
-            }
         }
     }
 
-    let is_futile = (depth == 1 && evaluate_position(&node) < (alpha - 3500)) || (depth == 2 && evaluate_position(&node) < (alpha - 5500));
+    let is_futile = (depth == 1 && evaluate_position(&node) < (alpha - 3500)); //|| (depth == 2 && evaluate_position(&node) < (alpha - 5500));
     let mut legal_move = false;
     for mv in moves.drain(..) {
         let is_tactical_move = is_move_tactical(&node, &mv);
@@ -423,9 +420,9 @@ unsafe fn negamax_search(node: &mut BB,
                 && (mv.promote_to == 0)
                 && !is_tactical_move {
                     let mut depth_to_search = depth - 2;
-                    if num_moves > 10 && !is_pv {
-                        depth_to_search = depth - 1 - (depth / 3);
-                    }
+                    // if num_moves > 10 && !is_pv {
+                    //     depth_to_search = depth - 1 - (depth / 3);
+                    // }
                     res = negamax_search(node, start_time, compute_time, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table);
                     if -res.1 <= alpha {
                         reduced = true;
