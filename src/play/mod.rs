@@ -371,7 +371,7 @@ unsafe fn negamax_search(node: &mut BB,
     let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize]), first_move);
     let mut num_moves = 0;
 
-    if !is_check && nmr_ok && !init && evaluate_position(&node) >= beta {
+    if !is_check && nmr_ok && !init && !is_pv && evaluate_position(&node) >= beta {
         // null move reductions
         let depth_to_search = depth - if depth > 6 {5} else {4};
         node.do_null_move();
@@ -385,7 +385,7 @@ unsafe fn negamax_search(node: &mut BB,
         }
     }
 
-    let is_futile = (depth == 1 && evaluate_position(&node) < (alpha - 3500)); //|| (depth == 2 && evaluate_position(&node) < (alpha - 5500));
+    let is_futile = !init && (depth == 1 && evaluate_position(&node) < (alpha - 3500)); // || (depth == 2 && evaluate_position(&node) < (alpha - 5500)));
     let mut legal_move = false;
     for mv in moves.drain(..) {
         let is_tactical_move = is_move_tactical(&node, &mv);
