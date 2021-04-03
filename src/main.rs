@@ -82,7 +82,7 @@ fn main() {
 fn get_calc_time(time: i32) -> u128 {
     let mut calc_time = 30000;
      // ten minutes
-    calc_time = time / 35;
+    calc_time = time / 30;
     if calc_time > 30000 {
         calc_time = 30000;
     }
