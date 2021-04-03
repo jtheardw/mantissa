@@ -418,7 +418,7 @@ unsafe fn negamax_search(node: &mut BB,
 
     let is_futile = !init && (depth == 1 && evaluate_position(&node) < (alpha - 3500)); // || (depth == 2 && evaluate_position(&node) < (alpha - 5500)));
     let mut legal_move = false;
-    for mv in moves.drain(..) {
+    for mv in moves { // .drain(..) {
         let is_tactical_move = is_move_tactical(&node, &mv);
         node.do_move(&mv);
 
