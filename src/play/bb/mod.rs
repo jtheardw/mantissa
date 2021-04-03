@@ -2275,6 +2275,29 @@ impl BB {
         return center_pieces[1] - center_pieces[0];
     }
 
+    pub fn rook_on_open_file_value(&self) -> i32 {
+        let mut open_file_rooks: [i32; 2] = [0, 0];
+        let mut semi_open_file_rooks: [i32; 2] = [0, 0];
+        for i in 0..2 {
+            let side = i as usize;
+            let enemy_side = if i == 1 {0} else {1};
+            let rook_bb = self.rook[side];
+            let mut rc = 0;
+            for f in 0..8 {
+                let rooks = (FILE_MASKS[f] & rook_bb).count_ones();
+                if rooks > 0 && ((FILE_MASKS[f] & self.pawn[side]) == 0) {
+                    // at least semi-open
+                    if ((FILE_MASKS[f] & self.pawn[enemy_side]) == 0) {
+                        open_file_rooks[side] += rooks as i32;
+                    } else {
+                        semi_open_file_rooks[side] += rooks as i32;
+                    }
+                }
+            }
+        }
+        return 2 * (open_file_rooks[1] - open_file_rooks[0]) + (semi_open_file_rooks[1] - semi_open_file_rooks[0]);
+    }
+
     pub fn backwards_pawns_value(&self) -> i32 {
         let white_pawn_attacks = ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9);
 

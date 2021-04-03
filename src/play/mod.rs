@@ -180,6 +180,7 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
     val += node.pawn_advancement_value() * 40;
     val += node.get_all_pt_bonus();
     val += node.rook_on_seventh_bonus() * 150;
+    val += node.rook_on_open_file_value() * 60;
 
     // slight tempo bonus
     val += if node.white_turn {150} else {-150};
@@ -208,6 +209,7 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("King danger value: {}", -node.king_danger_value());
     eprintln!("Tempo: {}", if node.white_turn {150} else {-150});
     eprintln!("Rook on 7th: {}", node.rook_on_seventh_bonus() * 150);
+    eprintln!("Rook on (semi-)open file: {}", node.rook_on_open_file_value() * 60);
     if pht.valid {
         let pht_entry = pht.get(node.pawn_hash);
         if pht_entry.valid {
@@ -377,6 +379,9 @@ unsafe fn negamax_search(node: &mut BB,
         node.undo_null_move();
         if nmr_val >= beta {
             depth -= 4;
+            if depth <= 0 {
+                return negamax_search(node, start_time, compute_time, 0, ply, alpha, beta, maximize, false, false, false, k_table);
+            }
         }
     }
 
