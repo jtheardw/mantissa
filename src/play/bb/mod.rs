@@ -255,6 +255,8 @@ impl BB {
         self.material = 0;
         self.hash = self.get_full_hash();
         self.pawn_hash = self.get_full_pawn_hash();
+
+        self.phase = 0;
     }
 
     pub fn bb_str(bb: u64) -> String {

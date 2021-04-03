@@ -174,7 +174,7 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
     }
     val += node.material;
     val += node.mobility_value() * 70;//(bb::PAWN_VALUE / 10);
-    val += node.pawn_defense_value() * 100;
+    val += node.pawn_defense_value() * 50;
     val += node.double_bishop_bonus() * 500;
     val += node.castled_bonus() * (500 * (256 - node.get_phase()) / 256); // should decay as game advances
     val += node.pawn_advancement_value() * 40;
@@ -187,6 +187,8 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
 
     val -= node.early_queen_penalty() * 300;
     val -= node.king_danger_value();
+
+    if node.material > 500 {val += node.phase * 2;} else if node.material < -500 {val -= node.phase * 2;}
 
     return val * if node.white_turn {1} else {-1};
 }
@@ -201,15 +203,16 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Center: {}", node.center_value() * 300);
     eprintln!("Near Center: {}", node.near_center_value() * 50);
     eprintln!("Double bishop: {}", node.double_bishop_bonus() * 500);
-    eprintln!("Pawn Defense: {}", node.pawn_defense_value() * 100);
+    eprintln!("Pawn Defense: {}", node.pawn_defense_value() * 50);
     eprintln!("Pawn advancement: {}", node.pawn_advancement_value() * 40);
-    eprintln!("Castle Bonus: {}", node.castled_bonus() * (500 * (256 - node.get_phase()) / 256));
+    eprintln!("Castle Bonus: {}", node.castled_bonus() * (500 * (256 - node.phase) / 256));
     eprintln!("Early queen penalty: {}", node.early_queen_penalty() * -300);
     eprintln!("All pt bonus: {}", node.get_all_pt_bonus());
     eprintln!("King danger value: {}", -node.king_danger_value());
     eprintln!("Tempo: {}", if node.white_turn {150} else {-150});
     eprintln!("Rook on 7th: {}", node.rook_on_seventh_bonus() * 150);
     eprintln!("Rook on (semi-)open file: {}", node.rook_on_open_file_value() * 60);
+    eprintln!("Material lead bonus: {}", if node.material > 500 {node.phase * 2} else if node.material < -500 {-node.phase * 2} else {0});
     if pht.valid {
         let pht_entry = pht.get(node.pawn_hash);
         if pht_entry.valid {
@@ -304,7 +307,7 @@ unsafe fn negamax_search(node: &mut BB,
         HITS += 1;
         let mv = tt_entry.mv;
         first_move = mv;
-        is_cut = tt_entry.node_type == CUT_NODE;
+        is_cut = tt_entry.node_type == CUT_NODE && !init;
         // is_pv = tt_entry.node_type == PV_NODE;
         if tt_entry.depth >= depth {
             if tt_entry.node_type == PV_NODE
@@ -384,6 +387,34 @@ unsafe fn negamax_search(node: &mut BB,
             }
         }
     }
+
+    let mut tried = 0;
+    let mut cuts = 0;
+    let m = 8;
+    let c = 3;
+    let r = 3;
+
+    // multicut
+    if is_cut {
+        for mv in moves.iter() {
+            node.do_move(&mv);
+            let score = -negamax_search(node, start_time, compute_time, depth - 1 - r, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table).1;
+            node.undo_move(&mv);
+            if score >= beta {
+                cuts += 1;
+                if cuts >= c {
+                    return (Mv::null_move(), beta, CUT_NODE);
+                }
+            }
+
+            tried += 1;
+            if tried >= m {
+                break;
+            }
+        }
+    }
+
+
 
     let is_futile = !init && (depth == 1 && evaluate_position(&node) < (alpha - 3500)); // || (depth == 2 && evaluate_position(&node) < (alpha - 5500)));
     let mut legal_move = false;
