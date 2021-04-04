@@ -282,20 +282,21 @@ fn moves_equivalent(mv1: &Mv, mv2: &Mv) -> bool {
             && mv1.is_ep == mv2.is_ep;
 }
 
-fn order_moves(mut moves: VecDeque<Mv>, best_move: Mv) -> VecDeque<Mv> {
+fn order_moves(mut moves: Vec<Mv>, best_move: Mv) -> Vec<Mv> {
     if best_move.is_null { return moves; }
     let mut found_move = false;
-    let mut new_q: VecDeque<Mv> = VecDeque::new();
-
-    for mv in moves.drain(..) {
+    let mut new_q: Vec<Mv> = Vec::new();
+    new_q.push(best_move);
+    for mv in moves {
         if moves_equivalent(&mv, &best_move) {
             found_move = true;
         } else {
-            new_q.push_back(mv);
+            new_q.push(mv);
         }
     }
-    if found_move {
-        new_q.push_front(best_move);
+    if !found_move {
+        // new_q.push_front(best_move);
+        new_q.remove(0);
     }
     return new_q;
 }
@@ -355,28 +356,28 @@ unsafe fn negamax_search(node: &mut BB,
                 || (tt_entry.value >= beta && tt_entry.node_type == CUT_NODE) // cut node is lower bound
             {
                 let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize]), first_move);
-                match moves.pop_front() {
-                    Some(fm) => {
-                        if moves_equivalent(&first_move, &fm) {
-                            // check 3 fold
-                            if !node.is_repitition() {
-                                let node_type = if tt_entry.value > alpha {if tt_entry.value >= beta {CUT_NODE} else {PV_NODE}} else {ALL_NODE};
-                                return (mv, if node_type ==  CUT_NODE {beta} else {tt_entry.value}, node_type);
-                            }
-                        } else {
-                            // weird collision
-                            first_move = Mv::null_move();
+                if moves.len() > 0 {
+                    let fm = moves[0];
+                    if moves_equivalent(&first_move, &fm) {
+                        // check 3 fold
+                        if !node.is_repitition() {
+                            let node_type = if tt_entry.value > alpha {if tt_entry.value >= beta {CUT_NODE} else {PV_NODE}} else {ALL_NODE};
+                            return (mv, if node_type ==  CUT_NODE {beta} else {tt_entry.value}, node_type);
                         }
-                    },
-                    None => {first_move = Mv::null_move();}
-                };
+                    } else {
+                        // weird collision
+                        first_move = Mv::null_move();
+                    }
+                } else {
+                    first_move = Mv::null_move();
+                }
             }
         }
     } else if depth > 6 {
         // internal iterative deepending
         let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize]), first_move);
         let mut best_val = LB;
-        for mv in moves.drain(..) {
+        for mv in moves {
             node.do_move(&mv);
             if node.is_check(maximize) {
                 node.undo_move(&mv);
@@ -581,7 +582,7 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
 
     let mut best_val = LB;
     let mut best_mv: Mv = Mv::null_move();
-    for mv in node.moves().drain(..) {
+    for mv in node.moves() {
         node.do_move(&mv);
         let res = quiescence_search(node, depth - 1, -beta, -alpha, !maximize);
         node.undo_move(&mv);

@@ -1302,8 +1302,8 @@ impl BB {
     }
 
     // move generation
-    pub fn king_moves(&self, white: bool) -> VecDeque<Mv> {
-        let mut moves: VecDeque<Mv> = VecDeque::new();
+    pub fn king_moves(&self, white: bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
         let mut start_idx: i32 = -1;
         let mut king_loc_bb = self.king[white as usize];
 
@@ -1324,17 +1324,17 @@ impl BB {
                 end_idx += c;
                 king_bb = king_bb >> c;
 
-                moves.push_back(Mv::normal_move(start_idx, end_idx, b'k'));
+                moves.push(Mv::normal_move(start_idx, end_idx, b'k'));
             }
 
             // kingside-castling
             if self.can_castle(white, false) {
-                moves.push_back(Mv::normal_move(start_idx, start_idx + 2, b'k'));
+                moves.push(Mv::normal_move(start_idx, start_idx + 2, b'k'));
             }
 
             // queenside-castling
             if self.can_castle(white, true) {
-                moves.push_back(Mv::normal_move(start_idx, start_idx - 2, b'k'));
+                moves.push(Mv::normal_move(start_idx, start_idx - 2, b'k'));
             }
         }
         return moves;
@@ -1352,15 +1352,16 @@ impl BB {
         return atked_squares & self.composite[white as usize];
     }
 
-    pub fn order_capture_moves(&self, mut mvs: VecDeque<Mv>, k_array: &[Mv; 3]) -> VecDeque<Mv> {
+    pub fn order_capture_moves(&self, mut mvs: Vec<Mv>, k_array: &[Mv; 3]) -> Vec<Mv> {
         let enemy_side = !self.white_turn as usize;
         let enemy_occ = self.composite[enemy_side];
-        let mut winning_caps: VecDeque<Mv> = VecDeque::new();
-        let mut equal_caps: VecDeque<Mv> = VecDeque::new();
-        let mut losing_caps: VecDeque<Mv> = VecDeque::new();
-        let mut killer_moves: VecDeque<Mv> = VecDeque::new();
-        let mut no_caps: VecDeque<Mv> = VecDeque::new();
-        let mut mv_q: VecDeque<Mv> = VecDeque::new();
+        let mut free_caps: Vec<Mv> = Vec::new();
+        let mut winning_caps: Vec<Mv> = Vec::new();
+        let mut equal_caps: Vec<Mv> = Vec::new();
+        let mut losing_caps: Vec<Mv> = Vec::new();
+        let mut killer_moves: Vec<Mv> = Vec::new();
+        let mut no_caps: Vec<Mv> = Vec::new();
+        let mut mv_q: Vec<Mv> = Vec::new();
         let def_pieces = self.get_defended_pieces(!self.white_turn);
         for mv in mvs.drain(..) {
             let dst_bb = BB::idx_to_bb(mv.end);
@@ -1368,73 +1369,74 @@ impl BB {
                 // capture of some sort
                 if dst_bb & def_pieces == 0 {
                     // undefended piece.  That's good
-                    winning_caps.push_front(mv);
+                    free_caps.push(mv);
                     continue;
                 }
                 match mv.piece {
                     b'p' => {
                         if (dst_bb & self.pawn[enemy_side]) != 0 {
-                            equal_caps.push_back(mv);
+                            equal_caps.push(mv);
                         } else {
                             // must be capturing non-pawn
-                            winning_caps.push_front(mv);
+                            winning_caps.push(mv);
                         }
                     },
                     b'n' => {
                         // losing
                         if (dst_bb & self.pawn[enemy_side]) != 0 {
-                            losing_caps.push_back(mv);
+                            losing_caps.push(mv);
                         } else if (dst_bb & (self.knight[enemy_side] | self.bishop[enemy_side])) != 0 {
-                            equal_caps.push_back(mv);
+                            equal_caps.push(mv);
                         } else {
-                            winning_caps.push_back(mv);
+                            winning_caps.push(mv);
                         }
                     },
                     b'b' => {
                         // losing
                         if (dst_bb & self.pawn[enemy_side]) != 0 {
-                            losing_caps.push_back(mv);
+                            losing_caps.push(mv);
                         } else if (dst_bb & (self.knight[enemy_side] | self.bishop[enemy_side])) != 0 {
-                            equal_caps.push_back(mv);
+                            equal_caps.push(mv);
                         } else {
-                            winning_caps.push_back(mv);
+                            winning_caps.push(mv);
                         }
                     },
                     b'r' => {
                         // winning
                         if (dst_bb & (self.queen[enemy_side] | self.king[enemy_side])) != 0 {
-                            winning_caps.push_back(mv);
+                            winning_caps.push(mv);
                         } else if (dst_bb & self.rook[enemy_side]) != 0 {
-                            equal_caps.push_back(mv);
+                            equal_caps.push(mv);
                         } else {
-                            losing_caps.push_back(mv);
+                            losing_caps.push(mv);
                         }
                     },
                     b'q' => {
                         // winning
                         if (dst_bb & self.king[enemy_side]) != 0 {
-                            winning_caps.push_back(mv);
+                            winning_caps.push(mv);
                         } else if (dst_bb & self.queen[enemy_side]) != 0 {
-                            equal_caps.push_back(mv);
+                            equal_caps.push(mv);
                         } else {
-                            losing_caps.push_back(mv);
+                            losing_caps.push(mv);
                         }
                     },
-                    _ => {no_caps.push_back(mv);}
+                    _ => {no_caps.push(mv);}
                 }
             } else {
                 if BB::moves_equivalent(&mv, &k_array[0]) {
-                    killer_moves.push_back(mv);
+                    killer_moves.push(mv);
                 } else if BB::moves_equivalent(&mv, &k_array[1]) {
-                    killer_moves.push_back(mv);
+                    killer_moves.push(mv);
                 } else if BB::moves_equivalent(&mv, &k_array[2]) {
-                    killer_moves.push_back(mv);
+                    killer_moves.push(mv);
                 } else {
-                    no_caps.push_back(mv);
+                    no_caps.push(mv);
                 }
             }
         }
 
+        mv_q.append(& mut free_caps);
         mv_q.append(& mut winning_caps);
         mv_q.append(& mut equal_caps);
         mv_q.append(& mut killer_moves);
@@ -1452,8 +1454,8 @@ impl BB {
             && mv1.is_ep == mv2.is_ep;
     }
 
-    pub fn knight_moves(&self, white: bool) -> VecDeque<Mv> {
-        let mut moves: VecDeque<Mv> = VecDeque::new();
+    pub fn knight_moves(&self, white: bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
         let mut start_idx: i32 = -1;
         let mut knight_loc_bb = self.knight[white as usize];
 
@@ -1473,14 +1475,14 @@ impl BB {
                 end_idx += c;
                 knight_bb = knight_bb >> c;
 
-                moves.push_back(Mv::normal_move(start_idx, end_idx, b'n'));
+                moves.push(Mv::normal_move(start_idx, end_idx, b'n'));
             }
         }
         return moves;
     }
 
-    pub fn pawn_moves(&self, white: bool) -> VecDeque<Mv> {
-        let mut moves: VecDeque<Mv> = VecDeque::new();
+    pub fn pawn_moves(&self, white: bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
         let mut start_idx = -1;
         let mut pawn_loc_bb = self.pawn[white as usize];
         let all_composite = self.composite[0] | self.composite[1];
@@ -1534,15 +1536,15 @@ impl BB {
                 pawn_capture_bb = pawn_capture_bb >> c;
 
                 if end_idx == self.ep {
-                    moves.push_back(Mv::pawn_ep_move(start_idx, end_idx));
+                    moves.push(Mv::pawn_ep_move(start_idx, end_idx));
                 } else {
                     if (white && end_idx >= 56) || (!white && end_idx < 8) {
                         // promotion
                         for p in [b'q', b'r', b'b', b'n'].iter() {
-                            moves.push_back(Mv::pawn_promote_move(start_idx, end_idx, *p));
+                            moves.push(Mv::pawn_promote_move(start_idx, end_idx, *p));
                         }
                     } else {
-                        moves.push_back(Mv::pawn_move(start_idx, end_idx));
+                        moves.push(Mv::pawn_move(start_idx, end_idx));
                     }
                 }
             }
@@ -1558,10 +1560,10 @@ impl BB {
                 if (white && end_idx >= 56) || (!white && end_idx < 8) {
                     // promotion
                     for p in [b'q', b'r', b'b', b'n'].iter() {
-                        moves.push_back(Mv::pawn_promote_move(start_idx, end_idx, *p));
+                        moves.push(Mv::pawn_promote_move(start_idx, end_idx, *p));
                     }
                 } else {
-                    moves.push_back(Mv::pawn_move(start_idx, end_idx));
+                    moves.push(Mv::pawn_move(start_idx, end_idx));
                 }
             }
         }
@@ -1569,8 +1571,8 @@ impl BB {
         return moves;
     }
 
-    pub fn rook_moves(&self, white:bool) -> VecDeque<Mv> {
-        let mut moves: VecDeque<Mv> = VecDeque::new();
+    pub fn rook_moves(&self, white:bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
         let mut start_idx = -1;
         let mut rook_loc_bb = self.rook[white as usize];
         let all_composite = self.composite[!white as usize] | self.composite[white as usize];
@@ -1596,14 +1598,14 @@ impl BB {
                 end_idx += c;
                 rook_bb = rook_bb >> c;
 
-                moves.push_back(Mv::normal_move(start_idx, end_idx, b'r'));
+                moves.push(Mv::normal_move(start_idx, end_idx, b'r'));
             }
         }
         return moves;
     }
 
-    pub fn bishop_moves(&self, white:bool) -> VecDeque<Mv> {
-        let mut moves: VecDeque<Mv> = VecDeque::new();
+    pub fn bishop_moves(&self, white:bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
         let mut start_idx = -1;
         let mut bishop_loc_bb = self.bishop[white as usize];
         let all_composite = self.composite[!white as usize] | self.composite[white as usize];
@@ -1629,14 +1631,14 @@ impl BB {
                 end_idx += c;
                 bishop_bb = bishop_bb >> c;
 
-                moves.push_back(Mv::normal_move(start_idx, end_idx, b'b'));
+                moves.push(Mv::normal_move(start_idx, end_idx, b'b'));
             }
         }
         return moves;
     }
 
-    pub fn queen_moves(&self, white:bool) -> VecDeque<Mv> {
-        let mut moves: VecDeque<Mv> = VecDeque::new();
+    pub fn queen_moves(&self, white:bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
         let mut start_idx = -1;
         let mut queen_loc_bb = self.queen[white as usize];
         let all_composite = self.composite[!white as usize] | self.composite[white as usize];
@@ -1668,14 +1670,14 @@ impl BB {
                 end_idx += c;
                 queen_bb = queen_bb >> c;
 
-                moves.push_back(Mv::normal_move(start_idx, end_idx, b'q'));
+                moves.push(Mv::normal_move(start_idx, end_idx, b'q'));
             }
         }
         return moves;
     }
 
-    pub fn moves(&self) -> VecDeque<Mv> {
-        let mut move_queue : VecDeque<Mv> = VecDeque::new();
+    pub fn moves(&self) -> Vec<Mv> {
+        let mut move_queue : Vec<Mv> = Vec::new();
 
         move_queue.append(& mut self.pawn_moves(self.white_turn));
         move_queue.append(& mut self.king_moves(self.white_turn));
