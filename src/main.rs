@@ -2,6 +2,7 @@
 #![feature(destructuring_assignment)]
 
 use std::io;
+use std::str::Split;
 mod play;
 
 struct Game {
@@ -34,6 +35,53 @@ impl Game {
             eval_params: eval_params,
             white_turn: true,
         }
+    }
+
+    fn update_param(& mut self, option: &str, value_str : &str) {
+        let value : i32 = match value_str.trim().parse() {
+            Ok(num) => num,
+            Err(_) => {eprintln!("invalid param"); return;}
+        };
+
+        match option {
+            "mobility" => { self.eval_params.mobility = value; },
+            "pdf" => { self.eval_params.pdf = value; },
+            "dbb" => { self.eval_params.dbb = value; },
+            "castle" => { self.eval_params.castle = value; },
+            "pav" => { self.eval_params.pav = value; },
+            "rook_on_seventh" => { self.eval_params.rook_on_seventh = value; },
+            "rook_on_open" => { self.eval_params.rook_on_open = value; },
+            "early_queen_penalty" => { self.eval_params.early_queen_penalty = value; },
+
+            "passed_pawn" => { self.eval_params.passed_pawn = value; },
+            "center_pawn" => { self.eval_params.center_pawn = value; },
+            "near_center_pawn" => { self.eval_params.near_center_pawn = value; },
+            "isolated_pawn" => { self.eval_params.isolated_pawn = value; },
+            "doubled_pawn" => { self.eval_params.doubled_pawn = value; },
+            "backwards_pawn" => { self.eval_params.backwards_pawn = value; },
+
+            "pawn_pt_offset" => { self.eval_params.pawn_pt_offset = value; },
+            "pawn_pt_scale" => { self.eval_params.pawn_pt_scale = value; },
+
+            "bishop_pt_offset" => { self.eval_params.bishop_pt_offset = value; },
+            "bishop_pt_scale" => { self.eval_params.bishop_pt_scale = value; },
+
+            "knight_pt_offset" => { self.eval_params.knight_pt_offset = value; },
+            "knight_pt_scale" => { self.eval_params.knight_pt_scale = value; },
+
+            "king_mg_pt_offset" => { self.eval_params.king_mg_pt_offset = value; },
+            "king_mg_pt_scale" => { self.eval_params.king_mg_pt_scale = value; },
+
+            "king_eg_pt_offset" => { self.eval_params.king_eg_pt_offset = value; },
+            "king_eg_pt_scale" => { self.eval_params.king_eg_pt_scale = value; },
+
+            "tempo_bonus" => { self.eval_params.tempo_bonus = value; },
+            "material_advantage" => { self.eval_params.material_advantage = value; },
+            "king_danger" => { self.eval_params.king_danger = value; },
+            _ => {}
+        }
+
+        self.board.eval_params = self.eval_params;
     }
 
     fn reset(& mut self) {
@@ -143,7 +191,17 @@ unsafe fn play() {
         if cmd == "isready" {
             println!("readyok");
         }
-        if cmd == "setoption" {}
+        if cmd == "setoption" {
+            match params.next() {
+                Some(o) => {
+                    match params.next() {
+                        Some(p) => {game.update_param(o, p);}
+                        None => {}
+                    }
+                }
+                None => {}
+            }
+        }
         if cmd == "ucinewgame" {
             game.reset();
         }
