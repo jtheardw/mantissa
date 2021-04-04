@@ -6,6 +6,7 @@ mod play;
 
 struct Game {
     pub board: play::bb::BB,
+    pub eval_params: play::bb::EvalParams,
     white_turn: bool,
 }
 
@@ -18,22 +19,33 @@ impl Game {
         zobrist_table: ([[u64; 12]; 64], (u64, u64))
     ) -> Game {
 
+        let eval_params = play::bb::EvalParams::default_params();
         let board = play::bb::BB::default_board(
             knight_mask,
             rook_mask,
             bishop_mask,
             king_mask,
-            zobrist_table
+            zobrist_table,
+            eval_params
         );
+
         Game{
             board: board,
+            eval_params: eval_params,
             white_turn: true,
         }
     }
 
     fn reset(& mut self) {
         self.board.reset();
+        self.board.eval_params = self.eval_params;
         self.white_turn = true;
+    }
+
+    fn reset_fen(& mut self, fen: String) {
+        self.board.reset_from_position(fen);
+        self.board.eval_params = self.eval_params;
+        self.white_turn = self.board.white_turn;
     }
 
     fn receive_move(& mut self, mv: String) {
@@ -140,13 +152,22 @@ unsafe fn play() {
                 Some(p) => {
                     if p == "startpos" {
                         game.reset();
-                        if params.next() == Some("moves") {
-                            loop {
-                                match params.next() {
-                                    Some(mv) => {game.receive_move(mv.to_string());},
-                                    None => {break;}
-                                };
+                    } else if p == "fen" {
+                        let mut position_str: String = String::from("");
+                        for i in 0..6 {
+                            match params.next() {
+                                Some(param) => {position_str.push_str(param); position_str.push_str(" "); eprintln!("{}", param);}
+                                None => {panic!("bad fen");}
                             }
+                        }
+                        game.reset_fen(position_str);
+                    }
+                    if params.next() == Some("moves") {
+                        loop {
+                            match params.next() {
+                                Some(mv) => {game.receive_move(mv.to_string());},
+                                None => {break;}
+                            };
                         }
                     }
                 },

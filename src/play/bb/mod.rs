@@ -130,6 +130,90 @@ const AHEAD_RANKS: [[u64; 8]; 2] =
         ],
     ];
 
+#[derive(Copy, Clone)]
+pub struct EvalParams {
+    pub mobility: i32,
+    pub pdf: i32,         // pawn defense
+    pub dbb: i32,         // double-bishop
+    pub castle: i32,
+    pub pav: i32,         // pawn advancement
+    pub rook_on_seventh: i32,
+    pub rook_on_open: i32,
+    pub early_queen_penalty: i32,
+
+    // pawn structure
+    pub passed_pawn: i32,
+    pub center_pawn: i32,
+    pub near_center_pawn: i32,
+    pub isolated_pawn: i32,
+    pub doubled_pawn: i32,
+    pub backwards_pawn: i32,
+
+    // piece tables
+    pub pawn_pt_offset: i32,
+    pub pawn_pt_scale: i32,
+
+    pub bishop_pt_offset: i32,
+    pub bishop_pt_scale: i32,
+
+    pub knight_pt_offset: i32,
+    pub knight_pt_scale: i32,
+
+    pub king_mg_pt_offset: i32,
+    pub king_mg_pt_scale: i32,
+
+    pub king_eg_pt_offset: i32,
+    pub king_eg_pt_scale: i32,
+
+    // tempo
+    pub tempo_bonus: i32,
+
+    // slight bonus to leader in material
+    pub material_advantage: i32,
+    pub king_danger: i32
+}
+
+impl EvalParams {
+    pub fn default_params() -> EvalParams {
+        EvalParams {
+            mobility: 70,
+            pdf: 50,
+            dbb: 500,
+            castle: 500,
+            pav: 40,
+            rook_on_seventh: 150,
+            rook_on_open: 60,
+            early_queen_penalty: -300,
+
+            passed_pawn: 500,
+            center_pawn: 300,
+            near_center_pawn: 50,
+            isolated_pawn: -300,
+            doubled_pawn: -300,
+            backwards_pawn: -300,
+
+            pawn_pt_offset: 0,
+            pawn_pt_scale: 100,
+
+            bishop_pt_offset: 0,
+            bishop_pt_scale: 100,
+
+            knight_pt_offset: 0,
+            knight_pt_scale: 100,
+
+            king_mg_pt_offset: 0,
+            king_mg_pt_scale: 100,
+
+            king_eg_pt_offset: 0,
+            king_eg_pt_scale: 100,
+
+            tempo_bonus: 150,
+            material_advantage: 200,
+            king_danger: -100,
+        }
+    }
+}
+
 pub struct BB {
     pub white_turn: bool,
 
@@ -168,6 +252,8 @@ pub struct BB {
     pub pawn_hash: u64,
     pub zobrist_table: ([[u64; 12]; 64], (u64, u64)),
     pub phase: i32,
+
+    pub eval_params: EvalParams
 }
 
 impl BB {
@@ -282,13 +368,32 @@ impl BB {
         return mat;
     }
 
+    pub fn slow_get_phase(&self) -> i32 {
+        let mut phase = 240;
+        phase -= (self.queen[1].count_ones() as i32) * board_eval::QUEEN_PHASE;
+        phase -= (self.queen[0].count_ones() as i32) * board_eval::QUEEN_PHASE;
+        phase -= (self.rook[1].count_ones() as i32) * board_eval::ROOK_PHASE;
+        phase -= (self.rook[0].count_ones() as i32) * board_eval::ROOK_PHASE;
+        phase -= (self.bishop[1].count_ones() as i32) * board_eval::BISHOP_PHASE;
+        phase -= (self.bishop[0].count_ones() as i32) * board_eval::BISHOP_PHASE;
+        phase -= (self.knight[1].count_ones() as i32) * board_eval::KNIGHT_PHASE;
+        phase -= (self.knight[0].count_ones() as i32) * board_eval::KNIGHT_PHASE;
+
+        if phase < 0 {
+            phase = 0;
+        }
+
+        return phase;
+    }
+
     pub fn from_position(
         fen: String,
         knight_mask: [u64; 64],
         rook_mask: [u64; 64],
         bishop_mask: [u64; 64],
         king_mask: [u64; 64],
-        zobrist_table: ([[u64; 12]; 64], (u64, u64))
+        zobrist_table: ([[u64; 12]; 64], (u64, u64)),
+        eval_params: EvalParams
     ) -> BB {
         let mut black_king: u64 = 0;
         let mut white_king: u64 = 0;
@@ -445,12 +550,165 @@ impl BB {
             hash: 0,
             pawn_hash: 0,
             zobrist_table: zobrist_table,
+            eval_params: eval_params,
             phase: 0,
         };
         bb.material = bb.get_material();
         bb.hash = bb.get_full_hash();
         bb.pawn_hash = bb.get_full_pawn_hash();
+        bb.phase = bb.slow_get_phase();
         return bb;
+    }
+
+    pub fn reset_from_position(
+        & mut self,
+        fen: String,
+    ) {
+        let mut black_king: u64 = 0;
+        let mut white_king: u64 = 0;
+
+        let mut black_queen: u64 = 0;
+        let mut white_queen: u64 = 0;
+
+        let mut black_rook: u64 = 0;
+        let mut white_rook: u64 = 0;
+
+        let mut black_bishop: u64 = 0;
+        let mut white_bishop: u64 = 0;
+
+        let mut black_knight: u64 = 0;
+        let mut white_knight: u64 = 0;
+
+        let mut black_pawn: u64 = 0;
+        let mut white_pawn: u64 = 0;
+
+        let mut rank: i32 = 7;
+        let mut file: i32 = 0;
+
+        let mut fen_split = fen.split(' ');
+        let positions = match fen_split.next() {
+            Some(s) => String::from(s),
+            None => panic!("bad FEN string")
+        };
+
+        for c in positions.as_bytes().iter() {
+            let c = *c;
+            match c {
+                b'k' => {black_king |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'K' => {white_king |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'q' => {black_queen |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'Q' => {white_queen |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'r' => {black_rook |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'R' => {white_rook |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'b' => {black_bishop |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'B' => {white_bishop |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'n' => {black_knight |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'N' => {white_knight |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'p' => {black_pawn |= BB::coord_to_bb((file, rank)); file += 1;},
+                b'P' => {white_pawn |= BB::coord_to_bb((file, rank)); file += 1;},
+
+                b'/' => {rank -= 1; file = 0;},
+                b'1' => {file += 1},
+                b'2' => {file += 2},
+                b'3' => {file += 3},
+                b'4' => {file += 4},
+                b'5' => {file += 5},
+                b'6' => {file += 6},
+                b'7' => {file += 7},
+                b'8' => {file += 8},
+                _ => {}
+            };
+        }
+
+        let mut white_turn = true;
+
+        match fen_split.next() {
+            Some(s) => {if s == "b" {white_turn = false;}},
+            None => panic!("bad FEN string")
+        };
+
+        let cr_str = match fen_split.next() {
+            Some(s) => s,
+            None => panic!("bad FEN string")
+        };
+
+        let mut cr: u64 = 0;
+        let wk_mask = BB::coord_to_bb((4, 0));
+        let bk_mask = BB::coord_to_bb((4, 7));
+        let wrk_mask = BB::coord_to_bb((7, 0));
+        let brk_mask = BB::coord_to_bb((7, 7));
+        let wrq_mask = BB::coord_to_bb((0, 0));
+        let brq_mask = BB::coord_to_bb((0, 7));
+
+        if cr_str != "-" {
+            for c in String::from(cr_str).as_bytes().iter() {
+                let c = *c;
+                match c {
+                    b'k' => {cr |= bk_mask | brk_mask;},
+                    b'K' => {cr |= wk_mask | wrk_mask;},
+                    b'q' => {cr |= bk_mask | brq_mask;},
+                    b'Q' => {cr |= wk_mask | wrq_mask;},
+                    _ => panic!("bad CR")
+                };
+            }
+        }
+
+        let ep_str = match fen_split.next() {
+            Some(s) => s,
+            None => panic!("bad fen str")
+        };
+
+        let mut ep: i32 = -1;
+        if ep_str != "-" {
+            let ep_str = String::from(ep_str);
+            let ep_chars = ep_str.as_bytes();
+            let file = ep_chars[0] - b'a';
+            let rank = ep_chars[1] - b'1';
+            ep = BB::coord_to_idx((file as i32, rank as i32));
+        }
+
+        let king = [black_king, white_king];
+        let queen = [black_queen, white_queen];
+        let rook = [black_rook, white_rook];
+        let bishop = [black_bishop, white_bishop];
+        let knight = [black_knight, white_knight];
+        let pawn = [black_pawn, white_pawn];
+
+        let black_composite = black_king | black_queen | black_rook | black_bishop | black_knight | black_pawn;
+        let white_composite = white_king | white_queen | white_rook | white_bishop | white_knight | white_pawn;
+        let composite = [black_composite, white_composite];
+
+        self.white_turn = white_turn;
+        self.king = king;
+        self.queen = queen;
+        self.rook = rook;
+        self.bishop = bishop;
+        self.knight = knight;
+        self.pawn = pawn;
+        self.composite = composite;
+
+        self.castling_rights = cr;
+        self.castled = [false, false];
+
+        self.ep = ep;
+
+        // stacks
+        self.ep_stack = Vec::new();
+        self.cap_stack = Vec::new();
+        self.cr_stack = Vec::new();
+        self.history = Vec::new();
+        self.pawn_history = Vec::new();
+
+        self.material = self.get_material();
+        self.hash = self.get_full_hash();
+        self.pawn_hash = self.get_full_pawn_hash();
+
+        self.phase = self.slow_get_phase();
     }
 
     // constructors
@@ -459,7 +717,8 @@ impl BB {
         rook_mask: [u64; 64],
         bishop_mask: [u64; 64],
         king_mask: [u64; 64],
-        zobrist_table: ([[u64; 12]; 64], (u64, u64))
+        zobrist_table: ([[u64; 12]; 64], (u64, u64)),
+        eval_params: EvalParams
     ) -> BB {
         let black_king = BB::coord_to_bb((4, 7));
         let white_king = BB::coord_to_bb((4, 0));
@@ -538,6 +797,8 @@ impl BB {
             pawn_hash: 0,
             zobrist_table: zobrist_table,
             phase: 0,
+
+            eval_params: eval_params
         };
         bb.hash = bb.get_full_hash();
         bb.pawn_hash = bb.get_full_pawn_hash();
@@ -2002,7 +2263,7 @@ impl BB {
     }
 
     pub fn king_danger_value(&self) -> i32 {
-        return self.king_danger_helper(true) - self.king_danger_helper(false);
+        return (self.eval_params.king_danger * (self.king_danger_helper(true) - self.king_danger_helper(false))) / 100;
     }
 
     pub fn rook_on_seventh_bonus(&self) -> i32 {
@@ -2012,7 +2273,7 @@ impl BB {
 
         let black_bonus = (self.rook[0] & RANK_MASKS[1]).count_ones() as i32;
         let black_cond = (self.king[1] & RANK_MASKS[0]) != 0 || (self.pawn[1] & RANK_MASKS[1] != 0);
-        return if white_cond {white_bonus} else {0} - if black_cond {black_bonus} else {0};
+        return self.eval_params.rook_on_seventh * (if white_cond {white_bonus} else {0} - if black_cond {black_bonus} else {0});
     }
 
     fn rook_mobility(&self, white: bool) -> i32 {
@@ -2165,7 +2426,7 @@ impl BB {
             mobility[side] += self.pawn_mobility(white);
         }
 
-        return mobility[1] - mobility[0];
+        return self.eval_params.mobility * (mobility[1] - mobility[0]);
     }
 
     pub fn doubled_pawns_value(&self) -> i32 {
@@ -2180,7 +2441,7 @@ impl BB {
                 }
             }
         }
-        return doubled_pawns[1] - doubled_pawns[0];
+        return self.eval_params.doubled_pawn * (doubled_pawns[1] - doubled_pawns[0]);
     }
 
     pub fn isolated_pawns_value(&self) -> i32 {
@@ -2205,7 +2466,7 @@ impl BB {
                 }
             }
         }
-        return isolated_pawns[1] - isolated_pawns[0];
+        return self.eval_params.isolated_pawn * (isolated_pawns[1] - isolated_pawns[0]);
     }
 
     pub fn passed_pawns_value(&self) -> i32 {
@@ -2242,7 +2503,7 @@ impl BB {
                 }
             }
         }
-        return passed_pawns[1] - passed_pawns[0];
+        return self.eval_params.passed_pawn * (passed_pawns[1] - passed_pawns[0]);
     }
 
     pub fn center_value(&self) -> i32 {
@@ -2251,7 +2512,7 @@ impl BB {
             let side = i as usize;
             center_pieces[side] = (CENTER_MASK & self.pawn[side]).count_ones() as i32;
         }
-        return center_pieces[1] - center_pieces[0];
+        return self.eval_params.center_pawn * (center_pieces[1] - center_pieces[0]);
     }
 
     pub fn pawn_defense_value(&self) -> i32 {
@@ -2265,7 +2526,7 @@ impl BB {
         let pawn_capture_mask = ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7);
         pdf -= (pawn_capture_mask & self.composite[0]).count_ones() as i32;
 
-        return pdf;
+        return self.eval_params.pdf * pdf;
     }
 
     pub fn near_center_value(&self) -> i32 {
@@ -2274,7 +2535,7 @@ impl BB {
             let side = i as usize;
             center_pieces[side] = (NEAR_CENTER_MASK & (self.pawn[side])).count_ones() as i32;
         }
-        return center_pieces[1] - center_pieces[0];
+        return self.eval_params.near_center_pawn * (center_pieces[1] - center_pieces[0]);
     }
 
     pub fn rook_on_open_file_value(&self) -> i32 {
@@ -2297,7 +2558,7 @@ impl BB {
                 }
             }
         }
-        return 2 * (open_file_rooks[1] - open_file_rooks[0]) + (semi_open_file_rooks[1] - semi_open_file_rooks[0]);
+        return self.eval_params.rook_on_open * (2 * (open_file_rooks[1] - open_file_rooks[0]) + (semi_open_file_rooks[1] - semi_open_file_rooks[0]));
     }
 
     pub fn backwards_pawns_value(&self) -> i32 {
@@ -2316,7 +2577,7 @@ impl BB {
         let white_backwards_pawns = (self.pawn[1] << 8) & black_pawn_attacks & !white_pawn_attack_proj;
         let black_backwards_pawns = (self.pawn[0] >> 8) & white_pawn_attacks & !black_pawn_attack_proj;
 
-        return white_backwards_pawns.count_ones() as i32 - black_backwards_pawns.count_ones() as i32;
+        return self.eval_params.backwards_pawn * (white_backwards_pawns.count_ones() as i32 - black_backwards_pawns.count_ones() as i32);
     }
 
     pub fn pawn_advancement_value(&self) -> i32 {
@@ -2340,11 +2601,11 @@ impl BB {
         }
 
         let scale_numerator = 256 + self.get_phase();
-        return ((pawn_advancement[1] - pawn_advancement[0]) * scale_numerator) / 256;
+        return self.eval_params.pav * (((pawn_advancement[1] - pawn_advancement[0]) * scale_numerator) / 256);
     }
 
     pub fn double_bishop_bonus(&self) -> i32 {
-        return (self.bishop[1].count_ones() >= 2) as i32 - (self.bishop[0].count_ones() >= 2) as i32;
+        return self.eval_params.dbb * ((self.bishop[1].count_ones() >= 2) as i32 - (self.bishop[0].count_ones() >= 2) as i32);
     }
 
     pub fn early_queen_penalty(&self) -> i32 {
@@ -2362,15 +2623,45 @@ impl BB {
             early_queen_black = 1;
         }
 
-        return early_queen_white - early_queen_black;
+        return self.eval_params.early_queen_penalty * (early_queen_white - early_queen_black);
+    }
+
+    pub fn tempo_bonus(&self) -> i32 {
+        return self.eval_params.tempo_bonus * if {self.white_turn} {1} else {-1};
+    }
+
+    pub fn material_advantage_bonus(&self) -> i32 {
+        if self.material.abs() < 500 {
+            return 0;
+        }
+        return (self.eval_params.material_advantage * self.phase * if self.material > 0 {1} else {-1}) / 100;
     }
 
     pub fn castled_bonus(&self) -> i32 {
-        return self.castled[1] as i32 - self.castled[0] as i32;
+        let castled_diff = self.castled[1] as i32 - self.castled[0] as i32;
+        return castled_diff * (self.eval_params.castle * (256 - self.get_phase()) / 256)
     }
 
     pub fn get_all_pt_bonus(&self) -> i32 {
-        return self.get_pawn_pt_bonus() + self.get_knight_pt_bonus() + self.get_bishop_pt_bonus() + self.get_king_pt_bonus();
+        let pawn_pt_bonus = self.get_pawn_pt_bonus();
+        let adj_pawn_pt_bonus = self.eval_params.pawn_pt_offset + (pawn_pt_bonus * self.eval_params.pawn_pt_scale) / 100;
+
+        let bishop_pt_bonus = self.get_bishop_pt_bonus();
+        let adj_bishop_pt_bonus = self.eval_params.bishop_pt_offset + (bishop_pt_bonus * self.eval_params.bishop_pt_scale) / 100;
+
+        let knight_pt_bonus = self.get_knight_pt_bonus();
+        let adj_knight_pt_bonus = self.eval_params.knight_pt_offset + (knight_pt_bonus * self.eval_params.knight_pt_scale) / 100;
+
+        let king_mg_pt_bonus = self.get_king_mg_pt_bonus();
+        let adj_king_mg_pt_bonus = self.eval_params.king_mg_pt_offset + (king_mg_pt_bonus * self.eval_params.king_mg_pt_scale) / 100;
+
+        let king_eg_pt_bonus = self.get_king_eg_pt_bonus();
+        let adj_king_eg_pt_bonus = self.eval_params.king_eg_pt_offset + (king_eg_pt_bonus * self.eval_params.king_eg_pt_scale) / 100;
+
+        let phase = self.get_phase();
+        let adj_king_pt_bonus = ((phase * adj_king_eg_pt_bonus) + ((256-phase) * adj_king_mg_pt_bonus)) / 256;
+
+        return adj_pawn_pt_bonus + adj_knight_pt_bonus + adj_bishop_pt_bonus + adj_king_pt_bonus;
     }
 
     fn get_pt_bonus(&self, bb: u64, pt: &[i32; 64], white: bool) -> i32 {
@@ -2423,6 +2714,20 @@ impl BB {
         let black_bonus: i32 = (phase * black_eg_bonus) + ((256-phase) * black_mg_bonus);
 
         return (white_bonus - black_bonus) / 256;
+    }
+
+    pub fn get_king_mg_pt_bonus(&self) -> i32 {
+        let white_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_MG_TABLE, true);
+        let black_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_MG_TABLE, false);
+
+        return white_bonus - black_bonus;
+    }
+
+    pub fn get_king_eg_pt_bonus(&self) -> i32 {
+        let white_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_EG_TABLE, true);
+        let black_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_EG_TABLE, false);
+
+        return white_bonus - black_bonus;
     }
 
     pub fn is_threefold(&self) -> bool {

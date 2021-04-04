@@ -162,6 +162,45 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
     if pht_entry.valid {
         val += pht_entry.val;
     } else {
+        let pp = node.passed_pawns_value();
+        let cp = node.center_value();
+        let ncp = node.near_center_value();
+        let ip = node.isolated_pawns_value();
+        let dp = node.doubled_pawns_value();
+        let bp = node.backwards_pawns_value();
+        let pv = pp + ip + dp + bp + cp + ncp;
+        val += pv;
+        pht.set(node.pawn_hash, pv);
+    }
+    val += node.material;
+    val += node.mobility_value();
+    val += node.pawn_defense_value();
+    val += node.double_bishop_bonus();
+    val += node.castled_bonus();
+    val += node.pawn_advancement_value();
+    val += node.get_all_pt_bonus();
+    val += node.rook_on_seventh_bonus();
+    val += node.rook_on_open_file_value();
+
+    // slight tempo bonus
+    val += node.tempo_bonus();
+
+    val += node.early_queen_penalty();
+    val += node.king_danger_value();
+    val += node.material_advantage_bonus();
+
+    return val * if node.white_turn {1} else {-1};
+}
+
+unsafe fn old_evaluate_position(node: &BB) -> i32 {
+    EVALED += 1;
+    let mut val = 0;
+
+    // pawn values
+    let pht_entry = pht.get(node.pawn_hash);
+    if pht_entry.valid {
+        val += pht_entry.val;
+    } else {
         let pp = node.passed_pawns_value() * 500;
         let cp = node.center_value() * 300;
         let ncp = node.near_center_value() * 50;
@@ -195,24 +234,24 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
 
 pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Material: {}", node.material);
-    eprintln!("Mobility: {}", node.mobility_value() * 70);
-    eprintln!("doubled p: {}", node.doubled_pawns_value() * -300);
-    eprintln!("isolated p: {}", node.isolated_pawns_value() * -300);
-    eprintln!("backwards p: {}", node.backwards_pawns_value() * -300);
-    eprintln!("passed p: {}", node.passed_pawns_value() * 500);
-    eprintln!("Center: {}", node.center_value() * 300);
-    eprintln!("Near Center: {}", node.near_center_value() * 50);
-    eprintln!("Double bishop: {}", node.double_bishop_bonus() * 500);
-    eprintln!("Pawn Defense: {}", node.pawn_defense_value() * 50);
-    eprintln!("Pawn advancement: {}", node.pawn_advancement_value() * 40);
-    eprintln!("Castle Bonus: {}", node.castled_bonus() * (500 * (256 - node.phase) / 256));
-    eprintln!("Early queen penalty: {}", node.early_queen_penalty() * -300);
+    eprintln!("Mobility: {}", node.mobility_value());
+    eprintln!("doubled p: {}", node.doubled_pawns_value());
+    eprintln!("isolated p: {}", node.isolated_pawns_value());
+    eprintln!("backwards p: {}", node.backwards_pawns_value());
+    eprintln!("passed p: {}", node.passed_pawns_value());
+    eprintln!("Center: {}", node.center_value());
+    eprintln!("Near Center: {}", node.near_center_value());
+    eprintln!("Double bishop: {}", node.double_bishop_bonus());
+    eprintln!("Pawn Defense: {}", node.pawn_defense_value());
+    eprintln!("Pawn advancement: {}", node.pawn_advancement_value());
+    eprintln!("Castle Bonus: {}", node.castled_bonus());
+    eprintln!("Early queen penalty: {}", node.early_queen_penalty());
     eprintln!("All pt bonus: {}", node.get_all_pt_bonus());
-    eprintln!("King danger value: {}", -node.king_danger_value());
-    eprintln!("Tempo: {}", if node.white_turn {150} else {-150});
-    eprintln!("Rook on 7th: {}", node.rook_on_seventh_bonus() * 150);
-    eprintln!("Rook on (semi-)open file: {}", node.rook_on_open_file_value() * 60);
-    eprintln!("Material lead bonus: {}", if node.material > 500 {node.phase * 2} else if node.material < -500 {-node.phase * 2} else {0});
+    eprintln!("King danger value: {}", node.king_danger_value());
+    eprintln!("Tempo: {}", node.tempo_bonus());
+    eprintln!("Rook on 7th: {}", node.rook_on_seventh_bonus());
+    eprintln!("Rook on (semi-)open file: {}", node.rook_on_open_file_value());
+    eprintln!("Material lead bonus: {}", node.material_advantage_bonus());
     if pht.valid {
         let pht_entry = pht.get(node.pawn_hash);
         if pht_entry.valid {
