@@ -140,6 +140,7 @@ pub struct EvalParams {
     pub rook_on_seventh: i32,
     pub rook_on_open: i32,
     pub early_queen_penalty: i32,
+    pub king_danger: i32,
 
     // pawn structure
     pub passed_pawn: i32,
@@ -169,8 +170,7 @@ pub struct EvalParams {
     pub tempo_bonus: i32,
 
     // slight bonus to leader in material
-    pub material_advantage: i32,
-    pub king_danger: i32
+    pub material_advantage: i32
 }
 
 impl EvalParams {

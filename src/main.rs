@@ -156,7 +156,7 @@ unsafe fn play() {
                         let mut position_str: String = String::from("");
                         for i in 0..6 {
                             match params.next() {
-                                Some(param) => {position_str.push_str(param); position_str.push_str(" "); eprintln!("{}", param);}
+                                Some(param) => {position_str.push_str(param); position_str.push_str(" ");}
                                 None => {panic!("bad fen");}
                             }
                         }
