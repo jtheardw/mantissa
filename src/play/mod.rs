@@ -435,7 +435,7 @@ unsafe fn negamax_search(node: &mut BB,
     let r = 3;
 
     // multicut
-    if is_cut {
+    if is_cut && depth > 4 {
         for mv in moves.iter() {
             node.do_move(&mv);
             let score = -negamax_search(node, start_time, compute_time, depth - 1 - r, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table).1;

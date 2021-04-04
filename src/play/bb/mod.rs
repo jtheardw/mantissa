@@ -1356,6 +1356,7 @@ impl BB {
         let enemy_side = !self.white_turn as usize;
         let enemy_occ = self.composite[enemy_side];
         let mut free_caps: Vec<Mv> = Vec::new();
+        let mut pawn_caps: Vec<Mv> = Vec::new();
         let mut winning_caps: Vec<Mv> = Vec::new();
         let mut equal_caps: Vec<Mv> = Vec::new();
         let mut losing_caps: Vec<Mv> = Vec::new();
@@ -1378,7 +1379,7 @@ impl BB {
                             equal_caps.push(mv);
                         } else {
                             // must be capturing non-pawn
-                            winning_caps.push(mv);
+                            pawn_caps.push(mv);
                         }
                     },
                     b'n' => {
@@ -1435,8 +1436,8 @@ impl BB {
                 }
             }
         }
-
         mv_q.append(& mut free_caps);
+        mv_q.append(& mut pawn_caps);
         mv_q.append(& mut winning_caps);
         mv_q.append(& mut equal_caps);
         mv_q.append(& mut killer_moves);

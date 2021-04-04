@@ -191,6 +191,14 @@ unsafe fn play() {
                         None => panic!("empty time!")
                     };
                     time = get_calc_time(clock_time);
+                } else if p == "movetime" {
+                    time = match params.next() {
+                        Some(p) => match p.trim().parse() {
+                            Ok(num) => num,
+                            Err(_) => panic!("error in time parse")
+                        },
+                        None => panic!("empty time!")
+                    };
                 }
             }
             let mv = game.make_move(time);
