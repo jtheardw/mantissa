@@ -414,7 +414,7 @@ unsafe fn negamax_search(node: &mut BB,
     let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize]), first_move);
     let mut num_moves = 0;
 
-    if !is_check && nmr_ok && !init && !is_pv && evaluate_position(&node) >= beta {
+    if !is_check && nmr_ok && !init && !is_pv { // && evaluate_position(&node) >= beta {
         // null move reductions
         let depth_to_search = depth - if depth > 6 {5} else {4};
         node.do_null_move();
@@ -430,20 +430,24 @@ unsafe fn negamax_search(node: &mut BB,
 
     let mut tried = 0;
     let mut cuts = 0;
-    let m = 8;
+    let m = 12;
     let c = 3;
     let r = 3;
+    let mut already_cut: [i32; 3] = [-1; 3];
 
     // multicut
-    if is_cut && depth > 4 {
+    if is_cut && depth >= 3 {
         for mv in moves.iter() {
             node.do_move(&mv);
             let score = -negamax_search(node, start_time, compute_time, depth - 1 - r, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table).1;
             node.undo_move(&mv);
             if score >= beta {
-                cuts += 1;
-                if cuts >= c {
-                    return (Mv::null_move(), beta, CUT_NODE);
+                if already_cut[0] != mv.start && already_cut[1] != mv.start && already_cut[2] != mv.start {
+                    already_cut[cuts] = mv.start;
+                    cuts += 1;
+                    if cuts >= c {
+                        return (Mv::null_move(), beta, CUT_NODE);
+                    }
                 }
             }
 
@@ -454,9 +458,14 @@ unsafe fn negamax_search(node: &mut BB,
         }
     }
 
-
-
-    let is_futile = !init && (depth == 1 && evaluate_position(&node) < (alpha - 3500)); // || (depth == 2 && evaluate_position(&node) < (alpha - 5500)));
+    let mut is_futile = false;
+    if !init && depth == 1 {
+        let futile_val = evaluate_position(&node);
+        if futile_val < (alpha - 3500) {
+            val = futile_val;
+        }
+    }
+    // let mut is_futile = !init && (depth == 1 && evaluate_position(&node) < (alpha - 3500)); // || (depth == 2 && evaluate_position(&node) < (alpha - 5500)));
     let mut legal_move = false;
     for mv in moves { // .drain(..) {
         let is_tactical_move = is_move_tactical(&node, &mv);
@@ -484,7 +493,7 @@ unsafe fn negamax_search(node: &mut BB,
 
         let mut reduced = false;
         if num_moves == 0 {
-            res = negamax_search(node, start_time, compute_time, depth - 1, ply+1, -beta, -alpha, !maximize, true, false, is_pv, k_table);
+            res = negamax_search(node, start_time, compute_time, depth - 1, ply+1, -beta, -alpha, !maximize, true, false, true, k_table);
         } else {
             if depth > 3
                 && !is_pv
@@ -510,7 +519,7 @@ unsafe fn negamax_search(node: &mut BB,
             if !reduced {
                 res = negamax_search(node, start_time, compute_time, depth - 1, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table);
                 if -res.1 > alpha && -res.1 < beta { // failed high
-                    res = negamax_search(node, start_time, compute_time, depth - 1, ply + 1, -beta, -alpha, !maximize, true, false, is_pv, k_table);
+                    res = negamax_search(node, start_time, compute_time, depth - 1, ply + 1, -beta, -alpha, !maximize, true, false, true, k_table);
                 }
             }
 

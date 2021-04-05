@@ -176,13 +176,13 @@ pub struct EvalParams {
 impl EvalParams {
     pub fn default_params() -> EvalParams {
         EvalParams {
-            mobility: 70,
-            pdf: 50,
+            mobility: 60,
+            pdf: 30,
             dbb: 500,
             castle: 500,
             pav: 40,
             rook_on_seventh: 150,
-            rook_on_open: 60,
+            rook_on_open: 80,
             early_queen_penalty: -300,
 
             passed_pawn: 500,
@@ -2647,24 +2647,19 @@ impl BB {
 
     pub fn get_all_pt_bonus(&self) -> i32 {
         let pawn_pt_bonus = self.get_pawn_pt_bonus();
-        let adj_pawn_pt_bonus = self.eval_params.pawn_pt_offset + (pawn_pt_bonus * self.eval_params.pawn_pt_scale) / 100;
 
         let bishop_pt_bonus = self.get_bishop_pt_bonus();
-        let adj_bishop_pt_bonus = self.eval_params.bishop_pt_offset + (bishop_pt_bonus * self.eval_params.bishop_pt_scale) / 100;
 
         let knight_pt_bonus = self.get_knight_pt_bonus();
-        let adj_knight_pt_bonus = self.eval_params.knight_pt_offset + (knight_pt_bonus * self.eval_params.knight_pt_scale) / 100;
 
         let king_mg_pt_bonus = self.get_king_mg_pt_bonus();
-        let adj_king_mg_pt_bonus = self.eval_params.king_mg_pt_offset + (king_mg_pt_bonus * self.eval_params.king_mg_pt_scale) / 100;
 
         let king_eg_pt_bonus = self.get_king_eg_pt_bonus();
-        let adj_king_eg_pt_bonus = self.eval_params.king_eg_pt_offset + (king_eg_pt_bonus * self.eval_params.king_eg_pt_scale) / 100;
 
         let phase = self.get_phase();
-        let adj_king_pt_bonus = ((phase * adj_king_eg_pt_bonus) + ((256-phase) * adj_king_mg_pt_bonus)) / 256;
+        let king_pt_bonus = ((phase * king_eg_pt_bonus) + ((256-phase) * king_mg_pt_bonus)) / 256;
 
-        return adj_pawn_pt_bonus + adj_knight_pt_bonus + adj_bishop_pt_bonus + adj_king_pt_bonus;
+        return pawn_pt_bonus + knight_pt_bonus + bishop_pt_bonus + king_pt_bonus;
     }
 
     fn get_pt_bonus(&self, bb: u64, pt: &[i32; 64], white: bool) -> i32 {
@@ -2686,21 +2681,27 @@ impl BB {
 
     pub fn get_pawn_pt_bonus(&self) -> i32 {
         let white_bonus = self.get_pt_bonus(self.pawn[1], &board_eval::PAWN_TABLE, true);
+        let white_bonus = self.eval_params.pawn_pt_offset + (white_bonus * self.eval_params.pawn_pt_scale) / 100;
         let black_bonus = self.get_pt_bonus(self.pawn[0], &board_eval::PAWN_TABLE, false);
+        let black_bonus = self.eval_params.pawn_pt_offset + (black_bonus * self.eval_params.pawn_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
 
     pub fn get_knight_pt_bonus(&self) -> i32 {
         let white_bonus = self.get_pt_bonus(self.knight[1], &board_eval::KNIGHT_TABLE, true);
+        let white_bonus = self.eval_params.knight_pt_offset + (white_bonus * self.eval_params.knight_pt_scale) / 100;
         let black_bonus = self.get_pt_bonus(self.knight[0], &board_eval::KNIGHT_TABLE, false);
+        let black_bonus = self.eval_params.knight_pt_offset + (black_bonus * self.eval_params.knight_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
 
     pub fn get_bishop_pt_bonus(&self) -> i32 {
         let white_bonus = self.get_pt_bonus(self.bishop[1], &board_eval::BISHOP_TABLE, true);
+        let white_bonus = self.eval_params.bishop_pt_offset + (white_bonus * self.eval_params.bishop_pt_scale) / 100;
         let black_bonus = self.get_pt_bonus(self.bishop[0], &board_eval::BISHOP_TABLE, false);
+        let black_bonus = self.eval_params.bishop_pt_offset + (black_bonus * self.eval_params.bishop_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
@@ -2721,14 +2722,18 @@ impl BB {
 
     pub fn get_king_mg_pt_bonus(&self) -> i32 {
         let white_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_MG_TABLE, true);
+        let white_bonus = self.eval_params.king_mg_pt_offset + (white_bonus * self.eval_params.king_mg_pt_scale) / 100;
         let black_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_MG_TABLE, false);
+        let black_bonus = self.eval_params.king_mg_pt_offset + (black_bonus * self.eval_params.king_mg_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
 
     pub fn get_king_eg_pt_bonus(&self) -> i32 {
         let white_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_EG_TABLE, true);
+        let white_bonus = self.eval_params.king_eg_pt_offset + (white_bonus * self.eval_params.king_eg_pt_scale) / 100;
         let black_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_EG_TABLE, false);
+        let black_bonus = self.eval_params.king_eg_pt_offset + (black_bonus * self.eval_params.king_eg_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
