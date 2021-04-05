@@ -243,7 +243,7 @@ pub struct BB {
     ep_stack: Vec<i32>,
     pub cap_stack: Vec<u8>,
     cr_stack: Vec<u64>,
-    history: Vec<u64>,
+    pub history: Vec<u64>,
     pawn_history: Vec<u64>,
 
     // eval
@@ -349,6 +349,11 @@ impl BB {
         self.pawn_hash = self.get_full_pawn_hash();
 
         self.phase = 0;
+        self.king_mg_pt_score = self.get_king_mg_pt_bonus();
+        self.king_eg_pt_score = self.get_king_eg_pt_bonus();
+        self.pawn_pt_score = self.get_pawn_pt_bonus();
+        self.knight_pt_score = self.get_knight_pt_bonus();
+        self.bishop_pt_score = self.get_bishop_pt_bonus();
     }
 
     pub fn bb_str(bb: u64) -> String {

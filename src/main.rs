@@ -139,15 +139,15 @@ fn main() {
     }
 }
 
-fn get_calc_time(time: i32) -> u128 {
-    let mut calc_time = 30000;
-     // ten minutes
-    calc_time = time / 30;
+fn get_calc_time(time: i32, inc: i32, ply: i32) -> u128 {
+    // All credit for this calculation goes to Kade Phillips and Thomas Ahle
+    let p = ply as f64;
+    let ply_remaining = 59.3 + (72830.0 - p*2330.0) / (p*p + p*10.0 + 2644.0);
+    let moves_remaining = ply_remaining / 2.0;
+    let mut calc_time = (((time - inc) as f64 / moves_remaining) as i32 + inc) as u128;
+
     if calc_time > 30000 {
         calc_time = 30000;
-    }
-    if calc_time < 250 {
-        calc_time = 250;
     }
     return calc_time as u128;
 }
@@ -234,6 +234,10 @@ unsafe fn play() {
         }
         if cmd == "go" {
             let clock_key = if game.board.white_turn {"wtime"} else {"btime"};
+            let inc_key = if game.board.white_turn {"winc"} else {"binc"};
+            let mut on_clock = false;
+            let mut clock_time = 0;
+            let mut inc_time = 0;
             let mut time = 10000;
             loop {
                 let p = match params.next() {
@@ -241,14 +245,23 @@ unsafe fn play() {
                     None => { break; }
                 };
                 if p == clock_key {
-                    let clock_time = match params.next() {
+                    clock_time = match params.next() {
                         Some(p) => match p.trim().parse() {
                             Ok(num) => num,
                             Err(_) => panic!("error in time parse")
                         },
                         None => panic!("empty time!")
                     };
-                    time = get_calc_time(clock_time);
+                    on_clock = true;
+                    // time = get_calc_time(clock_time);
+                } else if p == inc_key {
+                    inc_time = match params.next() {
+                        Some(p) => match p.trim().parse() {
+                            Ok(num) => num,
+                            Err(_) => panic!("error in time parse")
+                        },
+                        None => panic!("empty time!")
+                    };
                 } else if p == "movetime" {
                     time = match params.next() {
                         Some(p) => match p.trim().parse() {
@@ -259,6 +272,7 @@ unsafe fn play() {
                     };
                 }
             }
+            if on_clock { time = get_calc_time(clock_time, inc_time, game.board.history.len() as i32); }
             let mv = game.make_move(time);
             println!("bestmove {}", mv);
         }
