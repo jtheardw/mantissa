@@ -69,18 +69,18 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
     }
     let mut k_table: [[Mv; 3]; 64] = [[Mv::null_move(); 3]; 64];
 
-    let mut aspire = false;
+    let mut aspire = 0;
     while (current_time - start_time) <= compute_time {
         let mut alpha = LB;
         let mut beta = UB;
 
-        if aspire {
+        if aspire != 0 {
             if maximize {
-                alpha = best_val - 250;
-                beta = best_val + 250;
+                alpha = best_val - aspire;
+                beta = best_val + aspire;
             } else {
-                alpha = -best_val - 250;
-                beta = -best_val + 250;
+                alpha = -best_val - aspire;
+                beta = -best_val + aspire;
             }
         }
         let (ply_move, ply_val, node_type) = negamax_search(
@@ -105,7 +105,14 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
         // if node_type == CUT_NODE {
 
         // }
-        if ply_move.is_null || node_type != PV_NODE {aspire = false; continue;}
+        if ply_move.is_null || node_type != PV_NODE {
+            if aspire == 250 {
+                aspire = 1000;
+            } else {
+                aspire = 0;
+            }
+            continue;
+        }
 
         // we maintain that positive is always white advantage here so we have to flip
         (best_move, best_val) = (ply_move, if node.white_turn {ply_val} else {-ply_val});
@@ -119,7 +126,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
         }
 
         current_time = get_time_millis();
-        aspire = true;
+        aspire = 250;
         m_depth += 1;
     }
 
