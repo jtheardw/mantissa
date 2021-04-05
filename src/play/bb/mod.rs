@@ -176,7 +176,7 @@ pub struct EvalParams {
 impl EvalParams {
     pub fn default_params() -> EvalParams {
         EvalParams {
-            mobility: 60,
+            mobility: 40,
             pdf: 30,
             dbb: 500,
             castle: 500,
@@ -252,6 +252,12 @@ pub struct BB {
     pub pawn_hash: u64,
     pub zobrist_table: ([[u64; 12]; 64], (u64, u64)),
     pub phase: i32,
+
+    pub king_mg_pt_score: i32,
+    pub king_eg_pt_score: i32,
+    pub pawn_pt_score: i32,
+    pub knight_pt_score: i32,
+    pub bishop_pt_score: i32,
 
     pub eval_params: EvalParams
 }
@@ -552,11 +558,22 @@ impl BB {
             zobrist_table: zobrist_table,
             eval_params: eval_params,
             phase: 0,
+
+            king_mg_pt_score: 0,
+            king_eg_pt_score: 0,
+            pawn_pt_score: 0,
+            knight_pt_score: 0,
+            bishop_pt_score: 0
         };
         bb.material = bb.get_material();
         bb.hash = bb.get_full_hash();
         bb.pawn_hash = bb.get_full_pawn_hash();
         bb.phase = bb.slow_get_phase();
+        bb.king_mg_pt_score = bb.get_king_mg_pt_bonus();
+        bb.king_eg_pt_score = bb.get_king_eg_pt_bonus();
+        bb.pawn_pt_score = bb.get_pawn_pt_bonus();
+        bb.knight_pt_score = bb.get_knight_pt_bonus();
+        bb.bishop_pt_score = bb.get_bishop_pt_bonus();
         return bb;
     }
 
@@ -709,6 +726,12 @@ impl BB {
         self.pawn_hash = self.get_full_pawn_hash();
 
         self.phase = self.slow_get_phase();
+
+        self.king_mg_pt_score = self.get_king_mg_pt_bonus();
+        self.king_eg_pt_score = self.get_king_eg_pt_bonus();
+        self.pawn_pt_score = self.get_pawn_pt_bonus();
+        self.knight_pt_score = self.get_knight_pt_bonus();
+        self.bishop_pt_score = self.get_bishop_pt_bonus();
     }
 
     // constructors
@@ -798,10 +821,21 @@ impl BB {
             zobrist_table: zobrist_table,
             phase: 0,
 
-            eval_params: eval_params
+            eval_params: eval_params,
+            king_mg_pt_score: 0,
+            king_eg_pt_score: 0,
+            pawn_pt_score: 0,
+            knight_pt_score: 0,
+            bishop_pt_score: 0
         };
         bb.hash = bb.get_full_hash();
         bb.pawn_hash = bb.get_full_pawn_hash();
+        bb.king_mg_pt_score = bb.get_king_mg_pt_bonus();
+        bb.king_eg_pt_score = bb.get_king_eg_pt_bonus();
+        bb.pawn_pt_score = bb.get_pawn_pt_bonus();
+        bb.knight_pt_score = bb.get_knight_pt_bonus();
+        bb.bishop_pt_score = bb.get_bishop_pt_bonus();
+
         return bb;
     }
 
@@ -2020,6 +2054,114 @@ impl BB {
         self.ep = match self.ep_stack.pop() {Some(p) => p, None => panic!("empty ep stack")};
     }
 
+    fn get_pawn_table_val(&self, idx: i32, white: bool) -> i32 {
+        return board_eval::PAWN_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.pawn_pt_offset;
+    }
+
+    fn get_knight_table_val(&self, idx: i32, white: bool) -> i32 {
+        return board_eval::KNIGHT_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.knight_pt_offset;
+    }
+
+    fn get_bishop_table_val(&self, idx: i32, white: bool) -> i32 {
+        return board_eval::BISHOP_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.bishop_pt_offset;
+    }
+
+    fn get_king_mg_table_val(&self, idx: i32, white: bool) -> i32 {
+        return board_eval::KING_MG_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.king_mg_pt_offset;
+    }
+
+    fn get_king_eg_table_val(&self, idx: i32, white: bool) -> i32 {
+        return board_eval::KING_EG_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.king_eg_pt_offset;
+    }
+
+    fn update_pt_score(&mut self, piece: u8, white: bool, start: i32, end: i32, capture: u8, promotion: u8) {
+        let side_factor = if white {1} else {-1};
+        match piece {
+            b'p' => {
+                // remove score from before
+                self.pawn_pt_score -= side_factor * self.get_pawn_table_val(start, white);
+                match promotion {
+                    b'n' => {self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);},
+                    b'b' => {self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);},
+                    0 => {self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, white)},
+                    _ => {}
+                }
+            },
+            b'n' => {
+                self.knight_pt_score -= side_factor * self.get_knight_table_val(start, white);
+                self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);
+            },
+            b'b' => {
+                self.bishop_pt_score -= side_factor * self.get_bishop_table_val(start, white);
+                self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);
+            },
+            b'k' => {
+                self.king_mg_pt_score -= side_factor * self.get_king_mg_table_val(start, white);
+                self.king_mg_pt_score += side_factor * self.get_king_mg_table_val(end, white);
+                self.king_eg_pt_score -= side_factor * self.get_king_eg_table_val(start, white);
+                self.king_eg_pt_score += side_factor * self.get_king_eg_table_val(end, white);
+            },
+            _ => {}
+        };
+
+        match capture {
+            b'p' => {
+                self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, !white);
+            },
+            b'n' => {
+                self.knight_pt_score += side_factor * self.get_knight_table_val(end, !white);
+            },
+            b'b' => {
+                self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, !white);
+            },
+            _ => {}
+        };
+    }
+
+    fn deupdate_pt_score(&mut self, piece: u8, white: bool, start: i32, end: i32, capture: u8, promotion: u8) {
+        let side_factor = if white {-1} else {1};
+        match piece {
+            b'p' => {
+                // remove score from before
+                self.pawn_pt_score -= side_factor * self.get_pawn_table_val(start, white);
+                match promotion {
+                    b'n' => {self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);},
+                    b'b' => {self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);},
+                    0 => {self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, white)},
+                    _ => {}
+                }
+            },
+            b'n' => {
+                self.knight_pt_score -= side_factor * self.get_knight_table_val(start, white);
+                self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);
+            },
+            b'b' => {
+                self.bishop_pt_score -= side_factor * self.get_bishop_table_val(start, white);
+                self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);
+            },
+            b'k' => {
+                self.king_mg_pt_score -= side_factor * self.get_king_mg_table_val(start, white);
+                self.king_mg_pt_score += side_factor * self.get_king_mg_table_val(end, white);
+                self.king_eg_pt_score -= side_factor * self.get_king_eg_table_val(start, white);
+                self.king_eg_pt_score += side_factor * self.get_king_eg_table_val(end, white);
+            },
+            _ => {}
+        };
+
+        match capture {
+            b'p' => {
+                self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, !white);
+            },
+            b'n' => {
+                self.knight_pt_score += side_factor * self.get_knight_table_val(end, !white);
+            },
+            b'b' => {
+                self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, !white);
+            },
+            _ => {}
+        };
+    }
+
     // let's make moves
     pub fn do_move(&mut self, mv: &Mv) {
         // push history
@@ -2070,6 +2212,7 @@ impl BB {
             self.pawn[enemy_side] ^= BB::idx_to_bb(actual_pawn_idx);
             self.hash ^= self.get_zr_xor(actual_pawn_idx as usize, b'p', !self.white_turn);
             self.pawn_hash ^= self.get_zr_xor(actual_pawn_idx as usize, b'p', !self.white_turn);
+            self.pawn_pt_score += if self.white_turn {1} else {-1} * self.get_pawn_table_val(actual_pawn_idx, !self.white_turn);
             material_delta += PAWN_VALUE;
 
         } else if (end_point & self.composite[enemy_side]) != 0 {
@@ -2127,6 +2270,7 @@ impl BB {
             let rook_mask = BB::idx_to_bb(old_rook_idx) | BB::idx_to_bb(new_rook_idx);
             self.rook[self_side] ^= rook_mask;
             self.update_hash(b'r', self.white_turn, old_rook_idx, new_rook_idx, 0, 0);
+            // self.update_pt_score(b'r')
             self.castled[self_side] = true;
         }
 
@@ -2157,6 +2301,7 @@ impl BB {
 
         // main update hash
         self.update_hash(mv.piece, self.white_turn, mv.start, mv.end, if mv.is_ep {0} else {captured_piece}, mv.promote_to);
+        self.update_pt_score(mv.piece, self.white_turn, mv.start, mv.end, if mv.is_ep {0} else {captured_piece}, mv.promote_to);
 
         // update material
         self.material += material_delta * if self.white_turn {1} else {-1};
@@ -2227,6 +2372,7 @@ impl BB {
             };
             // remove the enemy pawn
             self.pawn[enemy_side] ^= BB::idx_to_bb(actual_pawn_idx);
+            self.pawn_pt_score -= if self.white_turn {1} else {-1} * self.get_pawn_table_val(actual_pawn_idx, !self.white_turn);
             material_delta += PAWN_VALUE;
         } else if captured_piece != 0 {
             match captured_piece {
@@ -2301,6 +2447,7 @@ impl BB {
 
         // update material
         self.material -= material_delta * if self.white_turn {1} else {-1};
+        self.deupdate_pt_score(mv.piece, self.white_turn, mv.start, mv.end, if mv.is_ep {0} else {captured_piece}, mv.promote_to);
 
         // update composites
         // TODO this can be done as part of the other operations
@@ -2963,15 +3110,11 @@ impl BB {
     }
 
     pub fn get_all_pt_bonus(&self) -> i32 {
-        let pawn_pt_bonus = self.get_pawn_pt_bonus();
-
-        let bishop_pt_bonus = self.get_bishop_pt_bonus();
-
-        let knight_pt_bonus = self.get_knight_pt_bonus();
-
-        let king_mg_pt_bonus = self.get_king_mg_pt_bonus();
-
-        let king_eg_pt_bonus = self.get_king_eg_pt_bonus();
+        let pawn_pt_bonus = self.pawn_pt_score;
+        let bishop_pt_bonus = self.bishop_pt_score;
+        let knight_pt_bonus = self.knight_pt_score;
+        let king_mg_pt_bonus = self.king_mg_pt_score;
+        let king_eg_pt_bonus = self.king_eg_pt_score;
 
         let phase = self.get_phase();
         let king_pt_bonus = ((phase * king_eg_pt_bonus) + ((256-phase) * king_mg_pt_bonus)) / 256;
@@ -2979,7 +3122,7 @@ impl BB {
         return pawn_pt_bonus + knight_pt_bonus + bishop_pt_bonus + king_pt_bonus;
     }
 
-    fn get_pt_bonus(&self, bb: u64, pt: &[i32; 64], white: bool) -> i32 {
+    fn get_pt_bonus(&self, bb: u64, pt: &[i32; 64], offset: i32, white: bool) -> i32 {
         let mut bonus = 0;
         let mut idx: i32 = -1;
         let mut bb = bb;
@@ -2990,67 +3133,72 @@ impl BB {
             bb = bb >> c;
 
             // this relies on pts being horizontally symmetric
-            bonus += pt[if white {idx} else {63-idx} as usize];
+            bonus += pt[if white {idx} else {63-idx} as usize] + offset;
         }
 
         return bonus;
     }
 
     pub fn get_pawn_pt_bonus(&self) -> i32 {
-        let white_bonus = self.get_pt_bonus(self.pawn[1], &board_eval::PAWN_TABLE, true);
-        let white_bonus = self.eval_params.pawn_pt_offset + (white_bonus * self.eval_params.pawn_pt_scale) / 100;
-        let black_bonus = self.get_pt_bonus(self.pawn[0], &board_eval::PAWN_TABLE, false);
-        let black_bonus = self.eval_params.pawn_pt_offset + (black_bonus * self.eval_params.pawn_pt_scale) / 100;
+        let offset = self.eval_params.pawn_pt_offset;
+        let white_bonus = self.get_pt_bonus(self.pawn[1], &board_eval::PAWN_TABLE, offset, true);
+        let white_bonus = (white_bonus * self.eval_params.pawn_pt_scale) / 100;
+        let black_bonus = self.get_pt_bonus(self.pawn[0], &board_eval::PAWN_TABLE, offset, false);
+        let black_bonus = (black_bonus * self.eval_params.pawn_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
 
     pub fn get_knight_pt_bonus(&self) -> i32 {
-        let white_bonus = self.get_pt_bonus(self.knight[1], &board_eval::KNIGHT_TABLE, true);
-        let white_bonus = self.eval_params.knight_pt_offset + (white_bonus * self.eval_params.knight_pt_scale) / 100;
-        let black_bonus = self.get_pt_bonus(self.knight[0], &board_eval::KNIGHT_TABLE, false);
-        let black_bonus = self.eval_params.knight_pt_offset + (black_bonus * self.eval_params.knight_pt_scale) / 100;
+        let offset = self.eval_params.knight_pt_offset;
+        let white_bonus = self.get_pt_bonus(self.knight[1], &board_eval::KNIGHT_TABLE, offset, true);
+        let white_bonus = (white_bonus * self.eval_params.knight_pt_scale) / 100;
+        let black_bonus = self.get_pt_bonus(self.knight[0], &board_eval::KNIGHT_TABLE, offset, false);
+        let black_bonus = (black_bonus * self.eval_params.knight_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
 
     pub fn get_bishop_pt_bonus(&self) -> i32 {
-        let white_bonus = self.get_pt_bonus(self.bishop[1], &board_eval::BISHOP_TABLE, true);
-        let white_bonus = self.eval_params.bishop_pt_offset + (white_bonus * self.eval_params.bishop_pt_scale) / 100;
-        let black_bonus = self.get_pt_bonus(self.bishop[0], &board_eval::BISHOP_TABLE, false);
-        let black_bonus = self.eval_params.bishop_pt_offset + (black_bonus * self.eval_params.bishop_pt_scale) / 100;
+        let offset = self.eval_params.bishop_pt_offset;
+        let white_bonus = self.get_pt_bonus(self.bishop[1], &board_eval::BISHOP_TABLE, offset, true);
+        let white_bonus = (white_bonus * self.eval_params.bishop_pt_scale) / 100;
+        let black_bonus = self.get_pt_bonus(self.bishop[0], &board_eval::BISHOP_TABLE, offset, false);
+        let black_bonus = (black_bonus * self.eval_params.bishop_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
 
-    pub fn get_king_pt_bonus(&self) -> i32 {
-        let white_mg_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_MG_TABLE, true);
-        let black_mg_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_MG_TABLE, false);
+    // pub fn get_king_pt_bonus(&self) -> i32 {
+    //     let white_mg_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_MG_TABLE, true);
+    //     let black_mg_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_MG_TABLE, false);
 
-        let white_eg_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_EG_TABLE, true);
-        let black_eg_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_EG_TABLE, false);
+    //     let white_eg_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_EG_TABLE, true);
+    //     let black_eg_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_EG_TABLE, false);
 
-        let phase = self.get_phase();
-        let white_bonus: i32 = (phase * white_eg_bonus) + ((256-phase) * white_mg_bonus);
-        let black_bonus: i32 = (phase * black_eg_bonus) + ((256-phase) * black_mg_bonus);
+    //     let phase = self.get_phase();
+    //     let white_bonus: i32 = (phase * white_eg_bonus) + ((256-phase) * white_mg_bonus);
+    //     let black_bonus: i32 = (phase * black_eg_bonus) + ((256-phase) * black_mg_bonus);
 
-        return (white_bonus - black_bonus) / 256;
-    }
+    //     return (white_bonus - black_bonus) / 256;
+    // }
 
     pub fn get_king_mg_pt_bonus(&self) -> i32 {
-        let white_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_MG_TABLE, true);
-        let white_bonus = self.eval_params.king_mg_pt_offset + (white_bonus * self.eval_params.king_mg_pt_scale) / 100;
-        let black_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_MG_TABLE, false);
-        let black_bonus = self.eval_params.king_mg_pt_offset + (black_bonus * self.eval_params.king_mg_pt_scale) / 100;
+        let offset = self.eval_params.king_mg_pt_offset;
+        let white_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_MG_TABLE, offset, true);
+        let white_bonus = (white_bonus * self.eval_params.king_mg_pt_scale) / 100;
+        let black_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_MG_TABLE, offset, false);
+        let black_bonus = (black_bonus * self.eval_params.king_mg_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
 
     pub fn get_king_eg_pt_bonus(&self) -> i32 {
-        let white_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_EG_TABLE, true);
-        let white_bonus = self.eval_params.king_eg_pt_offset + (white_bonus * self.eval_params.king_eg_pt_scale) / 100;
-        let black_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_EG_TABLE, false);
-        let black_bonus = self.eval_params.king_eg_pt_offset + (black_bonus * self.eval_params.king_eg_pt_scale) / 100;
+        let offset = self.eval_params.king_eg_pt_offset;
+        let white_bonus = self.get_pt_bonus(self.king[1], &board_eval::KING_EG_TABLE, offset, true);
+        let white_bonus = (white_bonus * self.eval_params.king_eg_pt_scale) / 100;
+        let black_bonus = self.get_pt_bonus(self.king[0], &board_eval::KING_EG_TABLE, offset, false);
+        let black_bonus = (black_bonus * self.eval_params.king_eg_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }
