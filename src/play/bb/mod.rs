@@ -1340,6 +1340,34 @@ impl BB {
         return moves;
     }
 
+    pub fn king_q_moves(&self, white: bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
+        let mut start_idx: i32 = -1;
+        let mut king_loc_bb = self.king[white as usize];
+
+        let mut kc = 0;
+        while king_loc_bb != 0 && kc < 64 {
+            kc = king_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += kc;
+            king_loc_bb = king_loc_bb >> kc;
+
+            // only include moves that capture
+            let mut king_bb = self.king_mask[start_idx as usize] & self.composite[!white as usize];
+            let mut end_idx: i32 = -1;
+
+            // normal moves
+            let mut c = 0;
+            while king_bb != 0 && c < 64 {
+                c = king_bb.trailing_zeros() as i32 + 1;
+                end_idx += c;
+                king_bb = king_bb >> c;
+
+                moves.push(Mv::normal_move(start_idx, end_idx, b'k'));
+            }
+        }
+        return moves;
+    }
+
     fn get_defended_pieces(&self, white: bool) -> u64 {
         let mut atked_squares: u64 = 0;
         atked_squares |= self.king_attacks(white);
@@ -1446,6 +1474,99 @@ impl BB {
         return mv_q;
     }
 
+    pub fn side_to_move_has_capture(&self) -> bool {
+        let white = self.white_turn;
+        let mut atked_squares: u64 = 0;
+        atked_squares |= self.king_attacks(white);
+        atked_squares |= self.queen_attacks(white);
+        atked_squares |= self.bishop_attacks(white);
+        atked_squares |= self.rook_attacks(white);
+        atked_squares |= self.knight_attacks(white);
+        atked_squares |= self.pawn_attacks(white);
+
+        return (atked_squares & self.composite[!white as usize]) != 0;
+    }
+
+    pub fn order_and_filter_capture_moves(&self, mut mvs: Vec<Mv>) -> Vec<Mv> {
+        let enemy_side = !self.white_turn as usize;
+        let enemy_occ = self.composite[enemy_side];
+        let mut free_caps: Vec<Mv> = Vec::new();
+        let mut pawn_caps: Vec<Mv> = Vec::new();
+        let mut winning_caps: Vec<Mv> = Vec::new();
+        let mut equal_caps: Vec<Mv> = Vec::new();
+        let mut losing_caps: Vec<Mv> = Vec::new();
+        let mut mv_q: Vec<Mv> = Vec::new();
+        let def_pieces = self.get_defended_pieces(!self.white_turn);
+        for mv in mvs.drain(..) {
+            let dst_bb = BB::idx_to_bb(mv.end);
+            if (dst_bb & enemy_occ) != 0 {
+                // capture of some sort
+                if dst_bb & def_pieces == 0 {
+                    // undefended piece.  That's good
+                    free_caps.push(mv);
+                    continue;
+                }
+                match mv.piece {
+                    b'p' => {
+                        if (dst_bb & self.pawn[enemy_side]) != 0 {
+                            equal_caps.push(mv);
+                        } else {
+                            // must be capturing non-pawn
+                            pawn_caps.push(mv);
+                        }
+                    },
+                    b'n' => {
+                        // losing
+                        if (dst_bb & self.pawn[enemy_side]) != 0 {
+                            losing_caps.push(mv);
+                        } else if (dst_bb & (self.knight[enemy_side] | self.bishop[enemy_side])) != 0 {
+                            equal_caps.push(mv);
+                        } else {
+                            winning_caps.push(mv);
+                        }
+                    },
+                    b'b' => {
+                        // losing
+                        if (dst_bb & self.pawn[enemy_side]) != 0 {
+                            losing_caps.push(mv);
+                        } else if (dst_bb & (self.knight[enemy_side] | self.bishop[enemy_side])) != 0 {
+                            equal_caps.push(mv);
+                        } else {
+                            winning_caps.push(mv);
+                        }
+                    },
+                    b'r' => {
+                        // winning
+                        if (dst_bb & (self.queen[enemy_side] | self.king[enemy_side])) != 0 {
+                            winning_caps.push(mv);
+                        } else if (dst_bb & self.rook[enemy_side]) != 0 {
+                            equal_caps.push(mv);
+                        } else {
+                            losing_caps.push(mv);
+                        }
+                    },
+                    b'q' => {
+                        // winning
+                        if (dst_bb & self.king[enemy_side]) != 0 {
+                            winning_caps.push(mv);
+                        } else if (dst_bb & self.queen[enemy_side]) != 0 {
+                            equal_caps.push(mv);
+                        } else {
+                            losing_caps.push(mv);
+                        }
+                    },
+                    _ => {}
+                }
+            }
+        }
+        mv_q.append(& mut free_caps);
+        mv_q.append(& mut pawn_caps);
+        mv_q.append(& mut winning_caps);
+        mv_q.append(& mut equal_caps);
+        mv_q.append(& mut losing_caps);
+        return mv_q;
+    }
+
     pub fn moves_equivalent(mv1: &Mv, mv2: &Mv) -> bool {
         return mv1.start == mv2.start
             && mv1.end == mv2.end
@@ -1453,6 +1574,33 @@ impl BB {
             && mv1.promote_to == mv2.promote_to
             && mv1.ep_tile == mv2.ep_tile
             && mv1.is_ep == mv2.is_ep;
+    }
+
+    pub fn knight_q_moves(&self, white: bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
+        let mut start_idx: i32 = -1;
+        let mut knight_loc_bb = self.knight[white as usize];
+
+        let mut kc = 0;
+        while knight_loc_bb != 0 && kc < 64 {
+            kc = knight_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += kc;
+            knight_loc_bb = knight_loc_bb >> kc;
+
+            // only include moves that capture
+            let mut knight_bb = self.knight_mask[start_idx as usize] & self.composite[!white as usize];
+            let mut end_idx: i32 = -1;
+
+            let mut c = 0;
+            while knight_bb != 0 && c < 64 {
+                c = knight_bb.trailing_zeros() as i32 + 1;
+                end_idx += c;
+                knight_bb = knight_bb >> c;
+
+                moves.push(Mv::normal_move(start_idx, end_idx, b'n'));
+            }
+        }
+        return moves;
     }
 
     pub fn knight_moves(&self, white: bool) -> Vec<Mv> {
@@ -1479,6 +1627,57 @@ impl BB {
                 moves.push(Mv::normal_move(start_idx, end_idx, b'n'));
             }
         }
+        return moves;
+    }
+
+    pub fn pawn_q_moves(&self, white:bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
+        let mut start_idx = -1;
+        let mut pawn_loc_bb = self.pawn[white as usize];
+        let all_composite = self.composite[0] | self.composite[1];
+        let mut capture_composite = self.composite[!white as usize];
+        if self.ep != -1 {
+            // include a "ghost" entry in the capture composite
+            // if an ep-able move happened
+            capture_composite |= BB::idx_to_bb(self.ep);
+        }
+
+        while pawn_loc_bb != 0 {
+            let pc = pawn_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += pc;
+            pawn_loc_bb = pawn_loc_bb >> pc;
+            let pawn_point_bb = BB::idx_to_bb(start_idx as i32);
+
+            // normal captures and en passant
+            let mut pawn_capture_bb: u64 = if white {
+                ((pawn_point_bb & !FILE_MASKS[0]) << 7) | ((pawn_point_bb & !FILE_MASKS[7]) << 9)
+            } else {
+                ((pawn_point_bb & !FILE_MASKS[0]) >> 9) | ((pawn_point_bb & !FILE_MASKS[7]) >> 7)
+            } & capture_composite;
+
+            // enqueue
+            let mut end_idx = -1;
+            let mut c = 0;
+            while pawn_capture_bb != 0 && c < 64 {
+                c = pawn_capture_bb.trailing_zeros() as i32 + 1;
+                end_idx += c;
+                pawn_capture_bb = pawn_capture_bb >> c;
+
+                if end_idx == self.ep {
+                    moves.push(Mv::pawn_ep_move(start_idx, end_idx));
+                } else {
+                    if (white && end_idx >= 56) || (!white && end_idx < 8) {
+                        // promotion
+                        for p in [b'q', b'r', b'b', b'n'].iter() {
+                            moves.push(Mv::pawn_promote_move(start_idx, end_idx, *p));
+                        }
+                    } else {
+                        moves.push(Mv::pawn_move(start_idx, end_idx));
+                    }
+                }
+            }
+        }
+
         return moves;
     }
 
@@ -1572,6 +1771,39 @@ impl BB {
         return moves;
     }
 
+    pub fn rook_q_moves(&self, white:bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
+        let mut start_idx = -1;
+        let mut rook_loc_bb = self.rook[white as usize];
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
+
+        let mut rc = 0;
+        while rook_loc_bb != 0  && rc < 64 {
+            rc = rook_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += rc;
+            rook_loc_bb = rook_loc_bb >> rc;
+
+            // lookup from the magic table
+            let rook_occ_bb = self.rook_mask[start_idx as usize] & all_composite;
+            let hash = BB::rook_magic_hash(rook_occ_bb, start_idx as usize);
+            let mut rook_bb = self.rook_magic_table[start_idx as usize][hash as usize];
+
+            // only captures
+            rook_bb = rook_bb & self.composite[!white as usize];
+            let mut end_idx = -1;
+
+            let mut c = 0;
+            while rook_bb != 0 && c < 64 {
+                c = rook_bb.trailing_zeros() as i32 + 1;
+                end_idx += c;
+                rook_bb = rook_bb >> c;
+
+                moves.push(Mv::normal_move(start_idx, end_idx, b'r'));
+            }
+        }
+        return moves;
+    }
+
     pub fn rook_moves(&self, white:bool) -> Vec<Mv> {
         let mut moves: Vec<Mv> = Vec::new();
         let mut start_idx = -1;
@@ -1605,6 +1837,39 @@ impl BB {
         return moves;
     }
 
+    pub fn bishop_q_moves(&self, white:bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
+        let mut start_idx = -1;
+        let mut bishop_loc_bb = self.bishop[white as usize];
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
+
+        let mut bc = 0;
+        while bishop_loc_bb != 0  && bc < 64 {
+            bc = bishop_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += bc;
+            bishop_loc_bb = bishop_loc_bb >> bc;
+
+            // lookup from the magic table
+            let bishop_occ_bb = self.bishop_mask[start_idx as usize] & all_composite;
+            let hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
+            let mut bishop_bb = self.bishop_magic_table[start_idx as usize][hash as usize];
+
+            // only captures
+            bishop_bb = bishop_bb & self.composite[!white as usize];
+            let mut end_idx = -1;
+
+            let mut c = 0;
+            while bishop_bb != 0 && c < 64 {
+                c = bishop_bb.trailing_zeros() as i32 + 1;
+                end_idx += c;
+                bishop_bb = bishop_bb >> c;
+
+                moves.push(Mv::normal_move(start_idx, end_idx, b'b'));
+            }
+        }
+        return moves;
+    }
+
     pub fn bishop_moves(&self, white:bool) -> Vec<Mv> {
         let mut moves: Vec<Mv> = Vec::new();
         let mut start_idx = -1;
@@ -1633,6 +1898,45 @@ impl BB {
                 bishop_bb = bishop_bb >> c;
 
                 moves.push(Mv::normal_move(start_idx, end_idx, b'b'));
+            }
+        }
+        return moves;
+    }
+
+    pub fn queen_q_moves(&self, white:bool) -> Vec<Mv> {
+        let mut moves: Vec<Mv> = Vec::new();
+        let mut start_idx = -1;
+        let mut queen_loc_bb = self.queen[white as usize];
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
+
+        let mut qc = 0;
+        while queen_loc_bb != 0 && qc < 64 {
+            qc = queen_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += qc;
+            queen_loc_bb = queen_loc_bb >> qc;
+
+            // treat a queen as a rook bishop combo
+            // lookup from the magic table
+            let rook_occ_bb = self.rook_mask[start_idx as usize] & all_composite;
+            let rook_hash = BB::rook_magic_hash(rook_occ_bb, start_idx as usize);
+            let rook_bb = self.rook_magic_table[start_idx as usize][rook_hash as usize];
+
+            let bishop_occ_bb = self.bishop_mask[start_idx as usize] & all_composite;
+            let bishop_hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
+            let bishop_bb = self.bishop_magic_table[start_idx as usize][bishop_hash as usize];
+
+            let mut queen_bb = rook_bb | bishop_bb;
+            // only captures
+            queen_bb = queen_bb & self.composite[!white as usize];
+            let mut end_idx = -1;
+
+            let mut c = 0;
+            while queen_bb != 0 && c < 64 {
+                c = queen_bb.trailing_zeros() as i32 + 1;
+                end_idx += c;
+                queen_bb = queen_bb >> c;
+
+                moves.push(Mv::normal_move(start_idx, end_idx, b'q'));
             }
         }
         return moves;
@@ -1675,6 +1979,19 @@ impl BB {
             }
         }
         return moves;
+    }
+
+    pub fn q_moves(&self) -> Vec<Mv> {
+        let mut move_queue : Vec<Mv> = Vec::new();
+
+        move_queue.append(& mut self.pawn_q_moves(self.white_turn));
+        move_queue.append(& mut self.king_q_moves(self.white_turn));
+        move_queue.append(& mut self.queen_q_moves(self.white_turn));
+        move_queue.append(& mut self.rook_q_moves(self.white_turn));
+        move_queue.append(& mut self.bishop_q_moves(self.white_turn));
+        move_queue.append(& mut self.knight_q_moves(self.white_turn));
+
+        return move_queue;
     }
 
     pub fn moves(&self) -> Vec<Mv> {

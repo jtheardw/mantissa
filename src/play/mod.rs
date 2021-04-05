@@ -261,15 +261,24 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Phase {} / 256", node.get_phase());
 }
 
+fn is_capture(node: &mut BB) -> bool {
+    if node.cap_stack.len() > 0 {
+        return node.cap_stack[node.cap_stack.len() - 1] != 0;
+    }
+    return false;
+}
+
 fn is_quiet(node: &mut BB) -> bool {
     let mut loud = false;
-    match node.cap_stack.pop() {
-        Some(cap) => {
-            loud |= (cap != 0);
-            node.cap_stack.push(cap);
-        },
-        None => {}
-    }
+    return !node.side_to_move_has_capture();
+    // return true;
+    // match node.cap_stack.pop() {
+    //     Some(cap) => {
+    //         loud |= (cap != 0);
+    //         node.cap_stack.push(cap);
+    //     },
+    //     None => {}
+    // }
     return !loud;
 }
 
@@ -328,6 +337,7 @@ unsafe fn negamax_search(node: &mut BB,
                          is_pv: bool,
                          k_table: & mut [[Mv; 3]; 64],
 ) -> (Mv, i32, u8) {
+    EVALED += 1;
     let current_time = get_time_millis();
     if current_time - start_time > compute_time { return (Mv::err_move(), 0, PV_NODE); }
 
@@ -393,14 +403,14 @@ unsafe fn negamax_search(node: &mut BB,
     }
 
     if depth <= 0 {
-        if is_quiet(node) {
-            let val = evaluate_position(&node);
-            let node_type = if val > alpha {if val >= beta {CUT_NODE} else {PV_NODE}} else {ALL_NODE};
-            return (Mv::null_move(), val, node_type);
-        } else {
-            let (val, node_type) = quiescence_search(node, 16, alpha, beta, maximize);
-            return (Mv::null_move(), val, node_type);
-        }
+        // if is_quiet(node) {
+        //     let val = evaluate_position(&node);
+        //     let node_type = if val > alpha {if val >= beta {CUT_NODE} else {PV_NODE}} else {ALL_NODE};
+        //     return (Mv::null_move(), val, node_type);
+        // } else {
+        let (val, node_type) = quiescence_search(node, 16, alpha, beta, maximize);
+        return (Mv::null_move(), val, node_type);
+        // }
     }
 
     let mut alpha = alpha;
@@ -428,40 +438,11 @@ unsafe fn negamax_search(node: &mut BB,
         }
     }
 
-    let mut tried = 0;
-    let mut cuts = 0;
-    let m = 12;
-    let c = 3;
-    let r = 3;
-    let mut already_cut: [i32; 3] = [-1; 3];
-
-    // multicut
-    if is_cut && depth >= 3 {
-        for mv in moves.iter() {
-            node.do_move(&mv);
-            let score = -negamax_search(node, start_time, compute_time, depth - 1 - r, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table).1;
-            node.undo_move(&mv);
-            if score >= beta {
-                if already_cut[0] != mv.start && already_cut[1] != mv.start && already_cut[2] != mv.start {
-                    already_cut[cuts] = mv.start;
-                    cuts += 1;
-                    if cuts >= c {
-                        return (Mv::null_move(), beta, CUT_NODE);
-                    }
-                }
-            }
-
-            tried += 1;
-            if tried >= m {
-                break;
-            }
-        }
-    }
-
     let mut is_futile = false;
     if !init && depth == 1 {
         let futile_val = evaluate_position(&node);
         if futile_val < (alpha - 3500) {
+            is_futile = true;
             val = futile_val;
         }
     }
@@ -470,13 +451,12 @@ unsafe fn negamax_search(node: &mut BB,
     for mv in moves { // .drain(..) {
         let is_tactical_move = is_move_tactical(&node, &mv);
         node.do_move(&mv);
-
         if node.is_check(maximize) {
             node.undo_move(&mv);
             continue;
         } else if is_futile {
             legal_move = true;
-            if is_quiet(node) &&
+            if !is_capture(node) &&
                 !is_terminal(node) &&
                 !node.is_check(node.white_turn) &&
                 (mv.promote_to == 0) &&
@@ -489,7 +469,8 @@ unsafe fn negamax_search(node: &mut BB,
         legal_move = true;
         let mut res: (Mv, i32, u8) = (Mv::null_move(), LB, PV_NODE);
 
-        let quiet = is_quiet(node) && mv.promote_to == 0 && !mv.is_ep;
+        let quiet = !is_capture(node) && mv.promote_to == 0 && !mv.is_ep;
+        let terminal = is_terminal(node);
 
         let mut reduced = false;
         if num_moves == 0 {
@@ -497,17 +478,15 @@ unsafe fn negamax_search(node: &mut BB,
         } else {
             if depth > 3
                 && !is_pv
-                && num_moves > 4
+                && num_moves >= 4
                 && !is_check
-                && is_quiet(node)
+                // && !is_capture(node)
                 && !is_terminal(node)
+                && quiet
                 && !node.is_check(node.white_turn)
-                && (mv.promote_to == 0)
+                // && (mv.promote_to == 0)
                 && !is_tactical_move {
                     let mut depth_to_search = depth - 2;
-                    // if num_moves > 10 && !is_pv {
-                    //     depth_to_search = depth - 1 - (depth / 3);
-                    // }
                     res = negamax_search(node, start_time, compute_time, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table);
                     if -res.1 <= alpha {
                         reduced = true;
@@ -573,8 +552,9 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
     let mut alpha = alpha;
     let beta = beta;
     let mut raised_alpha = false;
-    if !node.is_check(maximize) {
-        let curr_val = evaluate_position(node);
+    let curr_val = evaluate_position(node);
+    let is_check = node.is_check(maximize);
+    if !is_check {
         if curr_val >= beta {
             // beta cutoff
             return (beta, CUT_NODE);
@@ -591,8 +571,31 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
 
     let mut best_val = LB;
     let mut best_mv: Mv = Mv::null_move();
-    for mv in node.moves() {
+
+    let mv_q = node.order_and_filter_capture_moves(node.q_moves());
+    if mv_q.len() == 0 {
+        return (curr_val, if curr_val > alpha { if curr_val >= beta {CUT_NODE} else {PV_NODE} } else {ALL_NODE});
+    }
+
+    for mv in mv_q {
         node.do_move(&mv);
+        // check legality
+        if node.is_check(maximize) {node.undo_move(&mv); continue;}
+        if curr_val < alpha - 3000 && node.phase <= 160 {
+            let mut futile = false;
+            match node.cap_stack[node.cap_stack.len() - 1] {
+                b'p' => { if alpha > curr_val + 3000 { futile = true; }},
+                b'n' => { if alpha > curr_val + 5000 { futile = true; }},
+                b'b' => { if alpha > curr_val + 5000 { futile = true; }},
+                b'r' => { if alpha > curr_val + 7000 { futile = true; }},
+                b'q' => { if alpha > curr_val + 10000 { futile = true; }},
+                _ => {}
+            };
+            if futile {
+                node.undo_move(&mv);
+                continue;
+            }
+        }
         let res = quiescence_search(node, depth - 1, -beta, -alpha, !maximize);
         node.undo_move(&mv);
         let val = -res.0;
@@ -612,6 +615,6 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
 
     // if we didn't find further captures, we don't want to erroneously return the
     // min value, but we also need to be consistent with the fail-soft lower bound of non-QS
-    let node_val = if !best_mv.is_null {best_val} else {evaluate_position(node)};
+    let node_val = if !best_mv.is_null {best_val} else {curr_val};
     return (node_val, if raised_alpha {PV_NODE} else {ALL_NODE});
 }
