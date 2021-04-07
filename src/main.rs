@@ -144,10 +144,16 @@ fn get_calc_time(time: i32, inc: i32, ply: i32) -> u128 {
     let p = ply as f64;
     let ply_remaining = 59.3 + (72830.0 - p*2330.0) / (p*p + p*10.0 + 2644.0);
     let moves_remaining = ply_remaining / 2.0;
-    let mut calc_time = (((time - inc) as f64 / moves_remaining) as i32 + inc) as u128;
+    let mut calc_time = (((time - inc) as f64 / moves_remaining) as i32 + inc) as i32;
 
     if calc_time > 30000 {
         calc_time = 30000;
+    }
+    if calc_time > time - 100 {
+        calc_time = time - 100;
+    }
+    if calc_time < 0 {
+        calc_time = 0;          // single ply
     }
     return calc_time as u128;
 }

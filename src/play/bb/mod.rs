@@ -2060,23 +2060,28 @@ impl BB {
     }
 
     fn get_pawn_table_val(&self, idx: i32, white: bool) -> i32 {
-        return board_eval::PAWN_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.pawn_pt_offset;
+        let entry_value = (self.eval_params.pawn_pt_scale * board_eval::PAWN_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + self.eval_params.pawn_pt_offset;
     }
 
     fn get_knight_table_val(&self, idx: i32, white: bool) -> i32 {
-        return board_eval::KNIGHT_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.knight_pt_offset;
+        let entry_value = (self.eval_params.knight_pt_scale * board_eval::KNIGHT_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + self.eval_params.knight_pt_offset;
     }
 
     fn get_bishop_table_val(&self, idx: i32, white: bool) -> i32 {
-        return board_eval::BISHOP_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.bishop_pt_offset;
+        let entry_value = (self.eval_params.bishop_pt_scale * board_eval::BISHOP_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + self.eval_params.bishop_pt_offset;
     }
 
     fn get_king_mg_table_val(&self, idx: i32, white: bool) -> i32 {
-        return board_eval::KING_MG_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.king_mg_pt_offset;
+        let entry_value = (self.eval_params.king_mg_pt_scale * board_eval::KING_MG_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + self.eval_params.king_mg_pt_offset;
     }
 
     fn get_king_eg_table_val(&self, idx: i32, white: bool) -> i32 {
-        return board_eval::KING_EG_TABLE[if white {idx} else {63-idx} as usize] + self.eval_params.king_eg_pt_offset;
+        let entry_value = (self.eval_params.king_eg_pt_scale * board_eval::KING_EG_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + self.eval_params.king_eg_pt_offset;
     }
 
     fn update_pt_score(&mut self, piece: u8, white: bool, start: i32, end: i32, capture: u8, promotion: u8) {

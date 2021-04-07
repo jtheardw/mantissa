@@ -446,9 +446,9 @@ unsafe fn negamax_search(node: &mut BB,
     }
 
     let mut is_futile = false;
-    if !init && depth == 1 {
+    if !is_pv && !is_check && !init && depth <= 2 {
         let futile_val = evaluate_position(&node);
-        if futile_val < (alpha - 3500) {
+        if futile_val < (alpha - if depth == 1 {3200} else {5300}) {
             is_futile = true;
             val = futile_val;
         }
