@@ -2735,12 +2735,168 @@ impl BB {
         attack_value += 200 * knight_attacks;
         attack_value += 200 * bishop_attacks;
 
-        let atk_weights = [0, 0, 50, 75, 85, 90, 94, 99];
+        let atk_weights = [0, 0, 50, 75, 85, 90, 95, 100];
         return ((atk_weights[num_attackers as usize] * attack_value) / 100) as i32;
     }
 
     pub fn king_danger_value(&self) -> i32 {
         return (self.eval_params.king_danger * (self.king_danger_helper(true) - self.king_danger_helper(false))) / 100;
+    }
+
+    fn queen_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
+        let mut attacks: i32 = 0;
+        let mut attackers: i32 = 0;
+        let mut start_idx: i32 = -1;
+        let mut loc_bb = self.queen[white as usize];
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
+        let mut moves = 0;
+
+        let mut c = 0;
+        while loc_bb != 0 && c < 64 {
+            c = loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += c;
+            loc_bb = loc_bb >> c;
+
+            // treat a queen as a rook bishop combo
+            // lookup from the magic table
+            let rook_occ_bb = self.rook_mask[start_idx as usize] & all_composite;
+            let rook_hash = BB::rook_magic_hash(rook_occ_bb, start_idx as usize);
+            let rook_bb = self.rook_magic_table[start_idx as usize][rook_hash as usize];
+
+            let bishop_occ_bb = self.bishop_mask[start_idx as usize] & all_composite;
+            let bishop_hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
+            let bishop_bb = self.bishop_magic_table[start_idx as usize][bishop_hash as usize];
+
+            moves += ((rook_bb | bishop_bb) & !self.composite[white as usize]).count_ones() as i32;
+            let piece_attacks = ((rook_bb | bishop_bb) & king_bb).count_ones() as i32;
+            if piece_attacks > 0 {
+                attackers += 1;
+            }
+            attacks += piece_attacks;
+        }
+        return (moves, attackers, attacks);
+    }
+
+    fn bishop_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
+        let mut attacks: i32 = 0;
+        let mut attackers: i32 = 0;
+        let mut start_idx: i32 = -1;
+        let mut loc_bb = self.bishop[white as usize];
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
+        let mut moves = 0;
+
+        let mut c = 0;
+        while loc_bb != 0 && c < 64 {
+            c = loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += c;
+            loc_bb = loc_bb >> c;
+
+            let bishop_occ_bb = self.bishop_mask[start_idx as usize] & all_composite;
+            let bishop_hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
+            let bishop_bb = self.bishop_magic_table[start_idx as usize][bishop_hash as usize];
+
+            moves += (bishop_bb & !self.composite[white as usize]).count_ones() as i32;
+            let piece_attacks = (bishop_bb & king_bb).count_ones() as i32;
+            if piece_attacks > 0 {
+                attackers += 1;
+            }
+            attacks += piece_attacks
+
+        }
+        return (moves, attackers, attacks);
+    }
+
+    fn rook_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
+        let mut attacks: i32 = 0;
+        let mut attackers: i32 = 0;
+        let mut start_idx: i32 = -1;
+        let mut loc_bb = self.rook[white as usize];
+        let all_composite = self.composite[!white as usize] | self.composite[white as usize];
+        let mut moves = 0;
+
+        let mut c = 0;
+        while loc_bb != 0 && c < 64 {
+            c = loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += c;
+            loc_bb = loc_bb >> c;
+
+            let rook_occ_bb = self.rook_mask[start_idx as usize] & all_composite;
+            let rook_hash = BB::rook_magic_hash(rook_occ_bb, start_idx as usize);
+            let rook_bb = self.rook_magic_table[start_idx as usize][rook_hash as usize];
+
+            moves += (rook_bb & !self.composite[white as usize]).count_ones() as i32;
+            let piece_attacks = (rook_bb & king_bb).count_ones() as i32;
+            if piece_attacks > 0 {
+                attackers += 1;
+            }
+            attacks += piece_attacks;
+        }
+        return (moves, attackers, attacks);
+    }
+
+    fn knight_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
+        let mut attacks: i32 = 0;
+        let mut attackers: i32 = 0;
+        let mut start_idx: i32 = -1;
+        let mut knight_loc_bb = self.knight[white as usize];
+        let mut moves = 0;
+
+        let mut kc = 0;
+        while knight_loc_bb != 0 && kc < 64 {
+            kc = knight_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += kc;
+            knight_loc_bb = knight_loc_bb >> kc;
+
+            let knight_bb = self.knight_mask[start_idx as usize];
+            moves += (knight_bb & !self.composite[white as usize]).count_ones() as i32;
+            let piece_attacks = (knight_bb & king_bb).count_ones() as i32;
+            if piece_attacks > 0 {
+                attackers += 1;
+            }
+            attacks += piece_attacks;
+        }
+        return (moves, attackers, attacks);
+    }
+
+    pub fn mobility_kdf_combo(&self) -> i32 {
+        let mut mobility: [i32; 2] = [0; 2];
+        let mut king_danger: [i32; 2] = [0; 2];
+        for side in 0..2 {
+            let white = side != 0;
+
+            let king_loc_bb = self.king[white as usize];
+            if king_loc_bb == 0 {
+                return 0;
+            }
+            let mut attack_value: i32 = 0;
+
+            let king_idx = king_loc_bb.trailing_zeros() as i32;
+
+            let king_bb = king_loc_bb | self.king_mask[king_idx as usize];
+            let (queen_moves, queen_attackers, queen_attacks) = self.queen_mobility_kdf_attacks(!white, king_bb);
+            let (knight_moves, knight_attackers, knight_attacks) = self.knight_mobility_kdf_attacks(!white, king_bb);
+            let (bishop_moves, bishop_attackers, bishop_attacks) = self.bishop_mobility_kdf_attacks(!white, king_bb);
+            let (rook_moves, rook_attackers, rook_attacks) = self.rook_mobility_kdf_attacks(!white, king_bb);
+            let pawn_moves = self.pawn_mobility(!white);
+            let king_moves = self.king_mobility(!white);
+
+            mobility[!white as usize] = queen_moves + knight_moves + bishop_moves + rook_moves + pawn_moves + king_moves;
+            let mut num_attackers = queen_attackers + knight_attackers + bishop_attackers + rook_attackers;
+
+            if num_attackers > 7 { num_attackers = 7; }
+
+            attack_value += 800 * queen_attacks;
+            attack_value += 400 * rook_attacks;
+            attack_value += 200 * knight_attacks;
+            attack_value += 200 * bishop_attacks;
+
+            let atk_weights = [0, 0, 50, 75, 85, 90, 95, 100];
+            king_danger[side] = ((atk_weights[num_attackers as usize] * attack_value) / 100) as i32;
+        }
+
+        let king_danger_value = (self.eval_params.king_danger * (king_danger[1] - king_danger[0])) / 100;
+        let mobility = self.eval_params.mobility * (mobility[1] - mobility[0]);
+        return king_danger_value + mobility;
     }
 
     pub fn rook_on_seventh_bonus(&self) -> i32 {

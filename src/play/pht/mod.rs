@@ -39,8 +39,9 @@ impl PHT {
     pub fn get(&self, hash: u64) -> PHTEntry {
         let idx: usize = (hash & self.mask) as usize;
         let e = self.pht[idx];
-        if e.valid && e.hash == hash { return e; }
-        return PHTEntry::invalid_entry();
+        if !e.valid { return e; }
+        // if e.valid && e.hash == hash { return e; }
+        return if e.hash == hash {e} else {PHTEntry::invalid_entry()};
     }
 
     pub fn set(& mut self, hash: u64, val: i32) {

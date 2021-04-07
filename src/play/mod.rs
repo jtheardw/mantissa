@@ -161,7 +161,7 @@ fn is_move_tactical(node: &BB, mv: &Mv) -> bool {
 }
 
 unsafe fn evaluate_position(node: &BB) -> i32 {
-    EVALED += 1;
+    // EVALED += 1;
     let mut val = 0;
 
     // pawn values
@@ -180,7 +180,7 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
         pht.set(node.pawn_hash, pv);
     }
     val += node.material;
-    val += node.mobility_value();
+    // val += node.mobility_value();
     val += node.pawn_defense_value();
     val += node.double_bishop_bonus();
     val += node.castled_bonus();
@@ -188,14 +188,13 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
     val += node.get_all_pt_bonus();
     val += node.rook_on_seventh_bonus();
     val += node.rook_on_open_file_value();
-
+    val += node.mobility_kdf_combo();
     // slight tempo bonus
     val += node.tempo_bonus();
 
     val += node.early_queen_penalty();
-    val += node.king_danger_value();
+    // val += node.king_danger_value();
     val += node.material_advantage_bonus();
-
     return val * if node.white_turn {1} else {-1};
 }
 
@@ -242,6 +241,8 @@ unsafe fn old_evaluate_position(node: &BB) -> i32 {
 pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Material: {}", node.material);
     eprintln!("Mobility: {}", node.mobility_value());
+    eprintln!("King danger value: {}", node.king_danger_value());
+    eprintln!("Combo: {} vs. {}", node.mobility_value() + node.king_danger_value(), node.mobility_kdf_combo());
     eprintln!("doubled p: {}", node.doubled_pawns_value());
     eprintln!("isolated p: {}", node.isolated_pawns_value());
     eprintln!("backwards p: {}", node.backwards_pawns_value());
@@ -254,7 +255,6 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Castle Bonus: {}", node.castled_bonus());
     eprintln!("Early queen penalty: {}", node.early_queen_penalty());
     eprintln!("All pt bonus: {}", node.get_all_pt_bonus());
-    eprintln!("King danger value: {}", node.king_danger_value());
     eprintln!("Tempo: {}", node.tempo_bonus());
     eprintln!("Rook on 7th: {}", node.rook_on_seventh_bonus());
     eprintln!("Rook on (semi-)open file: {}", node.rook_on_open_file_value());
@@ -552,6 +552,7 @@ unsafe fn negamax_search(node: &mut BB,
 }
 
 unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, maximize: bool) -> (i32, u8) {
+    EVALED += 1;
     if depth == 0 || is_terminal(node) || is_quiet(node) {
         return (evaluate_position(node), PV_NODE);
     }
