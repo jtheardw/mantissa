@@ -2,7 +2,6 @@
 #![feature(destructuring_assignment)]
 
 use std::io;
-use std::str::Split;
 mod engine;
 
 struct Game {

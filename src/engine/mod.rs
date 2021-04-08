@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use std::collections::VecDeque;
 use std::time::SystemTime;
 
 pub mod bb;
@@ -249,17 +247,7 @@ fn is_capture(node: &mut BB) -> bool {
 }
 
 fn is_quiet(node: &mut BB) -> bool {
-    let mut loud = false;
     return !node.side_to_move_has_capture();
-    // return true;
-    // match node.cap_stack.pop() {
-    //     Some(cap) => {
-    //         loud |= (cap != 0);
-    //         node.cap_stack.push(cap);
-    //     },
-    //     None => {}
-    // }
-    return !loud;
 }
 
 fn moves_equivalent(mv1: &Mv, mv2: &Mv) -> bool {
@@ -271,7 +259,10 @@ fn moves_equivalent(mv1: &Mv, mv2: &Mv) -> bool {
             && mv1.is_ep == mv2.is_ep;
 }
 
-fn order_moves(mut moves: Vec<Mv>, best_move: Mv) -> Vec<Mv> {
+fn order_moves(moves: Vec<Mv>, best_move: Mv) -> Vec<Mv> {
+    // currently mostly just pushes the expected
+    // "best move" to the front with a baked-in
+    // legality check
     if best_move.is_null { return moves; }
     let mut found_move = false;
     let mut new_q: Vec<Mv> = Vec::new();
@@ -332,7 +323,6 @@ unsafe fn negamax_search(node: &mut BB,
 
     let mut first_move = Mv::null_move();
     let mut depth = depth;
-    let mut is_cut = false;
 
     let tt_entry = tt.get(node.hash);
     if tt_entry.valid {
@@ -505,7 +495,6 @@ unsafe fn negamax_search(node: &mut BB,
             return (Mv::err_move(), 0, PV_NODE);
         }
         let ret_val = -res.1;
-        let ret_node_type = res.2;
 
         if ret_val > val {
             best_move = mv;

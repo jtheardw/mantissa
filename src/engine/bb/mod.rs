@@ -1,5 +1,4 @@
 use rand::Rng;
-use std::collections::VecDeque;
 use std::fmt;
 use std::vec::Vec;
 
@@ -1604,7 +1603,6 @@ impl BB {
         let mut moves: Vec<Mv> = Vec::new();
         let mut start_idx = -1;
         let mut pawn_loc_bb = self.pawn[white as usize];
-        let all_composite = self.composite[0] | self.composite[1];
         let mut capture_composite = self.composite[!white as usize];
         if self.ep != -1 {
             // include a "ghost" entry in the capture composite
@@ -2111,7 +2109,7 @@ impl BB {
         return atked_squares & self.composite[white as usize];
     }
 
-    pub fn order_capture_moves(&self, mut mvs: Vec<Mv>, k_array: &[Mv; 3], h_table: &[[[u64; 64]; 6]; 2]) -> Vec<Mv> {
+    pub fn order_capture_moves(&self, mvs: Vec<Mv>, k_array: &[Mv; 3], h_table: &[[[u64; 64]; 6]; 2]) -> Vec<Mv> {
         let side = self.white_turn as usize;
         let enemy_side = !self.white_turn as usize;
         let enemy_occ = self.composite[enemy_side];
@@ -2226,7 +2224,7 @@ impl BB {
         return mv_q;
     }
 
-    pub fn order_and_filter_capture_moves(&self, mut mvs: Vec<Mv>) -> Vec<Mv> {
+    pub fn order_and_filter_capture_moves(&self, mvs: Vec<Mv>) -> Vec<Mv> {
         let enemy_side = !self.white_turn as usize;
         let enemy_occ = self.composite[enemy_side];
         let def_pieces = self.get_defended_pieces(!self.white_turn);
@@ -2445,7 +2443,7 @@ impl BB {
         // move piece
         if mv.promote_to != 0 {
             self.pawn[self_side] ^= start_point;
-            let mut material_gain = 0;
+            let mut material_gain;
             match mv.promote_to {
                 b'q' => { self.queen[self_side] |= end_point; material_gain = QUEEN_VALUE; },
                 b'r' => { self.rook[self_side] |= end_point; material_gain = ROOK_VALUE; },
@@ -2591,7 +2589,7 @@ impl BB {
         // move piece
         if mv.promote_to != 0 {
             self.pawn[self_side] ^= start_point;
-            let mut material_gain = 0;
+            let mut material_gain;
             match mv.promote_to {
                 b'q' => { self.queen[self_side] ^= end_point; material_gain = QUEEN_VALUE; },
                 b'r' => { self.rook[self_side] ^= end_point; material_gain = ROOK_VALUE; },
@@ -2949,7 +2947,7 @@ impl BB {
         // brute force but we cache it anyway
         let mut white_pawn_attack_proj = white_pawn_attacks;
         let mut black_pawn_attack_proj = black_pawn_attacks;
-        for r in 0..5 {
+        for _r in 0..5 {
             white_pawn_attack_proj |= white_pawn_attack_proj << 8;
             black_pawn_attack_proj |= black_pawn_attack_proj >> 8;
         }
@@ -3023,12 +3021,11 @@ impl BB {
             let side = i as usize;
             let enemy_side = if i == 1 {0} else {1};
             let rook_bb = self.rook[side];
-            let mut rc = 0;
             for f in 0..8 {
                 let rooks = (FILE_MASKS[f] & rook_bb).count_ones();
                 if rooks > 0 && ((FILE_MASKS[f] & self.pawn[side]) == 0) {
                     // at least semi-open
-                    if ((FILE_MASKS[f] & self.pawn[enemy_side]) == 0) {
+                    if (FILE_MASKS[f] & self.pawn[enemy_side]) == 0 {
                         open_file_rooks[side] += rooks as i32;
                     } else {
                         semi_open_file_rooks[side] += rooks as i32;
@@ -3062,7 +3059,7 @@ impl BB {
     }
 
     pub fn tempo_bonus(&self) -> i32 {
-        return self.eval_params.tempo_bonus * if {self.white_turn} {1} else {-1};
+        return self.eval_params.tempo_bonus * if self.white_turn {1} else {-1};
     }
 
     pub fn material_advantage_bonus(&self) -> i32 {
