@@ -22,7 +22,7 @@ Mantissa can be used with any UCI interface in theory.  It currently doesn't sup
 
 ## Build
 
-**You may need the "nightly" toolchain rather than "stable"**
+**Noes: You may need the "nightly" toolchain rather than "stable"**
 
 You can build Mantissa so long as you have rust installed with `cargo build --release` (for the optimized version).  If you have a machine with native popcount and bitscan/tzcnt/etc. instructions (most x86-64 machines qualify these days), you can compile with:
 
