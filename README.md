@@ -2,7 +2,7 @@
 
 Mantissa is a young UCI-compatible chess engine written as a side project to learn both chess programming and also rust.  Because of this, there are many things to improve both in terms of code clarity and in terms of performance and correctness for Mantissa, but there are a lot of ideas packed in already.
 
-Mantissa is named after the "significand" in mathematics but especially as a reference to the floating point spec.  Ironically there are next-to-no floats in Mantissa's code.
+Mantissa is named after the "significand" (or mantissa) in the floating point spec (and math in general).  Ironically there are next-to-no floats in Mantissa's code.
 
 ## Play Against Mantissa
 
