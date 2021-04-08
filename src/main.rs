@@ -3,11 +3,11 @@
 
 use std::io;
 use std::str::Split;
-mod play;
+mod engine;
 
 struct Game {
-    pub board: play::bb::BB,
-    pub eval_params: play::bb::EvalParams,
+    pub board: engine::bb::BB,
+    pub eval_params: engine::bb::EvalParams,
     white_turn: bool,
 }
 
@@ -20,8 +20,8 @@ impl Game {
         zobrist_table: ([[u64; 12]; 64], (u64, u64))
     ) -> Game {
 
-        let eval_params = play::bb::EvalParams::default_params();
-        let board = play::bb::BB::default_board(
+        let eval_params = engine::bb::EvalParams::default_params();
+        let board = engine::bb::BB::default_board(
             knight_mask,
             rook_mask,
             bishop_mask,
@@ -99,23 +99,23 @@ impl Game {
     fn receive_move(& mut self, mv: String) {
         // translate
         let move_bytes = mv.as_bytes();
-        let start = play::bb::BB::coord_to_idx(((move_bytes[0] - b'a') as i32, (move_bytes[1] - b'1') as i32));
-        let end = play::bb::BB::coord_to_idx(((move_bytes[2] - b'a') as i32, (move_bytes[3] - b'1') as i32));
-        let mv: play::bb::Mv;
+        let start = engine::bb::BB::coord_to_idx(((move_bytes[0] - b'a') as i32, (move_bytes[1] - b'1') as i32));
+        let end = engine::bb::BB::coord_to_idx(((move_bytes[2] - b'a') as i32, (move_bytes[3] - b'1') as i32));
+        let mv: engine::bb::Mv;
         if move_bytes.len() == 5 {
             // pawn promotion
             let promote_to = move_bytes[4];
-            mv = play::bb::Mv::pawn_promote_move(start, end, promote_to);
+            mv = engine::bb::Mv::pawn_promote_move(start, end, promote_to);
         } else {
             let piece = self.board.get_piece_at_idx(start);
             if piece == b'p' {
                 if self.board.is_ep(start, end) {
-                    mv = play::bb::Mv::pawn_ep_move(start, end);
+                    mv = engine::bb::Mv::pawn_ep_move(start, end);
                 } else {
-                    mv = play::bb::Mv::pawn_move(start, end);
+                    mv = engine::bb::Mv::pawn_move(start, end);
                 }
             } else if piece > 0 {
-                mv = play::bb::Mv::normal_move(start, end, piece);
+                mv = engine::bb::Mv::normal_move(start, end, piece);
             } else {
                 panic!("no piece at that location!");
             }
@@ -124,10 +124,10 @@ impl Game {
         self.white_turn = !self.white_turn;
     }
 
-    unsafe fn make_move(& mut self, compute_time: u128) -> play::bb::Mv {
+    unsafe fn make_move(& mut self, compute_time: u128) -> engine::bb::Mv {
         eprintln!("current eval:");
-        play::print_evaluate(&self.board);
-        let (best_move, _) = play::best_move(& mut self.board, self.white_turn, compute_time);
+        engine::print_evaluate(&self.board);
+        let (best_move, _) = engine::best_move(& mut self.board, self.white_turn, compute_time);
         eprintln!("best move is {}", best_move);
         return best_move;
     }
@@ -159,12 +159,12 @@ fn get_calc_time(time: i32, inc: i32, ply: i32) -> u128 {
 }
 
 unsafe fn play() {
-    let nm = play::bb::BB::gen_knight_mask();
-    let rm = play::bb::BB::gen_rook_mask();
-    let bm = play::bb::BB::gen_bishop_mask();
-    let km = play::bb::BB::gen_king_mask();
+    let nm = engine::bb::BB::gen_knight_mask();
+    let rm = engine::bb::BB::gen_rook_mask();
+    let bm = engine::bb::BB::gen_bishop_mask();
+    let km = engine::bb::BB::gen_king_mask();
 
-    let zobrist = play::bb::BB::init_zobrist();
+    let zobrist = engine::bb::BB::init_zobrist();
 
     let mut game : Game = Game::get_basic_game(
         nm,
