@@ -2845,7 +2845,7 @@ impl BB {
             attack_value += 200 * knight_attacks;
             attack_value += 200 * bishop_attacks;
 
-            let atk_weights = [0, 0, 50, 75, 85, 90, 95, 100];
+            let atk_weights = [0, 5, 50, 75, 85, 90, 95, 100];
             king_danger[side] = ((atk_weights[num_attackers as usize] * attack_value) / 100) as i32;
         }
 
