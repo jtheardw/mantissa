@@ -1419,7 +1419,8 @@ impl BB {
         return atked_squares & self.composite[white as usize];
     }
 
-    pub fn order_capture_moves(&self, mut mvs: Vec<Mv>, k_array: &[Mv; 3]) -> Vec<Mv> {
+    pub fn order_capture_moves(&self, mut mvs: Vec<Mv>, k_array: &[Mv; 3], h_table: &[[[u64; 64]; 6]; 2]) -> Vec<Mv> {
+        let side = self.white_turn as usize;
         let enemy_side = !self.white_turn as usize;
         let enemy_occ = self.composite[enemy_side];
         let mut free_caps: Vec<Mv> = Vec::new();
@@ -1499,10 +1500,28 @@ impl BB {
                 } else if BB::moves_equivalent(&mv, &k_array[2]) {
                     killer_moves.push(mv);
                 } else {
-                    no_caps.push(mv);
+                    let history_value = h_table[side][mv.get_piece_num()][mv.end as usize];
+                    if history_value == 0 || no_caps.len() == 0 {
+                        no_caps.push(mv);
+                        continue;
+                    }
+                    let mut pushed = false;
+                    let mut i = 0;
+                    for other_mv in no_caps.iter() {
+                        if h_table[side][other_mv.get_piece_num()][other_mv.end as usize] <= history_value {
+                            no_caps.insert(i, mv);
+                            pushed = true;
+                            break;
+                        }
+                        i += 1;
+                    }
+                    if !pushed {
+                        no_caps.push(mv);
+                    }
                 }
             }
         }
+
         mv_q.append(& mut free_caps);
         mv_q.append(& mut pawn_caps);
         mv_q.append(& mut winning_caps);
@@ -3424,6 +3443,18 @@ impl Mv {
         let p = if self.promote_to != 0 {(self.promote_to as char).to_string()} else {"".to_string()};
 
         return format!("{}{}{}{}{}", f1.to_string(), r1, f2.to_string(), r2, p);
+    }
+
+    pub fn get_piece_num(&self) -> usize {
+        match self.piece {
+            b'k'=> 0,
+            b'q'=> 1,
+            b'r'=> 2,
+            b'b'=> 3,
+            b'n'=> 4,
+            b'p'=> 5,
+            _ => panic!("bad piece for getting num")
+        }
     }
 
     pub fn normal_move(start: i32, end: i32, piece: u8) -> Mv {
