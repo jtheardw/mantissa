@@ -5,13 +5,15 @@ use std::io;
 mod engine;
 
 struct Game {
-    pub board: engine::bb::BB,
+    pub boards: Vec<engine::bb::BB>,
     pub eval_params: engine::bb::EvalParams,
     white_turn: bool,
+    num_threads: i32,
 }
 
 impl Game {
     fn get_basic_game(
+        num_threads: i32,
         knight_mask: [u64; 64],
         rook_mask: [u64; 64],
         bishop_mask: [u64; 64],
@@ -20,19 +22,24 @@ impl Game {
     ) -> Game {
 
         let eval_params = engine::bb::EvalParams::default_params();
-        let board = engine::bb::BB::default_board(
-            knight_mask,
-            rook_mask,
-            bishop_mask,
-            king_mask,
-            zobrist_table,
-            eval_params
-        );
+        let mut boards: Vec<engine::bb::BB> = Vec::new();
+        for i in 0..num_threads {
+            let board = engine::bb::BB::default_board(
+                knight_mask,
+                rook_mask,
+                bishop_mask,
+                king_mask,
+                zobrist_table,
+                eval_params
+            );
+            boards.push(board);
+        }
 
         Game{
-            board: board,
+            boards: boards,
             eval_params: eval_params,
             white_turn: true,
+            num_threads: num_threads
         }
     }
 
@@ -80,18 +87,24 @@ impl Game {
             _ => {}
         }
 
-        self.board.eval_params = self.eval_params;
+        for i in 0..self.boards.len() {
+            self.boards[i].eval_params = self.eval_params;
+        }
     }
 
     fn reset(& mut self) {
-        self.board.reset();
-        self.board.eval_params = self.eval_params;
+        for i in 0..self.boards.len() {
+            self.boards[i].reset();
+            self.boards[i].eval_params = self.eval_params;
+        }
         self.white_turn = true;
     }
 
     fn reset_fen(& mut self, fen: String) {
-        self.board.reset_from_position(fen);
-        self.board.eval_params = self.eval_params;
+        for i in 0..self.boards.len() {
+            self.boards[i].reset_from_position(fen);
+            self.boards[i].eval_params = self.eval_params;
+        }
         self.white_turn = self.board.white_turn;
     }
 
@@ -106,9 +119,9 @@ impl Game {
             let promote_to = move_bytes[4];
             mv = engine::bb::Mv::pawn_promote_move(start, end, promote_to);
         } else {
-            let piece = self.board.get_piece_at_idx(start);
+            let piece = self.boards[0].get_piece_at_idx(start);
             if piece == b'p' {
-                if self.board.is_ep(start, end) {
+                if self.boards[0].is_ep(start, end) {
                     mv = engine::bb::Mv::pawn_ep_move(start, end);
                 } else {
                     mv = engine::bb::Mv::pawn_move(start, end);
@@ -119,14 +132,16 @@ impl Game {
                 panic!("no piece at that location!");
             }
         }
-        self.board.do_move(&mv);
+        for i in 0..self.boards.len() {
+            self.boards[i].do_move(&mv);
+        }
         self.white_turn = !self.white_turn;
     }
 
     unsafe fn make_move(& mut self, compute_time: u128) -> engine::bb::Mv {
         eprintln!("current eval:");
-        engine::print_evaluate(&self.board);
-        let (best_move, _) = engine::best_move(& mut self.board, self.white_turn, compute_time);
+        engine::print_evaluate(&self.boards[0]);
+        let (best_move, _) = engine::best_move(& mut self.boards, self.white_turn, compute_time);
         eprintln!("best move is {}", best_move);
         return best_move;
     }
@@ -164,8 +179,10 @@ unsafe fn play() {
     let km = engine::bb::BB::gen_king_mask();
 
     let zobrist = engine::bb::BB::init_zobrist();
+    let num_threads = 2;
 
     let mut game : Game = Game::get_basic_game(
+        num_threads,
         nm,
         rm,
         bm,
