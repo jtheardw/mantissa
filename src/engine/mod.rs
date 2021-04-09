@@ -61,7 +61,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
         tt = TT::get_tt(24);
     }
     if !pht.valid {
-        pht = PHT::get_pht(22);
+        pht = PHT::get_pht(18);
     }
 
     // killer moves table
