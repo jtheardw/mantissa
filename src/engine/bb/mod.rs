@@ -8,7 +8,7 @@ pub mod board_eval;
 
 const KING_VALUE: i32 = 200000;
 const QUEEN_VALUE: i32 = 9000;
-const ROOK_VALUE: i32 = 5300;
+const ROOK_VALUE: i32 = 5000;
 const BISHOP_VALUE: i32 = 3200;
 const KNIGHT_VALUE: i32 = 3000;
 const PAWN_VALUE: i32 = 1000;
@@ -2825,7 +2825,14 @@ impl BB {
 
             let king_idx = king_loc_bb.trailing_zeros() as i32;
 
-            let king_bb = king_loc_bb | self.king_mask[king_idx as usize];
+            let mut king_bb = king_loc_bb | self.king_mask[king_idx as usize];
+            // eprintln!("{}", BB::bb_str(king_bb));
+            // if white {
+            //     king_bb |= king_bb << 8;
+            // } else {
+            //     king_bb |= king_bb >> 8;
+            // }
+
             let (queen_moves, queen_attackers, queen_attacks) = self.queen_mobility_kdf_attacks(!white, king_bb);
             let (knight_moves, knight_attackers, knight_attacks) = self.knight_mobility_kdf_attacks(!white, king_bb);
             let (bishop_moves, bishop_attackers, bishop_attacks) = self.bishop_mobility_kdf_attacks(!white, king_bb);

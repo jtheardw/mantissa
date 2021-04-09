@@ -1,3 +1,4 @@
+use core::arch::x86_64;
 use std::time::SystemTime;
 
 pub mod bb;
@@ -311,8 +312,6 @@ unsafe fn negamax_search(node: &mut BB,
                          h_table: & mut [[[u64; 64]; 6]; 2]
 ) -> (Mv, i32, u8) {
     node.nodes_evaluated += 1;
-    let current_time = get_time_millis();
-    if current_time - start_time > compute_time { return (Mv::err_move(), 0, PV_NODE); }
 
     if is_terminal(&node) {
         if node.is_threefold() {
@@ -320,6 +319,12 @@ unsafe fn negamax_search(node: &mut BB,
         }
         return (Mv::null_move(), evaluate_position(&node), PV_NODE);
     }
+
+    x86_64::_mm_prefetch(tt.get_ptr(node.hash), x86_64::_MM_HINT_NTA);
+    x86_64::_mm_prefetch(pht.get_ptr(node.pawn_hash), x86_64::_MM_HINT_NTA);
+
+    let current_time = get_time_millis();
+    if current_time - start_time > compute_time { return (Mv::err_move(), 0, PV_NODE); }
 
     let mut first_move = Mv::null_move();
     let mut depth = depth;
@@ -409,6 +414,13 @@ unsafe fn negamax_search(node: &mut BB,
             }
         }
     }
+
+    // if depth == 3 {
+    //     // a sort of limited razoring-like thing?
+    //     if !is_pv && !is_check && !init && evaluate_position(&node) < alpha {
+    //         depth = 2;
+    //     }
+    // }
 
     // futility pruning and extended futility pruning
     let mut is_futile = false;

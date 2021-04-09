@@ -36,6 +36,11 @@ impl PHT {
         }
     }
 
+    pub fn get_ptr(&self, hash: u64) -> * const i8 {
+        let idx: usize = (hash & self.mask) as usize;
+        return &self.pht[idx] as *const PHTEntry as *const i8;
+    }
+
     pub fn get(&self, hash: u64) -> PHTEntry {
         let idx: usize = (hash & self.mask) as usize;
         let e = self.pht[idx];

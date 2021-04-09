@@ -49,6 +49,11 @@ impl TT {
         }
     }
 
+    pub fn get_ptr(&self, hash: u64) -> * const i8 {
+        let idx: usize = (hash & self.mask) as usize;
+        return &self.tt[idx] as *const (TTEntry, TTEntry) as *const i8;
+    }
+
     pub fn get(&self, hash: u64) -> TTEntry {
         let idx: usize = (hash & self.mask) as usize;
         let (e1, e2) = self.tt[idx];
