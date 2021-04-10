@@ -44,9 +44,14 @@ pub unsafe fn print_pv(node: & mut BB, depth: i32) {
     }
 }
 
-pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (Mv, f64) {
-    node.nodes_evaluated = 0;
-    node.tt_hits = 0;
+// TODO
+// pub unsafe fn thread_handler(node, move_tx, term_rx, depth, 0, )
+
+pub unsafe fn best_move(nodes: &mut Vec<BB>, maximize: bool, compute_time: u128) -> (Mv, f64) {
+    for i in 0..nodes.len() {
+        node.nodes_evaluated = 0;
+        node.tt_hits = 0;
+    }
 
     let mut m_depth: i32 = 1;
     let start_time: u128 = get_time_millis();
@@ -61,13 +66,18 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128) -> (M
         tt = TT::get_tt(24);
     }
     if !pht.valid {
-        pht = PHT::get_pht(22);
+        pht = PHT::get_pht(18);
     }
 
-    // killer moves table
-    let mut k_table: [[Mv; 3]; 64] = [[Mv::null_move(); 3]; 64];
-    // history table: h_table[s2m][piece][to]
-    let mut h_table: [[[u64; 64]; 6]; 2] = [[[0; 64]; 6]; 2];
+    let mut k_tables: Vec<[[Mv; 3]; 64]>;
+    let mut h_tables: Vec<[[[u64; 64]; 6]; 2]>;
+    for i in 0..nodes.len() {
+        // killer moves table
+        let k_table: [[Mv; 3]; 64] = [[Mv::null_move(); 3]; 64];
+        // history table: h_table[s2m][piece][to]
+        let h_table: [[[u64; 64]; 6]; 2] = [[[0; 64]; 6]; 2];
+        k_tables.append(k_table);
+        h_tables.append(h_table);
 
     let mut aspire = 0;
     while (current_time - start_time) <= compute_time {
