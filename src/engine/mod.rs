@@ -542,6 +542,14 @@ unsafe fn negamax_search(node: &mut BB,
     return (best_move, val, if !raised_alpha {ALL_NODE} else {PV_NODE});
 }
 
+pub unsafe fn q_eval(node: &mut BB, maximize: bool) -> i32 {
+    if !pht.valid {
+        pht = PHT::get_pht(18);
+    }
+    let (val, _) = quiescence_search(node, 100, -1000000, 1000000, maximize);
+    return val;
+}
+
 unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, maximize: bool) -> (i32, u8) {
     node.nodes_evaluated += 1;
     if depth == 0 || is_terminal(node) || is_quiet(node) {

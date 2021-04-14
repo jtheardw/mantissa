@@ -130,6 +130,11 @@ impl Game {
         eprintln!("best move is {}", best_move);
         return best_move;
     }
+
+    unsafe fn eval(& mut self) -> i32 {
+        let val = engine::q_eval(& mut self.board, self.white_turn);
+        return val
+    }
 }
 
 fn main() {
@@ -280,6 +285,10 @@ unsafe fn play() {
             if on_clock { time = get_calc_time(clock_time, inc_time, game.board.history.len() as i32); }
             let mv = game.make_move(time);
             println!("bestmove {}", mv);
+        }
+        if cmd == "eval" {
+            let val: i32 = game.eval();
+            println!("value {}", val);
         }
     }
 }

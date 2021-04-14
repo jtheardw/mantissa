@@ -175,40 +175,40 @@ pub struct EvalParams {
 impl EvalParams {
     pub fn default_params() -> EvalParams {
         EvalParams {
-            mobility: 40,
-            pdf: 30,
-            dbb: 500,
-            castle: 500,
+            mobility: 30,
+            pdf: 10,
+            dbb: 450,
+            castle: 441,
             pav: 40,
             rook_on_seventh: 150,
             rook_on_open: 80,
             early_queen_penalty: -300,
 
             passed_pawn: 500,
-            center_pawn: 300,
-            near_center_pawn: 50,
-            isolated_pawn: -300,
-            doubled_pawn: -300,
-            backwards_pawn: -300,
+            center_pawn: 250,
+            near_center_pawn: 69,
+            isolated_pawn: -340,
+            doubled_pawn: -212,
+            backwards_pawn: -230,
 
-            pawn_pt_offset: 0,
+            pawn_pt_offset: -56,
             pawn_pt_scale: 100,
 
-            bishop_pt_offset: 0,
-            bishop_pt_scale: 100,
+            bishop_pt_offset: 10,
+            bishop_pt_scale: 111,
 
-            knight_pt_offset: 0,
-            knight_pt_scale: 100,
+            knight_pt_offset: 30,
+            knight_pt_scale: 195,
 
-            king_mg_pt_offset: 0,
-            king_mg_pt_scale: 100,
+            king_mg_pt_offset: -27,
+            king_mg_pt_scale: 103,
 
-            king_eg_pt_offset: 0,
+            king_eg_pt_offset: -80,
             king_eg_pt_scale: 100,
 
-            tempo_bonus: 150,
-            material_advantage: 200,
-            king_danger: -100,
+            tempo_bonus: 100,
+            material_advantage: 300,
+            king_danger: -70,
         }
     }
 }
