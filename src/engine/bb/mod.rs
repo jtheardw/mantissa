@@ -175,40 +175,40 @@ pub struct EvalParams {
 impl EvalParams {
     pub fn default_params() -> EvalParams {
         EvalParams {
-            mobility: 40,
-            pdf: 30,
-            dbb: 500,
-            castle: 500,
-            pav: 40,
-            rook_on_seventh: 150,
-            rook_on_open: 80,
-            early_queen_penalty: -300,
+            mobility: 15,
+            pdf: 70,
+            dbb: 550,
+            castle: 441,
+            pav: 36,
+            rook_on_seventh: 140,
+            rook_on_open: 77,
+            early_queen_penalty: -254,
 
-            passed_pawn: 500,
-            center_pawn: 300,
-            near_center_pawn: 50,
-            isolated_pawn: -300,
-            doubled_pawn: -300,
-            backwards_pawn: -300,
+            passed_pawn: 531,
+            center_pawn: 165,
+            near_center_pawn: 30,
+            isolated_pawn: -170,
+            doubled_pawn: -263,
+            backwards_pawn: -260,
 
-            pawn_pt_offset: 0,
-            pawn_pt_scale: 100,
+            pawn_pt_offset: -52,
+            pawn_pt_scale: 102,
 
-            bishop_pt_offset: 0,
-            bishop_pt_scale: 100,
+            bishop_pt_offset: -16,
+            bishop_pt_scale: 104,
 
-            knight_pt_offset: 0,
-            knight_pt_scale: 100,
+            knight_pt_offset: 80,
+            knight_pt_scale: 127,
 
-            king_mg_pt_offset: 0,
-            king_mg_pt_scale: 100,
+            king_mg_pt_offset: 12,
+            king_mg_pt_scale: 97,
 
-            king_eg_pt_offset: 0,
-            king_eg_pt_scale: 100,
+            king_eg_pt_offset: -17,
+            king_eg_pt_scale: 114,
 
-            tempo_bonus: 150,
-            material_advantage: 200,
-            king_danger: -100,
+            tempo_bonus: 152,
+            material_advantage: 212,
+            king_danger: -65,
         }
     }
 }
