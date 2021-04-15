@@ -28,6 +28,8 @@ pub fn get_time_millis() -> u128 {
 static mut tt: TT = TT {tt: Vec::new(), bits: 0, mask: 0, valid: false};
 static mut pht: PHT = PHT {pht: Vec::new(), bits: 0, mask: 0, valid: false};
 
+static mut tt_lock: RwLock = RwLock::new(1);
+
 pub unsafe fn print_pv(node: & mut BB, depth: i32) {
     if depth < 0 {
         eprint!("\n");
@@ -44,8 +46,18 @@ pub unsafe fn print_pv(node: & mut BB, depth: i32) {
     }
 }
 
-// TODO
-// pub unsafe fn thread_handler(node, move_tx, term_rx, depth, 0, )
+pub unsafe fn thread_handler(node: &mut BB,
+                             & mut move_tx: Sender<(Mv, i32, u8)>,
+                             &term_rx: Receiver<bool>,
+                             depth: i32,
+                             alpha: i32,
+                             beta: i32,
+                             maximize: bool,
+                             & mut k_table: [[Mv; 3]; 64],
+                             & mut h_table: [[[u64; 64]; 6]; 2]) {
+    let result = negamax_search(node, term_rx, depth, 0, alpha, beta, maximize, true, true, k_table, h_table);
+    move_tx.send(result).unwrap();
+}
 
 pub unsafe fn best_move(nodes: &mut Vec<BB>, maximize: bool, compute_time: u128) -> (Mv, f64) {
     for i in 0..nodes.len() {
@@ -308,8 +320,7 @@ fn update_k_table(k_table: & mut [[Mv; 3]; 64], mv: Mv, ply: i32) {
 
 // TODO: can clean up all these args
 unsafe fn negamax_search(node: &mut BB,
-                         start_time: u128,
-                         compute_time: u128,
+                         &term_rx: Receiver<Bool>,
                          depth: i32,
                          ply: i32,
                          alpha: i32,
@@ -333,8 +344,12 @@ unsafe fn negamax_search(node: &mut BB,
     x86_64::_mm_prefetch(tt.get_ptr(node.hash), x86_64::_MM_HINT_NTA);
     x86_64::_mm_prefetch(pht.get_ptr(node.pawn_hash), x86_64::_MM_HINT_NTA);
 
-    let current_time = get_time_millis();
-    if current_time - start_time > compute_time { return (Mv::err_move(), 0, PV_NODE); }
+    match term_rx.try_recv() {
+        Ok(_) | Err(TryRecvError::Disconnected) => {
+            return (Mv::err_move(), 0, PV_NODE);
+        }
+        Err(TryRecvError::Empty) => {}}
+    }
 
     let mut first_move = Mv::null_move();
     let mut depth = depth;
