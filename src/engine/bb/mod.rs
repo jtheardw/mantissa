@@ -293,6 +293,76 @@ impl BB {
         bb & (1 << idx)
     }
 
+    pub fn copy(&self) -> BB {
+        let mut rmt: Vec<Vec<u64>> = Vec::new();
+        for sq in &self.rook_magic_table {
+            let mut rmt_sq: Vec<u64> = Vec::new();
+            for v in sq {
+                rmt_sq.push(*v);
+            }
+            rmt.push(rmt_sq);
+        }
+
+        let mut bmt: Vec<Vec<u64>> = Vec::new();
+        for sq in &self.bishop_magic_table {
+            let mut bmt_sq: Vec<u64> = Vec::new();
+            for v in sq {
+                bmt_sq.push(*v);
+            }
+            bmt.push(bmt_sq);
+        }
+
+        let mut h: Vec<u64> = Vec::new();
+        for hash in &self.history {
+            h.push(*hash);
+        }
+
+        BB {
+            white_turn: self.white_turn,
+            king: self.king,
+            queen: self.queen,
+            rook: self.rook,
+            bishop: self.bishop,
+            knight: self.knight,
+            pawn: self.pawn,
+            composite: self.composite,
+
+            knight_mask: self.knight_mask,
+            rook_mask: self.rook_mask,
+            bishop_mask: self.bishop_mask,
+            king_mask: self.king_mask,
+
+            castling_rights: self.castling_rights,
+            castled: self.castled,
+            rook_magic_table: rmt,
+            bishop_magic_table: bmt,
+
+            ep: self.ep,
+            ep_stack: Vec::new(),
+            cr_stack: Vec::new(),
+            cap_stack: Vec::new(),
+            history: h,
+            pawn_history: Vec::new(),
+
+            material: self.material,
+            hash: self.hash,
+            pawn_hash: self.pawn_hash,
+            zobrist_table: self.zobrist_table,
+            phase: self.phase,
+
+            king_mg_pt_score: self.king_mg_pt_score,
+            king_eg_pt_score: self.king_eg_pt_score,
+            pawn_pt_score: self.pawn_pt_score,
+            knight_pt_score: self.knight_pt_score,
+            bishop_pt_score: self.bishop_pt_score,
+
+            eval_params: self.eval_params,
+
+            nodes_evaluated: 0,
+            tt_hits: 0
+        }
+    }
+
     // constructors
     pub fn default_board(
         knight_mask: [u64; 64],
@@ -3359,7 +3429,7 @@ impl BB {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Mv {
     pub start: i32,
     pub end: i32,

@@ -1,4 +1,9 @@
 use core::arch::x86_64;
+use std::sync::mpsc::{self, TryRecvError};
+use std::sync::mpsc::{Sender, Receiver};
+use std::sync::RwLock;
+use std::thread;
+use std::time::Duration;
 use std::time::SystemTime;
 
 pub mod bb;
@@ -7,6 +12,7 @@ use bb::Mv;
 
 pub mod tt;
 use tt::TT;
+use tt::TTEntry;
 
 pub mod pht;
 use pht::PHT;
@@ -28,8 +34,6 @@ pub fn get_time_millis() -> u128 {
 static mut tt: TT = TT {tt: Vec::new(), bits: 0, mask: 0, valid: false};
 static mut pht: PHT = PHT {pht: Vec::new(), bits: 0, mask: 0, valid: false};
 
-static mut tt_lock: RwLock = RwLock::new(1);
-
 pub unsafe fn print_pv(node: & mut BB, depth: i32) {
     if depth < 0 {
         eprint!("\n");
@@ -46,24 +50,32 @@ pub unsafe fn print_pv(node: & mut BB, depth: i32) {
     }
 }
 
-pub unsafe fn thread_handler(node: &mut BB,
-                             & mut move_tx: Sender<(Mv, i32, u8)>,
-                             &term_rx: Receiver<bool>,
+pub unsafe fn thread_handler(mut node: BB,
+                             tnum: usize,
+                             move_tx: Sender<(Mv, i32, u8)>,
                              depth: i32,
                              alpha: i32,
                              beta: i32,
                              maximize: bool,
-                             & mut k_table: [[Mv; 3]; 64],
-                             & mut h_table: [[[u64; 64]; 6]; 2]) {
-    let result = negamax_search(node, term_rx, depth, 0, alpha, beta, maximize, true, true, k_table, h_table);
+                             mut k_table: [[Mv; 3]; 64],
+                             mut h_table: [[[u64; 64]; 6]; 2]) {
+    let result = negamax_search(&mut node, depth, 0, alpha, beta, maximize, true, true, true, &mut k_table, &mut h_table);
     move_tx.send(result).unwrap();
+    evaled[tnum] += node.nodes_evaluated;
+    hits[tnum] += node.tt_hits;
+    k_tables[tnum] = k_table;
+    h_tables[tnum] = h_table;
 }
 
-pub unsafe fn best_move(nodes: &mut Vec<BB>, maximize: bool, compute_time: u128) -> (Mv, f64) {
-    for i in 0..nodes.len() {
-        node.nodes_evaluated = 0;
-        node.tt_hits = 0;
-    }
+static mut kill_threads: bool = false;
+static mut evaled: Vec<u64> = Vec::new();
+static mut hits: Vec<u64> = Vec::new();
+static mut k_tables: Vec<[[Mv; 3]; 64]> = Vec::new();
+static mut h_tables: Vec<[[[u64; 64]; 6]; 2]> = Vec::new();
+
+pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthreads: usize) -> (Mv, f64) {
+    node.nodes_evaluated = 0;
+    node.tt_hits = 0;
 
     let mut m_depth: i32 = 1;
     let start_time: u128 = get_time_millis();
@@ -73,6 +85,9 @@ pub unsafe fn best_move(nodes: &mut Vec<BB>, maximize: bool, compute_time: u128)
     let mut best_move : Mv = Mv::null_move();
     let mut best_val: i32 = 0;
 
+    let mut nodes_evaled = 0;
+    let mut tt_hits = 0;
+
     // initialize persistent tables
     if !tt.valid {
         tt = TT::get_tt(24);
@@ -81,15 +96,21 @@ pub unsafe fn best_move(nodes: &mut Vec<BB>, maximize: bool, compute_time: u128)
         pht = PHT::get_pht(18);
     }
 
-    let mut k_tables: Vec<[[Mv; 3]; 64]>;
-    let mut h_tables: Vec<[[[u64; 64]; 6]; 2]>;
-    for i in 0..nodes.len() {
+    evaled = Vec::new();
+    hits = Vec::new();
+    k_tables = Vec::new();
+    h_tables = Vec::new();
+    for i in 0..nthreads {
+        evaled.push(0);
+        hits.push(0);
+
         // killer moves table
         let k_table: [[Mv; 3]; 64] = [[Mv::null_move(); 3]; 64];
         // history table: h_table[s2m][piece][to]
         let h_table: [[[u64; 64]; 6]; 2] = [[[0; 64]; 6]; 2];
-        k_tables.append(k_table);
-        h_tables.append(h_table);
+        k_tables.push(k_table);
+        h_tables.push(h_table);
+    }
 
     let mut aspire = 0;
     while (current_time - start_time) <= compute_time {
@@ -105,21 +126,64 @@ pub unsafe fn best_move(nodes: &mut Vec<BB>, maximize: bool, compute_time: u128)
                 beta = -best_val + aspire;
             }
         }
-        let (ply_move, ply_val, node_type) = negamax_search(
-            node,
-            start_time,
-            if best_move.is_null {100000} else {compute_time},
-            m_depth,
-            0,
-            alpha,
-            beta,
-            maximize,
-            true,
-            true,
-            true,
-            &mut k_table,
-            &mut h_table
-        );
+
+        // let (term_tx, term_rx) = mpsc::channel();
+        let (move_tx, move_rx) = mpsc::channel();
+        kill_threads = false;
+        let mut threads = vec![];
+        for t_num in 0..nthreads {
+            let extra_depth = if t_num > 0 {t_num.trailing_zeros() as i32} else {1};
+            let mut node = node.copy();
+            let mut h_table = h_tables[t_num];
+            let mut k_table = k_tables[t_num];
+            let move_tx = move_tx.clone();
+            threads.push(thread::spawn(move || {
+                thread_handler(node, t_num, move_tx, m_depth+extra_depth, alpha, beta, maximize, k_table, h_table);
+            }));
+        }
+
+        let mut ply_move = Mv::err_move();
+        let mut ply_val = 0;
+        let mut node_type = PV_NODE;
+        loop {
+            thread::sleep(Duration::from_millis(50));
+            match move_rx.try_recv() {
+                Ok((mv, score, n_type)) => {
+                    ply_move = mv;
+                    ply_val = score;
+                    node_type = n_type;
+                    kill_threads = true;
+                    break;
+                },
+                Err(TryRecvError::Empty) => {},
+                Err(TryRecvError::Disconnected) => panic!("what.")
+            }
+
+            let current_time = get_time_millis();
+            if current_time - start_time >= compute_time {
+                ply_move = Mv::err_move();
+                kill_threads = true;
+                break;
+            }
+        }
+        for t in threads {
+            t.join();
+        }
+        // let (ply_move, ply_val, node_type) = negamax_search(
+        //     node,
+        //     start_time,
+        //     if best_move.is_null {100000} else {compute_time},
+        //     m_depth,
+        //     0,
+        //     alpha,
+        //     beta,
+        //     maximize,
+        //     true,
+        //     true,
+        //     true,
+        //     &mut k_table,
+        //     &mut h_table
+        // );
 
         // kind of a misnomer, this means we ran out of time
         if ply_move.is_err {break;}
@@ -137,13 +201,20 @@ pub unsafe fn best_move(nodes: &mut Vec<BB>, maximize: bool, compute_time: u128)
         }
 
         // we maintain that positive is always white advantage here so we have to flip
-        (best_move, best_val) = (ply_move, if node.white_turn {ply_val} else {-ply_val});
+        (best_move, best_val) = (ply_move, if maximize {ply_val} else {-ply_val});
+
+        nodes_evaled = 0;
+        tt_hits = 0;
+        for i in 0..nthreads {
+            nodes_evaled += evaled[i];
+            tt_hits += hits[i];
+        }
 
         // for debugging
         eprintln!(
             "{} eval'd {} this time got val {} and recommends {} with piece {}",
             m_depth,
-            node.nodes_evaluated,
+            nodes_evaled,
             best_val,
             best_move,
             best_move.piece);
@@ -159,10 +230,17 @@ pub unsafe fn best_move(nodes: &mut Vec<BB>, maximize: bool, compute_time: u128)
         m_depth += 1;
     }
 
+    nodes_evaled = 0;
+    tt_hits = 0;
+    for i in 0..nthreads {
+        nodes_evaled += evaled[i];
+        tt_hits += hits[i];
+    }
+
     // all for debugging
-    eprintln!("{} tt hits", node.tt_hits);
+    eprintln!("{} tt hits", tt_hits);
     eprintln!("{} ply evaluated", m_depth - 1);
-    eprintln!("{} nodes evaluated", node.nodes_evaluated);
+    eprintln!("{} nodes evaluated", nodes_evaled);
     eprintln!("projected value: {}", best_val);
     eprintln!("elapsed time: {}", get_time_millis() - start_time);
     eprintln!("expected PV:");
@@ -336,7 +414,6 @@ fn move_sort(mvs: & mut Vec<(Mv, u64)>, cur_i: usize) {
 
 // TODO: can clean up all these args
 unsafe fn negamax_search(node: &mut BB,
-                         &term_rx: Receiver<Bool>,
                          depth: i32,
                          ply: i32,
                          alpha: i32,
@@ -357,26 +434,32 @@ unsafe fn negamax_search(node: &mut BB,
         return (Mv::null_move(), evaluate_position(&node), PV_NODE);
     }
 
+    if depth <= 0 {
+        let (val, node_type) = quiescence_search(node, 64, alpha, beta, maximize);
+        return (Mv::null_move(), val, node_type);
+    }
 
     x86_64::_mm_prefetch(tt.get_ptr(node.hash), x86_64::_MM_HINT_NTA);
     x86_64::_mm_prefetch(pht.get_ptr(node.pawn_hash), x86_64::_MM_HINT_NTA);
 
-    match term_rx.try_recv() {
-        Ok(_) | Err(TryRecvError::Disconnected) => {
-            return (Mv::err_move(), 0, PV_NODE);
-        }
-        Err(TryRecvError::Empty) => {}}
+    // match term_rx.try_recv() {
+    //     Ok(_) | Err(TryRecvError::Disconnected) => {
+    //         return (Mv::err_move(), 0, PV_NODE);
+    //     }
+    //     Err(TryRecvError::Empty) => {}
+    // }
+
+    if kill_threads {
+        return (Mv::err_move(), 0, PV_NODE);
     }
 
     let mut first_move = Mv::null_move();
     let mut depth = depth;
-
-    let tt_entry = tt.get(node.hash);
+    let mut tt_entry = tt.get(node.hash);
     if tt_entry.valid {
         node.tt_hits += 1;
         let mv = tt_entry.mv;
         first_move = mv;
-
         if tt_entry.depth >= depth {
             if tt_entry.node_type == PV_NODE
                 || (tt_entry.value < alpha && tt_entry.node_type == ALL_NODE) // all node is upper bound
@@ -405,7 +488,7 @@ unsafe fn negamax_search(node: &mut BB,
         }
     } else if depth >= 6 && is_pv {
         // internal iterative deepening
-        let (mv, val, _) = negamax_search(node, start_time, compute_time, depth - 2, ply, alpha, beta, maximize, true, false, false, k_table, h_table);
+        let (mv, val, _) = negamax_search(node, depth - 2, ply, alpha, beta, maximize, true, false, false, k_table, h_table);
         first_move = mv;
     }
 
@@ -414,13 +497,9 @@ unsafe fn negamax_search(node: &mut BB,
     }
 
     let is_check = node.is_check(maximize);
-    if is_check && depth <= 0 {
+    if is_check {
         // check extension
-        depth = 1;
-    }
-    if depth <= 0 {
-        let (val, node_type) = quiescence_search(node, 16, alpha, beta, maximize);
-        return (Mv::null_move(), val, node_type);
+        depth += 1;
     }
 
     let mut alpha = alpha;
@@ -430,13 +509,22 @@ unsafe fn negamax_search(node: &mut BB,
     let mut best_move = Mv::null_move();
     let mut val = LB;
 
-    if !is_check && nmr_ok && !init && !is_pv {// && evaluate_position(&node) >= beta {
+    // RFP
+    if (depth < 3) && !is_pv && !is_check && !init {
+        let cur_val = evaluate_position(&node);
+
+        let margin = [0, 1300, 2500];
+        if (cur_val - margin[depth as usize]) >= beta {
+            return (Mv::null_move(), (cur_val - margin[depth as usize]), CUT_NODE);
+        }
+    }
+
+    if depth >= 3 && !is_check && nmr_ok && !init && !is_pv {// && evaluate_position(&node) >= beta {
         // null move reductions
         let depth_to_search = depth - if depth > 6 {5} else {4};
-        // let depth_to_search = depth - if depth > 6 {4} else {3};
 
         node.do_null_move();
-        let nmr_val = -negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table, h_table).1;
+        let nmr_val = -negamax_search(node, depth_to_search, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table, h_table).1;
         node.undo_null_move();
 
         if nmr_val >= beta {
@@ -446,17 +534,10 @@ unsafe fn negamax_search(node: &mut BB,
             // return (Mv::null_move(), beta, CUT_NODE);
             depth -= 4;
             if depth <= 0 {
-                return negamax_search(node, start_time, compute_time, 0, ply, alpha, beta, maximize, false, false, false, k_table, h_table);
+                return negamax_search(node, 0, ply, alpha, beta, maximize, false, false, false, k_table, h_table);
             }
         }
     }
-
-    // if depth == 3 {
-    //     // a sort of limited razoring-like thing?
-    //     if !is_pv && !is_check && !init && evaluate_position(&node) < alpha {
-    //         depth = 2;
-    //     }
-    // }
 
     let mut moves = order_moves(node.get_scored_moves(node.moves(), &k_table[ply as usize], &h_table), first_move);
     let mut num_moves = 0;
@@ -507,7 +588,7 @@ unsafe fn negamax_search(node: &mut BB,
 
         let mut reduced = false;
         if num_moves == 0 {
-            res = negamax_search(node, start_time, compute_time, depth - 1, ply+1, -beta, -alpha, !maximize, true, false, true, k_table, h_table);
+            res = negamax_search(node, depth - 1, ply+1, -beta, -alpha, !maximize, true, false, true, k_table, h_table);
         } else {
             if depth > 3
                 && !is_pv
@@ -524,7 +605,7 @@ unsafe fn negamax_search(node: &mut BB,
                         depth_to_search = depth - 1 - (depth / 3);
                     }
 
-                    res = negamax_search(node, start_time, compute_time, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table);
+                    res = negamax_search(node, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table);
 
                     if -res.1 <= alpha {
                         // if we fail to raise alpha we can move on
@@ -537,9 +618,9 @@ unsafe fn negamax_search(node: &mut BB,
                 }
 
             if !reduced {
-                res = negamax_search(node, start_time, compute_time, depth - 1, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table);
+                res = negamax_search(node, depth - 1, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table);
                 if -res.1 > alpha && -res.1 < beta { // failed high
-                    res = negamax_search(node, start_time, compute_time, depth - 1, ply + 1, -beta, -alpha, !maximize, true, false, true, k_table, h_table);
+                    res = negamax_search(node, depth - 1, ply + 1, -beta, -alpha, !maximize, true, false, true, k_table, h_table);
                 }
             }
 
