@@ -282,16 +282,16 @@ fn moves_equivalent(mv1: &Mv, mv2: &Mv) -> bool {
             && mv1.is_ep == mv2.is_ep;
 }
 
-fn order_moves(moves: Vec<Mv>, best_move: Mv) -> Vec<Mv> {
+fn order_moves(moves: Vec<(Mv, u64)>, best_move: Mv) -> Vec<(Mv, u64)> {
     // currently mostly just pushes the expected
     // "best move" to the front with a baked-in
     // legality check
     if best_move.is_null { return moves; }
     let mut found_move = false;
-    let mut new_q: Vec<Mv> = Vec::new();
-    new_q.push(best_move);
+    let mut new_q: Vec<(Mv, u64)> = Vec::new();
+    new_q.push((best_move, 0xFFFFFFFFFFFFFFFF));
     for mv in moves {
-        if moves_equivalent(&mv, &best_move) {
+        if moves_equivalent(&mv.0, &best_move) {
             found_move = true;
         } else {
             new_q.push(mv);
@@ -318,6 +318,22 @@ fn update_k_table(k_table: & mut [[Mv; 3]; 64], mv: Mv, ply: i32) {
     k_table[ply][(get_time_millis() % 3) as usize] = mv;
 }
 
+fn move_sort(mvs: & mut Vec<(Mv, u64)>, cur_i: usize) {
+    let mut highest_i = cur_i;
+
+    for i in (cur_i + 1)..mvs.len() {
+        if mvs[i].1 > mvs[highest_i].1 {
+            highest_i = i;
+        }
+    }
+
+    // swap
+    let (mv, score) = mvs[highest_i];
+    mvs[highest_i] = mvs[cur_i];
+    mvs[cur_i] = (mv, score);
+}
+
+
 // TODO: can clean up all these args
 unsafe fn negamax_search(node: &mut BB,
                          &term_rx: Receiver<Bool>,
@@ -340,6 +356,7 @@ unsafe fn negamax_search(node: &mut BB,
         }
         return (Mv::null_move(), evaluate_position(&node), PV_NODE);
     }
+
 
     x86_64::_mm_prefetch(tt.get_ptr(node.hash), x86_64::_MM_HINT_NTA);
     x86_64::_mm_prefetch(pht.get_ptr(node.pawn_hash), x86_64::_MM_HINT_NTA);
@@ -368,9 +385,9 @@ unsafe fn negamax_search(node: &mut BB,
                 // we do a janky legality check just in case of freak collisions
                 // where we use the fact that move ordering will make sure a move comes from this
                 // position
-                let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize], &h_table), first_move);
+                let mut moves = order_moves(node.get_scored_moves(node.moves(), &k_table[ply as usize], &h_table), first_move);
                 if moves.len() > 0 {
-                    let fm = moves[0];
+                    let (fm, _) = moves[0];
                     if moves_equivalent(&first_move, &fm) {
                         // check 3 fold
                         if !node.is_repitition() {
@@ -386,25 +403,21 @@ unsafe fn negamax_search(node: &mut BB,
                 }
             }
         }
-    } else if depth > 6 {
+    } else if depth >= 6 && is_pv {
         // internal iterative deepening
-        let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize], &h_table), first_move);
-        let mut best_val = LB;
-        for mv in moves {
-            node.do_move(&mv);
-            if node.is_check(maximize) {
-                node.undo_move(&mv);
-                continue
-            }
-            let val = -negamax_search(node, start_time, compute_time, depth - 5, ply+1, -beta, -alpha, !maximize, true, false, false, k_table, h_table).1;
-            node.undo_move(&mv);
-            if val > best_val {
-                best_val = val;
-                first_move = mv;
-            }
-        }
+        let (mv, val, _) = negamax_search(node, start_time, compute_time, depth - 2, ply, alpha, beta, maximize, true, false, false, k_table, h_table);
+        first_move = mv;
     }
 
+    if first_move.is_err {
+        return (first_move, 0, PV_NODE);
+    }
+
+    let is_check = node.is_check(maximize);
+    if is_check && depth <= 0 {
+        // check extension
+        depth = 1;
+    }
     if depth <= 0 {
         let (val, node_type) = quiescence_search(node, 16, alpha, beta, maximize);
         return (Mv::null_move(), val, node_type);
@@ -414,16 +427,13 @@ unsafe fn negamax_search(node: &mut BB,
     let beta = beta;
 
     let mut raised_alpha = false;
-    let is_check = node.is_check(maximize);
     let mut best_move = Mv::null_move();
     let mut val = LB;
 
-    let mut moves = order_moves(node.order_capture_moves(node.moves(), &k_table[ply as usize], &h_table), first_move);
-    let mut num_moves = 0;
-
-    if !is_check && nmr_ok && !init && !is_pv { // && evaluate_position(&node) >= beta {
+    if !is_check && nmr_ok && !init && !is_pv {// && evaluate_position(&node) >= beta {
         // null move reductions
         let depth_to_search = depth - if depth > 6 {5} else {4};
+        // let depth_to_search = depth - if depth > 6 {4} else {3};
 
         node.do_null_move();
         let nmr_val = -negamax_search(node, start_time, compute_time, depth_to_search, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table, h_table).1;
@@ -433,6 +443,7 @@ unsafe fn negamax_search(node: &mut BB,
             // using the extended null move reductions
             // idea from Eli David and Nathan S. Netanyahu
             // in the paper of the same name
+            // return (Mv::null_move(), beta, CUT_NODE);
             depth -= 4;
             if depth <= 0 {
                 return negamax_search(node, start_time, compute_time, 0, ply, alpha, beta, maximize, false, false, false, k_table, h_table);
@@ -447,18 +458,28 @@ unsafe fn negamax_search(node: &mut BB,
     //     }
     // }
 
+    let mut moves = order_moves(node.get_scored_moves(node.moves(), &k_table[ply as usize], &h_table), first_move);
+    let mut num_moves = 0;
+    let mut cur_i = 0;
+
     // futility pruning and extended futility pruning
     let mut is_futile = false;
-    if !is_pv && !is_check && !init && depth <= 2 {
+    if !is_pv && !is_check && !init && depth <= 3 {
+        let futile_margin = [0, 2200, 3200, 5300];
         let futile_val = evaluate_position(&node);
-        if futile_val < (alpha - if depth == 1 {3200} else {5300}) {
+        if futile_val <= (alpha - futile_margin[depth as usize]) {
             is_futile = true;
             val = futile_val;
         }
     }
     let mut legal_move = false;
 
-    for mv in moves {
+    while cur_i < moves.len() {
+        move_sort(&mut moves, cur_i);
+        let (mv, score) = moves[cur_i];
+        // println!("depth {} cur_i {} mov {} score {}", depth, cur_i, mv, score);
+        cur_i += 1;
+
         let is_tactical_move = is_move_tactical(&node, &mv);
         node.do_move(&mv);
         if node.is_check(maximize) {
@@ -498,7 +519,7 @@ unsafe fn negamax_search(node: &mut BB,
                 && !is_tactical_move {
                     // late move reductions
                     let mut depth_to_search = depth - 2;
-                    if num_moves >= 8 {
+                    if num_moves >= 10 {
                         // later move reductions
                         depth_to_search = depth - 1 - (depth / 3);
                     }
@@ -605,12 +626,16 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
     let mut best_val = LB;
     let mut best_mv: Mv = Mv::null_move();
 
-    let mv_q = node.order_and_filter_capture_moves(node.q_moves());
+    let mut mv_q = node.get_scored_q_moves(node.q_moves());
+    let mut cur_i = 0;
     if mv_q.len() == 0 {
         return (curr_val, if curr_val > alpha { if curr_val >= beta {CUT_NODE} else {PV_NODE} } else {ALL_NODE});
     }
 
-    for mv in mv_q {
+    while cur_i < mv_q.len() {
+        move_sort(&mut mv_q, cur_i);
+        let (mv, score) = mv_q[cur_i];
+        cur_i += 1;
         node.do_move(&mv);
         // check legality
         if node.is_check(maximize) {node.undo_move(&mv); continue;}
@@ -618,14 +643,14 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
         // delta pruning
         // if we're very behind of where we could be (alpha)
         // we should only accept exceptionally good captures
-        if curr_val < alpha - 3000 && node.phase <= 160 {
+        if node.phase <= 160 {
             let mut futile = false;
             match node.cap_stack[node.cap_stack.len() - 1] {
                 b'p' => { if alpha > curr_val + 3000 { futile = true; }},
                 b'n' => { if alpha > curr_val + 5000 { futile = true; }},
                 b'b' => { if alpha > curr_val + 5000 { futile = true; }},
                 b'r' => { if alpha > curr_val + 7000 { futile = true; }},
-                b'q' => { if alpha > curr_val + 10000 { futile = true; }},
+                b'q' => { if alpha > curr_val + 11000 { futile = true; }},
                 _ => {}
             };
             if futile {

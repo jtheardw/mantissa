@@ -2224,16 +2224,160 @@ impl BB {
         return mv_q;
     }
 
-    pub fn order_and_filter_capture_moves(&self, mvs: Vec<Mv>) -> Vec<Mv> {
+    pub fn get_scored_moves(&self, mvs: Vec<Mv>, k_array: &[Mv; 3], h_table: &[[[u64; 64]; 6]; 2]) -> Vec<(Mv, u64)> {
+        let side = self.white_turn as usize;
         let enemy_side = !self.white_turn as usize;
         let enemy_occ = self.composite[enemy_side];
         let def_pieces = self.get_defended_pieces(!self.white_turn);
+
+        let cap_offset: u64 = 1 << 45;
+        let free_cap_offset: u64 = 1 << 50;
+        let killer_score_offset: u64 = 1 << 42;
+        let no_cap_offset: u64 = 1 << 16;
+        let bad_cap_offset: u64 = 0; // TODO move sophistication
+        let mut mv_q: Vec<(Mv, u64)> = Vec::new();
+
+        for mv in mvs {
+            let mut mv_score: u64 = 0;
+            let dst_bb = BB::idx_to_bb(mv.end);
+            if (dst_bb & enemy_occ) == 0 {
+                // not a capture
+                if BB::moves_equivalent(&mv, &k_array[0]) ||
+                    BB::moves_equivalent(&mv, &k_array[1]) ||
+                    BB::moves_equivalent(&mv, &k_array[2]) {
+                    mv_score = killer_score_offset;
+                } else {
+                    mv_score = no_cap_offset + h_table[side][mv.get_piece_num()][mv.end as usize];
+                }
+            } else {
+                let my_val = match mv.piece {
+                    b'p' => 1000,
+                    b'n' => 3000,
+                    b'b' => 3000,
+                    b'r' => 5000,
+                    b'q' => 9000,
+                    b'k' => 10000,
+                    _ => 0
+                };
+
+                if dst_bb & def_pieces == 0 {
+                    // free capture.  That's good
+                    mv_score = free_cap_offset - my_val;
+                } else {
+                    if mv.piece == b'k' {
+                        // not legal
+                        continue;
+                    }
+                    // defended
+                    let mut other_val: u64 = 0;
+                    if dst_bb & self.pawn[enemy_side] != 0 {
+                        other_val = 1000;
+                    } else if dst_bb & self.knight[enemy_side] != 0 {
+                        other_val = 3000;
+                    } else if dst_bb & self.bishop[enemy_side] != 0 {
+                        other_val = 3000;
+                    } else if dst_bb & self.rook[enemy_side] != 0 {
+                        other_val = 5000;
+                    } else if dst_bb & self.queen[enemy_side] != 0 {
+                        other_val = 9000;
+                    } else if dst_bb & self.king[enemy_side] != 0 {
+                        // shouldn't be possible
+                        panic!("king capture?");
+                    }
+                    if my_val > other_val {
+                        // "losing" capture
+                        mv_score = 11000 - (my_val - other_val);
+                    } else {
+                        mv_score = cap_offset + (other_val - my_val);
+                    }
+                }
+            }
+
+            mv_q.push((mv, mv_score));
+        }
+        return mv_q;
+    }
+
+    pub fn get_scored_q_moves(&self, mvs: Vec<Mv>) -> Vec<(Mv, u64)> {
+        let side = self.white_turn as usize;
+        let enemy_side = !self.white_turn as usize;
+        let enemy_occ = self.composite[enemy_side];
+        let def_pieces = self.get_defended_pieces(!self.white_turn);
+
+        let free_cap_offset: u64 = 1 << 50;
+        let cap_offset: u64 = 1 << 45;
+        let killer_score_offset: u64 = 1 << 42;
+        let bad_cap_offset: u64 = 0; // TODO move sophistication
+        let mut mv_q: Vec<(Mv, u64)> = Vec::new();
+        let mut vlc_q: Vec<(Mv, u64)> = Vec::new();
+
+        for mv in mvs {
+            let mut mv_score: u64 = 0;
+            let dst_bb = BB::idx_to_bb(mv.end);
+            if (dst_bb & enemy_occ) == 0 {
+                // not a capture
+                continue        // for now
+            } else {
+                let my_val = match mv.piece {
+                    b'p' => 1000,
+                    b'n' => 3000,
+                    b'b' => 3000,
+                    b'r' => 5000,
+                    b'q' => 9000,
+                    b'k' => 10000,
+                    _ => 0
+                };
+
+                if dst_bb & def_pieces == 0 {
+                    // free capture.  That's good
+                    mv_score = free_cap_offset - my_val;
+                } else {
+                    if mv.piece == b'k' {
+                        // not legal
+                        continue;
+                    }
+                    // defended
+                    let mut other_val: u64 = 0;
+                    if dst_bb & self.pawn[enemy_side] != 0 {
+                        other_val = 1000;
+                    } else if dst_bb & self.knight[enemy_side] != 0 {
+                        other_val = 3000;
+                    } else if dst_bb & self.bishop[enemy_side] != 0 {
+                        other_val = 3000;
+                    } else if dst_bb & self.rook[enemy_side] != 0 {
+                        other_val = 5000;
+                    } else if dst_bb & self.queen[enemy_side] != 0 {
+                        other_val = 9000;
+                    } else if dst_bb & self.king[enemy_side] != 0 {
+                        // shouldn't be possible
+                        panic!("king capture?");
+                    }
+                    if my_val > other_val {
+                        // "losing" capture
+                        mv_score = 11000 - (my_val - other_val);
+                    } else {
+                        mv_score = cap_offset + (other_val - my_val);
+                    }
+                }
+            }
+
+            mv_q.push((mv, mv_score));
+        }
+        return mv_q;
+    }
+
+    pub fn order_and_filter_capture_moves(&self, mvs: Vec<Mv>) -> (Vec<Mv>, Vec<Mv>) {
+        let enemy_side = !self.white_turn as usize;
+        let enemy_occ = self.composite[enemy_side];
+        let def_pieces = self.get_defended_pieces(!self.white_turn);
+        let pawn_def_pieces = self.pawn_attacks(!self.white_turn) & self.composite[!self.white_turn as usize];
 
         let mut free_caps: Vec<Mv> = Vec::new();
         let mut pawn_caps: Vec<Mv> = Vec::new();
         let mut winning_caps: Vec<Mv> = Vec::new();
         let mut equal_caps: Vec<Mv> = Vec::new();
         let mut losing_caps: Vec<Mv> = Vec::new();
+        let mut very_losing_caps: Vec<Mv> = Vec::new();
         let mut mv_q: Vec<Mv> = Vec::new();
 
         for mv in mvs {
@@ -2244,6 +2388,29 @@ impl BB {
                     // undefended piece.  That's good
                     free_caps.push(mv);
                     continue;
+                }
+                if dst_bb & pawn_def_pieces == 0 {
+                    // might be very bad
+                    let mut skip = false;
+                    if mv.piece == b'r' {
+                        if (dst_bb & self.pawn[enemy_side]) != 0 {
+                            very_losing_caps.push(mv);
+                            skip = true;
+                        }
+                    } else if mv.piece == b'b' || mv.piece == b'n' {
+                        if (dst_bb & self.pawn[enemy_side]) != 0 {
+                            very_losing_caps.push(mv);
+                            skip = true;
+                        }
+                    } else if mv.piece == b'q' {
+                        if (dst_bb & self.queen[enemy_side]) == 0 {
+                            very_losing_caps.push(mv);
+                            skip = true;
+                        }
+                    }
+                    if skip {
+                        continue;
+                    }
                 }
                 match mv.piece {
                     b'p' => {
@@ -2303,7 +2470,7 @@ impl BB {
         mv_q.append(& mut winning_caps);
         mv_q.append(& mut equal_caps);
         mv_q.append(& mut losing_caps);
-        return mv_q;
+        return (mv_q, very_losing_caps);
     }
 
     pub fn moves_equivalent(mv1: &Mv, mv2: &Mv) -> bool {
@@ -2850,7 +3017,7 @@ impl BB {
             attack_value += 200 * knight_attacks;
             attack_value += 200 * bishop_attacks;
 
-            let atk_weights = [0, 5, 50, 75, 85, 90, 95, 100];
+            let atk_weights = [0, 0, 50, 75, 85, 90, 95, 100];
             king_danger[side] = ((atk_weights[num_attackers as usize] * attack_value) / 100) as i32;
         }
 
