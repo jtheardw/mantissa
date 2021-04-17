@@ -442,7 +442,7 @@ unsafe fn negamax_search(node: &mut BB,
     if !is_pv && !is_check && !init && depth <= 3 {
         let futile_margin = [0, 2200, 3200, 5300];
         let futile_val = evaluate_position(&node);
-        if futile_val < (alpha - futile_margin[depth as usize]) {
+        if futile_val <= (alpha - futile_margin[depth as usize]) {
             is_futile = true;
             val = futile_val;
         }

@@ -2230,10 +2230,10 @@ impl BB {
         let enemy_occ = self.composite[enemy_side];
         let def_pieces = self.get_defended_pieces(!self.white_turn);
 
-        let cap_offset: u64 = 1 << 42;
-        let free_cap_offset: u64 = 1 << 45;
-        let killer_score_offset: u64 = 1 << 40;
-        let no_cap_offset: u64 = 1 << 10;
+        let cap_offset: u64 = 1 << 45;
+        let free_cap_offset: u64 = 1 << 50;
+        let killer_score_offset: u64 = 1 << 42;
+        let no_cap_offset: u64 = 1 << 16;
         let bad_cap_offset: u64 = 0; // TODO move sophistication
         let mut mv_q: Vec<(Mv, u64)> = Vec::new();
 
@@ -2286,7 +2286,7 @@ impl BB {
                     }
                     if my_val > other_val {
                         // "losing" capture
-                        mv_score = 0;
+                        mv_score = 11000 - (my_val - other_val);
                     } else {
                         mv_score = cap_offset + (other_val - my_val);
                     }
@@ -2304,10 +2304,9 @@ impl BB {
         let enemy_occ = self.composite[enemy_side];
         let def_pieces = self.get_defended_pieces(!self.white_turn);
 
-        let cap_offset: u64 = 1 << 42;
-        let free_cap_offset: u64 = 1 << 45;
-        let killer_score_offset: u64 = 1 << 40;
-        let no_cap_offset: u64 = 1 << 10;
+        let free_cap_offset: u64 = 1 << 50;
+        let cap_offset: u64 = 1 << 45;
+        let killer_score_offset: u64 = 1 << 42;
         let bad_cap_offset: u64 = 0; // TODO move sophistication
         let mut mv_q: Vec<(Mv, u64)> = Vec::new();
         let mut vlc_q: Vec<(Mv, u64)> = Vec::new();
@@ -2355,7 +2354,7 @@ impl BB {
                     }
                     if my_val > other_val {
                         // "losing" capture
-                        mv_score = 0;
+                        mv_score = 11000 - (my_val - other_val);
                     } else {
                         mv_score = cap_offset + (other_val - my_val);
                     }
@@ -3018,7 +3017,7 @@ impl BB {
             attack_value += 200 * knight_attacks;
             attack_value += 200 * bishop_attacks;
 
-            let atk_weights = [0, 5, 50, 75, 85, 90, 95, 100];
+            let atk_weights = [0, 0, 50, 75, 85, 90, 95, 100];
             king_danger[side] = ((atk_weights[num_attackers as usize] * attack_value) / 100) as i32;
         }
 
