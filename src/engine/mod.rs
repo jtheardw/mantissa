@@ -56,9 +56,9 @@ pub unsafe fn thread_handler(mut node: BB,
                              depth: i32,
                              alpha: i32,
                              beta: i32,
-                             maximize: bool,
-                             mut k_table: [[Mv; 3]; 64],
-                             mut h_table: [[[u64; 64]; 6]; 2]) {
+                             maximize: bool) {
+    let mut h_table = h_tables[tnum];
+    let mut k_table = k_tables[tnum];
     let result = negamax_search(&mut node, depth, 0, alpha, beta, maximize, true, true, true, &mut k_table, &mut h_table);
     move_tx.send(result).unwrap();
     evaled[tnum] += node.nodes_evaluated;
@@ -133,12 +133,11 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
         let mut threads = vec![];
         for t_num in 0..nthreads {
             let extra_depth = if t_num > 0 {t_num.trailing_zeros() as i32} else {1};
+            // let extra_depth = 0;
             let mut node = node.copy();
-            let mut h_table = h_tables[t_num];
-            let mut k_table = k_tables[t_num];
             let move_tx = move_tx.clone();
             threads.push(thread::spawn(move || {
-                thread_handler(node, t_num, move_tx, m_depth+extra_depth, alpha, beta, maximize, k_table, h_table);
+                thread_handler(node, t_num, move_tx, m_depth+extra_depth, alpha, beta, maximize);
             }));
         }
 
