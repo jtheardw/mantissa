@@ -459,7 +459,7 @@ unsafe fn negamax_search(node: &mut BB,
         node.tt_hits += 1;
         let mv = tt_entry.mv;
         first_move = mv;
-        if tt_entry.depth >= depth {
+        if !is_pv && tt_entry.depth >= depth {
             if tt_entry.node_type == PV_NODE
                 || (tt_entry.value < alpha && tt_entry.node_type == ALL_NODE) // all node is upper bound
                 || (tt_entry.value >= beta && tt_entry.node_type == CUT_NODE) // cut node is lower bound
@@ -518,7 +518,7 @@ unsafe fn negamax_search(node: &mut BB,
         }
     }
 
-    if depth >= 3 && !is_check && nmr_ok && !init && !is_pv {// && evaluate_position(&node) >= beta {
+    if depth >= 3 && !is_check && nmr_ok && !init && !is_pv {
         // null move reductions
         let depth_to_search = depth - if depth > 6 {5} else {4};
 

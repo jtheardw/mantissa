@@ -3114,7 +3114,7 @@ impl BB {
                 let mask = FILE_MASKS[f as usize];
                 let file_pawns = mask & self.pawn[side];
                 if file_pawns.count_ones() > 1 {
-                    doubled_pawns[side] += 1;
+                    doubled_pawns[side] += (file_pawns.count_ones() as i32 - 1);
                 }
             }
         }
