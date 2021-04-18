@@ -70,7 +70,7 @@ pub unsafe fn thread_handler(mut node: BB,
 static mut kill_threads: bool = false;
 static mut evaled: Vec<u64> = Vec::new();
 static mut hits: Vec<u64> = Vec::new();
-static mut k_tables: Vec<[[Mv; 3]; 64]> = Vec::new();
+static mut k_tables: Vec<[[(Mv, i32); 3]; 64]> = Vec::new();
 static mut h_tables: Vec<[[[u64; 64]; 6]; 2]> = Vec::new();
 
 pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthreads: usize) -> (Mv, f64) {
@@ -105,7 +105,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
         hits.push(0);
 
         // killer moves table
-        let k_table: [[Mv; 3]; 64] = [[Mv::null_move(); 3]; 64];
+        let k_table: [[(Mv, i32); 3]; 64] = [[Mv::null_move(); 3]; 64];
         // history table: h_table[s2m][piece][to]
         let h_table: [[[u64; 64]; 6]; 2] = [[[0; 64]; 6]; 2];
         k_tables.push(k_table);
@@ -381,18 +381,46 @@ fn order_moves(moves: Vec<(Mv, u64)>, best_move: Mv) -> Vec<(Mv, u64)> {
     return new_q;
 }
 
-fn update_k_table(k_table: & mut [[Mv; 3]; 64], mv: Mv, ply: i32) {
+fn update_k_table(k_table: & mut [[(Mv, i32); 3]; 64], mv: Mv, depth: i32, ply: i32) {
     let ply = ply as usize;
-    if moves_equivalent(&k_table[ply][0], &mv) {return;}
-    if moves_equivalent(&k_table[ply][1], &mv) {return;}
-    if moves_equivalent(&k_table[ply][2], &mv) {return;}
+    if moves_equivalent(&k_table[ply][0].0, &mv) {
+        if depth > k_table[ply][0].1 {
+            k_table[ply][0] = (mv, depth);
+        }
+        return;
+    }
+    if moves_equivalent(&k_table[ply][1].0, &mv) {
+        if depth > k_table[ply][0].1 {
+            k_table[ply][0] = (mv, depth);
+        }
+        return;
+    }
+    if moves_equivalent(&k_table[ply][2].0, &mv) {
+        if depth > k_table[ply][0].1 {
+            k_table[ply][0] = (mv, depth);
+        }
+        return;
+    }
 
-    if k_table[ply][0].is_null {k_table[ply][0] = mv; return;}
-    if k_table[ply][1].is_null {k_table[ply][1] = mv; return;}
-    if k_table[ply][2].is_null {k_table[ply][2] = mv; return;}
+    if k_table[ply][0].0.is_null {
+        k_table[ply][0] = (mv, depth);
+        return;
+    }
+    if k_table[ply][1].0.is_null || k_table[ply][1].1 <= depth {
+        k_table[ply][1] = (mv, depth);
+        return;
+    }
+    if k_table[ply][2].0.is_null || k_table[ply][2].1 <= depth {
+        k_table[ply][2] = (mv, depth);
+        return;
+    }
 
     // otherwise replace one.  Let's choose arbitrarily
-    k_table[ply][(get_time_millis() % 3) as usize] = mv;
+    let to_replace = (get_time_millis() % 3) as usize;
+
+    if k_table[ply][to_replace].1 <= depth {
+        k_table[ply][to_replace] = mv;
+    }
 }
 
 fn move_sort(mvs: & mut Vec<(Mv, u64)>, cur_i: usize) {
@@ -421,7 +449,7 @@ unsafe fn negamax_search(node: &mut BB,
                          nmr_ok: bool,
                          init: bool,
                          is_pv: bool,
-                         k_table: & mut [[Mv; 3]; 64],
+                         k_table: & mut [[(Mv, i32); 3]; 64],
                          h_table: & mut [[[u64; 64]; 6]; 2]
 ) -> (Mv, i32, u8) {
     node.nodes_evaluated += 1;

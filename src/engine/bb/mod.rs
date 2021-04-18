@@ -2294,7 +2294,7 @@ impl BB {
         return mv_q;
     }
 
-    pub fn get_scored_moves(&self, mvs: Vec<Mv>, k_array: &[Mv; 3], h_table: &[[[u64; 64]; 6]; 2]) -> Vec<(Mv, u64)> {
+    pub fn get_scored_moves(&self, mvs: Vec<Mv>, k_array: &[(Mv, i32); 3], h_table: &[[[u64; 64]; 6]; 2]) -> Vec<(Mv, u64)> {
         let side = self.white_turn as usize;
         let enemy_side = !self.white_turn as usize;
         let enemy_occ = self.composite[enemy_side];
@@ -2312,9 +2312,9 @@ impl BB {
             let dst_bb = BB::idx_to_bb(mv.end);
             if (dst_bb & enemy_occ) == 0 {
                 // not a capture
-                if BB::moves_equivalent(&mv, &k_array[0]) ||
-                    BB::moves_equivalent(&mv, &k_array[1]) ||
-                    BB::moves_equivalent(&mv, &k_array[2]) {
+                if BB::moves_equivalent(&mv, &k_array[0].0) ||
+                    BB::moves_equivalent(&mv, &k_array[1].0) ||
+                    BB::moves_equivalent(&mv, &k_array[2].0) {
                     mv_score = killer_score_offset;
                 } else {
                     mv_score = no_cap_offset + h_table[side][mv.get_piece_num()][mv.end as usize];
