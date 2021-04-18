@@ -105,7 +105,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
         hits.push(0);
 
         // killer moves table
-        let k_table: [[(Mv, i32); 3]; 64] = [[Mv::null_move(); 3]; 64];
+        let k_table: [[(Mv, i32); 3]; 64] = [[(Mv::null_move(), 0); 3]; 64];
         // history table: h_table[s2m][piece][to]
         let h_table: [[[u64; 64]; 6]; 2] = [[[0; 64]; 6]; 2];
         k_tables.push(k_table);
@@ -390,14 +390,14 @@ fn update_k_table(k_table: & mut [[(Mv, i32); 3]; 64], mv: Mv, depth: i32, ply: 
         return;
     }
     if moves_equivalent(&k_table[ply][1].0, &mv) {
-        if depth > k_table[ply][0].1 {
-            k_table[ply][0] = (mv, depth);
+        if depth > k_table[ply][1].1 {
+            k_table[ply][1] = (mv, depth);
         }
         return;
     }
     if moves_equivalent(&k_table[ply][2].0, &mv) {
-        if depth > k_table[ply][0].1 {
-            k_table[ply][0] = (mv, depth);
+        if depth > k_table[ply][2].1 {
+            k_table[ply][2] = (mv, depth);
         }
         return;
     }
@@ -406,20 +406,35 @@ fn update_k_table(k_table: & mut [[(Mv, i32); 3]; 64], mv: Mv, depth: i32, ply: 
         k_table[ply][0] = (mv, depth);
         return;
     }
-    if k_table[ply][1].0.is_null || k_table[ply][1].1 <= depth {
+    if k_table[ply][1].0.is_null {
         k_table[ply][1] = (mv, depth);
         return;
     }
-    if k_table[ply][2].0.is_null || k_table[ply][2].1 <= depth {
+    if k_table[ply][2].0.is_null {
         k_table[ply][2] = (mv, depth);
         return;
     }
 
     // otherwise replace one.  Let's choose arbitrarily
-    let to_replace = (get_time_millis() % 3) as usize;
+    let mut to_replace = (get_time_millis() % 3) as usize;
 
     if k_table[ply][to_replace].1 <= depth {
-        k_table[ply][to_replace] = mv;
+        k_table[ply][to_replace] = (mv, depth);
+        return;
+    }
+
+    to_replace = (to_replace + 1) % 3;
+
+    if k_table[ply][to_replace].1 <= depth {
+        k_table[ply][to_replace] = (mv, depth);
+        return;
+    }
+
+    to_replace = (to_replace + 1) % 3;
+
+    if k_table[ply][to_replace].1 <= depth {
+        k_table[ply][to_replace] = (mv, depth);
+        return;
     }
 }
 
@@ -611,7 +626,7 @@ unsafe fn negamax_search(node: &mut BB,
         let mut res: (Mv, i32, u8) = (Mv::null_move(), LB, PV_NODE);
 
         let quiet = !is_capture(node) && mv.promote_to == 0 && !mv.is_ep;
-        let terminal = is_terminal(node);
+        // let terminal = is_terminal(node);
 
         let mut reduced = false;
         if num_moves == 0 {
@@ -622,7 +637,7 @@ unsafe fn negamax_search(node: &mut BB,
                 && quiet
                 && num_moves >= 4
                 && !is_check
-                && !is_terminal(node)
+                // && !is_terminal(node)
                 && !node.is_check(node.white_turn)
                 && !is_tactical_move {
                     // late move reductions
@@ -675,7 +690,7 @@ unsafe fn negamax_search(node: &mut BB,
             if quiet {
                 // killer moves
                 // and history moves
-                update_k_table(k_table, mv, ply);
+                update_k_table(k_table, mv, depth, ply);
                 h_table[maximize as usize][mv.get_piece_num()][mv.end as usize] += 1 << depth;
             }
             tt.set(node.hash, best_move, val, CUT_NODE, depth);
