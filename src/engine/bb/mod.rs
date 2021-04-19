@@ -131,7 +131,10 @@ const AHEAD_RANKS: [[u64; 8]; 2] =
 // modifiable scaling factors for the sub-evaluators
 #[derive(Copy, Clone)]
 pub struct EvalParams {
-    pub mobility: i32,
+    pub queen_mobility: i32,
+    pub rook_mobility: i32,
+    pub bishop_mobility: i32,
+    pub knight_mobility: i32,
     pub pdf: i32,         // pawn defense
     pub dbb: i32,         // double-bishop
     pub castle: i32,
@@ -148,6 +151,8 @@ pub struct EvalParams {
     pub isolated_pawn: i32,
     pub doubled_pawn: i32,
     pub backwards_pawn: i32,
+    pub supported_bonus: i32,
+    pub advancement_bonus: i32,
 
     // piece tables
     pub pawn_pt_offset: i32,
@@ -175,40 +180,45 @@ pub struct EvalParams {
 impl EvalParams {
     pub fn default_params() -> EvalParams {
         EvalParams {
-            mobility: 15,
-            pdf: 70,
-            dbb: 550,
-            castle: 441,
-            pav: 36,
-            rook_on_seventh: 140,
-            rook_on_open: 77,
-            early_queen_penalty: -254,
+            queen_mobility: 23,
+            rook_mobility: 30,
+            knight_mobility: 33,
+            bishop_mobility: 48,
+            pdf: 50,
+            dbb: 530,
+            castle: 450,
+            pav: 12,
+            rook_on_seventh: 145,
+            rook_on_open: 75,
+            early_queen_penalty: -252,
 
-            passed_pawn: 531,
-            center_pawn: 165,
-            near_center_pawn: 30,
-            isolated_pawn: -170,
-            doubled_pawn: -263,
-            backwards_pawn: -260,
+            passed_pawn: 75,
+            center_pawn: 210,
+            near_center_pawn: 25,
+            isolated_pawn: -160,
+            doubled_pawn: -203,
+            backwards_pawn: -216,
+            supported_bonus: 65,
+            advancement_bonus: 15,
 
-            pawn_pt_offset: -52,
-            pawn_pt_scale: 102,
+            pawn_pt_offset: -5,
+            pawn_pt_scale: 94,
 
-            bishop_pt_offset: -16,
-            bishop_pt_scale: 104,
+            bishop_pt_offset: 25,
+            bishop_pt_scale: 100,
 
-            knight_pt_offset: 80,
-            knight_pt_scale: 127,
+            knight_pt_offset: 100,
+            knight_pt_scale: 125,
 
-            king_mg_pt_offset: 12,
-            king_mg_pt_scale: 97,
+            king_mg_pt_offset: 6,
+            king_mg_pt_scale: 95,
 
-            king_eg_pt_offset: -17,
+            king_eg_pt_offset: -5,
             king_eg_pt_scale: 114,
 
-            tempo_bonus: 152,
-            material_advantage: 212,
-            king_danger: -65,
+            tempo_bonus: 127,
+            material_advantage: 229,
+            king_danger: -55,
         }
     }
 }
@@ -2894,6 +2904,7 @@ impl BB {
         let mut loc_bb = self.queen[white as usize];
         let all_composite = self.composite[!white as usize] | self.composite[white as usize];
         let mut moves = 0;
+        let mut center = 3;
 
         let mut c = 0;
         while loc_bb != 0 && c < 64 {
@@ -2918,7 +2929,7 @@ impl BB {
             }
             attacks += piece_attacks;
         }
-        return (moves, attackers, attacks);
+        return ((moves - center) * self.eval_params.queen_mobility, attackers, attacks);
     }
 
     fn bishop_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
@@ -2928,6 +2939,7 @@ impl BB {
         let mut loc_bb = self.bishop[white as usize];
         let all_composite = self.composite[!white as usize] | self.composite[white as usize];
         let mut moves = 0;
+        let center = 2;
 
         let mut c = 0;
         while loc_bb != 0 && c < 64 {
@@ -2947,7 +2959,7 @@ impl BB {
             attacks += piece_attacks
 
         }
-        return (moves, attackers, attacks);
+        return ((moves - center) * self.eval_params.bishop_mobility, attackers, attacks);
     }
 
     fn rook_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
@@ -2957,6 +2969,7 @@ impl BB {
         let mut loc_bb = self.rook[white as usize];
         let all_composite = self.composite[!white as usize] | self.composite[white as usize];
         let mut moves = 0;
+        let center = 2;
 
         let mut c = 0;
         while loc_bb != 0 && c < 64 {
@@ -2975,7 +2988,7 @@ impl BB {
             }
             attacks += piece_attacks;
         }
-        return (moves, attackers, attacks);
+        return ((moves - center) * self.eval_params.rook_mobility, attackers, attacks);
     }
 
     fn knight_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
@@ -2984,6 +2997,7 @@ impl BB {
         let mut start_idx: i32 = -1;
         let mut knight_loc_bb = self.knight[white as usize];
         let mut moves = 0;
+        let center = 2;
 
         let mut kc = 0;
         while knight_loc_bb != 0 && kc < 64 {
@@ -2999,9 +3013,8 @@ impl BB {
             }
             attacks += piece_attacks;
         }
-        return (moves, attackers, attacks);
+        return ((moves - center) * self.eval_params.knight_mobility, attackers, attacks);
     }
-
 
     fn pawn_mobility(&self, white: bool) -> i32 {
         // as a first pass not going to count promotions as 4 moves
@@ -3063,21 +3076,15 @@ impl BB {
             let king_idx = king_loc_bb.trailing_zeros() as i32;
 
             let mut king_bb = king_loc_bb | self.king_mask[king_idx as usize];
-            // eprintln!("{}", BB::bb_str(king_bb));
-            // if white {
-            //     king_bb |= king_bb << 8;
-            // } else {
-            //     king_bb |= king_bb >> 8;
-            // }
 
             let (queen_moves, queen_attackers, queen_attacks) = self.queen_mobility_kdf_attacks(!white, king_bb);
             let (knight_moves, knight_attackers, knight_attacks) = self.knight_mobility_kdf_attacks(!white, king_bb);
             let (bishop_moves, bishop_attackers, bishop_attacks) = self.bishop_mobility_kdf_attacks(!white, king_bb);
             let (rook_moves, rook_attackers, rook_attacks) = self.rook_mobility_kdf_attacks(!white, king_bb);
-            let pawn_moves = self.pawn_mobility(!white);
-            let king_moves = self.king_mobility(!white);
+            // let pawn_moves = self.pawn_mobility(!white);
+            // let king_moves = self.king_mobility(!white);
 
-            mobility[!white as usize] = queen_moves + knight_moves + bishop_moves + rook_moves + pawn_moves + king_moves;
+            mobility[!white as usize] = queen_moves + knight_moves + bishop_moves + rook_moves;
             let mut num_attackers = queen_attackers + knight_attackers + bishop_attackers + rook_attackers;
 
             if num_attackers > 7 { num_attackers = 7; }
@@ -3092,7 +3099,7 @@ impl BB {
         }
 
         let king_danger_value = (self.eval_params.king_danger * (king_danger[1] - king_danger[0])) / 100;
-        let mobility = self.eval_params.mobility * (mobility[1] - mobility[0]);
+        let mobility = mobility[1] - mobility[0];
         return (mobility, king_danger_value);
     }
 
@@ -3119,6 +3126,84 @@ impl BB {
             }
         }
         return self.eval_params.doubled_pawn * (doubled_pawns[1] - doubled_pawns[0]);
+    }
+
+    pub fn connected_pawns_value(&self) -> i32 {
+        let mut connected_pawns: [i32; 2] = [0, 0];
+        let sup_bonus = self.eval_params.supported_bonus;
+        let advancement_bonus = self.eval_params.advancement_bonus;
+
+        // white
+        let w_pawn_capture_mask = ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9);
+
+        // black
+        let b_pawn_capture_mask = ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7);
+
+        let mut wpc = 0;
+        let mut pawn_loc_bb = self.pawn[1]; // white
+        let mut start_idx: i32 = -1;
+        while pawn_loc_bb != 0 && wpc < 64 {
+            wpc = pawn_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += wpc;
+            pawn_loc_bb = pawn_loc_bb >> wpc;
+
+            // supported?
+            // is it protected by another pawn
+            let supported = (BB::idx_to_bb(start_idx) & w_pawn_capture_mask) != 0;
+            if supported {
+                connected_pawns[1] += sup_bonus;
+            }
+
+            // part of a phalanx?
+            // is its stop square covered by one of its neighbors?
+            let phalanx = ((BB::idx_to_bb(start_idx) << 8) & w_pawn_capture_mask) != 0;
+
+            if phalanx || supported {
+                let rank = (start_idx / 8);
+                let file = (start_idx % 8) as usize;
+                connected_pawns[1] += advancement_bonus * rank; // advancement bonus
+                if phalanx {
+                    connected_pawns[1] += advancement_bonus * rank;
+                }
+                if (FILE_MASKS[file] & self.pawn[0]) == 0 {
+                    connected_pawns[1] += advancement_bonus * rank;
+                }
+            }
+        }
+
+        let mut bpc = 0;
+        pawn_loc_bb = self.pawn[0]; // black
+        start_idx = -1;
+        while pawn_loc_bb != 0 && bpc < 64 {
+            bpc = pawn_loc_bb.trailing_zeros() as i32 + 1;
+            start_idx += bpc;
+            pawn_loc_bb = pawn_loc_bb >> bpc;
+
+            // supported?
+            // is it protected by another pawn
+            let supported = (BB::idx_to_bb(start_idx) & b_pawn_capture_mask) != 0;
+            if supported {
+                connected_pawns[0] += sup_bonus;
+            }
+
+            // part of a phalanx?
+            // is its stop square covered by one of its neighbors?
+            let phalanx = ((BB::idx_to_bb(start_idx) >> 8) & b_pawn_capture_mask) != 0;
+
+            if phalanx || supported {
+                let rank = (7 - (start_idx / 8));
+                let file = (start_idx % 8) as usize;
+                connected_pawns[0] += advancement_bonus * rank; // advancement bonus
+                if phalanx {
+                    connected_pawns[0] += advancement_bonus * rank;
+                }
+                if (FILE_MASKS[file] & self.pawn[1]) == 0 {
+                    connected_pawns[0] += advancement_bonus * rank;
+                }
+            }
+        }
+
+        return connected_pawns[1] - connected_pawns[0];
     }
 
     pub fn isolated_pawns_value(&self) -> i32 {
@@ -3164,23 +3249,29 @@ impl BB {
                     }
                     enemy_mask |= mask;
                     let mut rank_mask = 0;
+                    let mut pp_rank = 0;
                     for r in 0..8 {
                         let r = if white {7-r} else {r};
                         if RANK_MASKS[r] & file_pawns == 0 {
                             rank_mask |= RANK_MASKS[r]
                         } else {
+                            if white {
+                                pp_rank = r;
+                            } else {
+                                pp_rank = 7 - r;
+                            }
                             break;
                         }
                     }
                     enemy_mask &= rank_mask;
 
                     if enemy_mask & self.pawn[!white as usize] == 0 {
-                        passed_pawns[side] += 1;
+                        passed_pawns[side] += self.eval_params.passed_pawn * pp_rank as i32;
                     }
                 }
             }
         }
-        return self.eval_params.passed_pawn * (passed_pawns[1] - passed_pawns[0]);
+        return (passed_pawns[1] - passed_pawns[0]);
     }
 
     pub fn backwards_pawns_value(&self) -> i32 {

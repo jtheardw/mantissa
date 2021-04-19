@@ -46,7 +46,10 @@ impl Game {
         };
 
         match option {
-            "mobility" => { self.eval_params.mobility = value; },
+            "queen_mobility" => { self.eval_params.queen_mobility = value; },
+            "rook_mobility" => { self.eval_params.rook_mobility = value; },
+            "bishop_mobility" => { self.eval_params.bishop_mobility = value; },
+            "knight_mobility" => { self.eval_params.knight_mobility = value; },
             "pdf" => { self.eval_params.pdf = value; },
             "dbb" => { self.eval_params.dbb = value; },
             "castle" => { self.eval_params.castle = value; },
@@ -61,6 +64,8 @@ impl Game {
             "isolated_pawn" => { self.eval_params.isolated_pawn = value; },
             "doubled_pawn" => { self.eval_params.doubled_pawn = value; },
             "backwards_pawn" => { self.eval_params.backwards_pawn = value; },
+            "supported_bonus" => { self.eval_params.supported_bonus = value; },
+            "advancement_bonus" => { self.eval_params.advancement_bonus = value; },
 
             "pawn_pt_offset" => { self.eval_params.pawn_pt_offset = value; },
             "pawn_pt_scale" => { self.eval_params.pawn_pt_scale = value; },

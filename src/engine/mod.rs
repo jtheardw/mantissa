@@ -132,7 +132,11 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
         kill_threads = false;
         let mut threads = vec![];
         for t_num in 0..nthreads {
-            let extra_depth = if t_num > 0 {t_num.trailing_zeros() as i32} else {1};
+            let extra_depth = if nthreads > 1 {
+                if t_num > 0 {t_num.trailing_zeros() as i32} else {1}
+            } else {
+                0
+            };
             // let extra_depth = 0;
             let mut node = node.copy();
             let move_tx = move_tx.clone();
@@ -145,7 +149,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
         let mut ply_val = 0;
         let mut node_type = PV_NODE;
         loop {
-            thread::sleep(Duration::from_millis(50));
+            thread::sleep(Duration::from_millis(10));
             match move_rx.try_recv() {
                 Ok((mv, score, n_type)) => {
                     ply_move = mv;
@@ -160,9 +164,11 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
 
             let current_time = get_time_millis();
             if current_time - start_time >= compute_time {
-                ply_move = Mv::err_move();
-                kill_threads = true;
-                break;
+                if m_depth > 1 {
+                    ply_move = Mv::err_move();
+                    kill_threads = true;
+                    break;
+                }
             }
         }
         for t in threads {
@@ -287,7 +293,8 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
         let ip = node.isolated_pawns_value();
         let dp = node.doubled_pawns_value();
         let bp = node.backwards_pawns_value();
-        let pv = pp + ip + dp + bp + cp + ncp;
+        let conn_p = node.connected_pawns_value();
+        let pv = pp + ip + dp + bp + cp + ncp + conn_p;
         val += pv;
         pht.set(node.pawn_hash, pv);
     }
@@ -318,6 +325,7 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("isolated p: {}", node.isolated_pawns_value());
     eprintln!("backwards p: {}", node.backwards_pawns_value());
     eprintln!("passed p: {}", node.passed_pawns_value());
+    eprintln!("connected p: {}", node.connected_pawns_value());
     eprintln!("Center: {}", node.center_value());
     eprintln!("Near Center: {}", node.near_center_value());
     eprintln!("Double bishop: {}", node.double_bishop_bonus());
@@ -477,19 +485,12 @@ unsafe fn negamax_search(node: &mut BB,
     }
 
     if depth <= 0 {
-        let (val, node_type) = quiescence_search(node, 64, alpha, beta, maximize);
+        let (val, node_type) = quiescence_search(node, 0, alpha, beta, maximize);
         return (Mv::null_move(), val, node_type);
     }
 
     x86_64::_mm_prefetch(tt.get_ptr(node.hash), x86_64::_MM_HINT_NTA);
     x86_64::_mm_prefetch(pht.get_ptr(node.pawn_hash), x86_64::_MM_HINT_NTA);
-
-    // match term_rx.try_recv() {
-    //     Ok(_) | Err(TryRecvError::Disconnected) => {
-    //         return (Mv::err_move(), 0, PV_NODE);
-    //     }
-    //     Err(TryRecvError::Empty) => {}
-    // }
 
     if kill_threads {
         return (Mv::err_move(), 0, PV_NODE);
@@ -552,7 +553,7 @@ unsafe fn negamax_search(node: &mut BB,
     let mut val = LB;
 
     // RFP
-    if (depth < 3) && !is_pv && !is_check && !init {
+    if (depth < 3) && !is_pv && !is_check && !init && nmr_ok {
         let cur_val = evaluate_position(&node);
 
         let margin = [0, 1300, 2500];
@@ -573,7 +574,6 @@ unsafe fn negamax_search(node: &mut BB,
             // using the extended null move reductions
             // idea from Eli David and Nathan S. Netanyahu
             // in the paper of the same name
-            // return (Mv::null_move(), beta, CUT_NODE);
             depth -= 4;
             if depth <= 0 {
                 return negamax_search(node, 0, ply, alpha, beta, maximize, false, false, false, k_table, h_table);
@@ -590,6 +590,11 @@ unsafe fn negamax_search(node: &mut BB,
     if !is_pv && !is_check && !init && depth <= 3 {
         let futile_margin = [0, 2200, 3200, 5300];
         let futile_val = evaluate_position(&node);
+        if depth == 3 {
+            if futile_val < alpha - futile_margin[3] {
+                depth = 2;
+            }
+        }
         if futile_val <= (alpha - futile_margin[depth as usize]) {
             is_futile = true;
             val = futile_val;
@@ -641,7 +646,7 @@ unsafe fn negamax_search(node: &mut BB,
                 && !node.is_check(node.white_turn)
                 && !is_tactical_move {
                     // late move reductions
-                    let mut depth_to_search = depth - 2;
+                    let mut depth_to_search = depth - 1 - 1;
                     if num_moves >= 10 {
                         // later move reductions
                         depth_to_search = depth - 1 - (depth / 3);
@@ -715,13 +720,13 @@ pub unsafe fn q_eval(node: &mut BB, maximize: bool) -> i32 {
     if !pht.valid {
         pht = PHT::get_pht(18);
     }
-    let (val, _) = quiescence_search(node, 100, -1000000, 1000000, maximize);
+    let (val, _) = quiescence_search(node, 0, -1000000, 1000000, maximize);
     return val;
 }
 
 unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, maximize: bool) -> (i32, u8) {
     node.nodes_evaluated += 1;
-    if depth == 0 || is_terminal(node) || is_quiet(node) {
+    if depth <= -32 || is_terminal(node) || is_quiet(node) {
         return (evaluate_position(node), PV_NODE);
     }
 
@@ -766,7 +771,7 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
         // delta pruning
         // if we're very behind of where we could be (alpha)
         // we should only accept exceptionally good captures
-        if node.phase <= 160 {
+        if node.phase <= 160 && !is_check {
             let mut futile = false;
             match node.cap_stack[node.cap_stack.len() - 1] {
                 b'p' => { if alpha > curr_val + 3000 { futile = true; }},
@@ -801,5 +806,6 @@ unsafe fn quiescence_search(node: &mut BB, depth: i32, alpha: i32, beta: i32, ma
     // if we didn't find further captures, we don't want to erroneously return the
     // min value, but we also need to be consistent with the fail-soft lower bound of non-QS
     let node_val = if !best_mv.is_null {best_val} else {curr_val};
-    return (node_val, if raised_alpha {PV_NODE} else {ALL_NODE});
+    let node_type = if raised_alpha {PV_NODE} else {ALL_NODE};
+    return (node_val, node_type);
 }
