@@ -153,6 +153,7 @@ pub struct EvalParams {
     pub backwards_pawn: i32,
     pub supported_bonus: i32,
     pub advancement_bonus: i32,
+    pub space: i32,
 
     // piece tables
     pub pawn_pt_offset: i32,
@@ -180,44 +181,45 @@ pub struct EvalParams {
 impl EvalParams {
     pub fn default_params() -> EvalParams {
         EvalParams {
-            queen_mobility: 23,
+            queen_mobility: 24,
             rook_mobility: 30,
             knight_mobility: 33,
-            bishop_mobility: 48,
-            pdf: 50,
-            dbb: 530,
+            bishop_mobility: 47,
+            pdf: 51,
+            dbb: 532,
             castle: 450,
             pav: 12,
-            rook_on_seventh: 145,
-            rook_on_open: 75,
+            rook_on_seventh: 144,
+            rook_on_open: 76,
             early_queen_penalty: -252,
 
-            passed_pawn: 75,
-            center_pawn: 210,
-            near_center_pawn: 25,
-            isolated_pawn: -160,
+            passed_pawn: 78,
+            center_pawn: 209,
+            near_center_pawn: 23,
+            isolated_pawn: -150,
             doubled_pawn: -203,
-            backwards_pawn: -216,
-            supported_bonus: 65,
-            advancement_bonus: 15,
+            backwards_pawn: -214,
+            supported_bonus: 66,
+            advancement_bonus: 16,
+            space: 30,
 
-            pawn_pt_offset: -5,
-            pawn_pt_scale: 94,
+            pawn_pt_offset: -7,
+            pawn_pt_scale: 92,
 
             bishop_pt_offset: 25,
-            bishop_pt_scale: 100,
+            bishop_pt_scale: 97,
 
-            knight_pt_offset: 100,
+            knight_pt_offset: 102,
             knight_pt_scale: 125,
 
-            king_mg_pt_offset: 6,
-            king_mg_pt_scale: 95,
+            king_mg_pt_offset: 8,
+            king_mg_pt_scale: 90,
 
-            king_eg_pt_offset: -5,
-            king_eg_pt_scale: 114,
+            king_eg_pt_offset: -3,
+            king_eg_pt_scale: 115,
 
             tempo_bonus: 127,
-            material_advantage: 229,
+            material_advantage: 224,
             king_danger: -55,
         }
     }
@@ -3126,6 +3128,33 @@ impl BB {
             }
         }
         return self.eval_params.doubled_pawn * (doubled_pawns[1] - doubled_pawns[0]);
+    }
+
+    pub fn space_control_value(&self) -> i32 {
+        let mut space_control: [i32; 2] = [0, 0];
+        // white
+        let w_pawn_capture_mask = ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9);
+
+        // black
+        let b_pawn_capture_mask = ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7);
+
+        let white_space_mask = (FILE_MASKS[2] | FILE_MASKS[3] | FILE_MASKS[4] | FILE_MASKS[5])
+            & (RANK_MASKS[1] | RANK_MASKS[2] | RANK_MASKS[3]);
+
+        let black_space_mask = (FILE_MASKS[2] | FILE_MASKS[3] | FILE_MASKS[4] | FILE_MASKS[5])
+            & (RANK_MASKS[6] | RANK_MASKS[5] | RANK_MASKS[4]);
+
+        let base_w_space = white_space_mask & !b_pawn_capture_mask & !self.pawn[1];
+        let base_b_space = black_space_mask & !w_pawn_capture_mask & !self.pawn[0];
+
+        // bonus for sheltering behind a pawn
+        let bonus_w_space = (self.pawn[1] >> 8 | self.pawn[1] >> 16) & base_w_space;
+        let bonus_b_space = (self.pawn[0] << 8 | self.pawn[0] << 16) & base_b_space;
+
+        space_control[1] = (base_w_space.count_ones() + bonus_w_space.count_ones()) as i32;
+        space_control[0] = (base_b_space.count_ones() + bonus_b_space.count_ones()) as i32;
+
+        return self.eval_params.space * (space_control[1] - space_control[0])
     }
 
     pub fn connected_pawns_value(&self) -> i32 {

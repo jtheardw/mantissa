@@ -66,6 +66,7 @@ impl Game {
             "backwards_pawn" => { self.eval_params.backwards_pawn = value; },
             "supported_bonus" => { self.eval_params.supported_bonus = value; },
             "advancement_bonus" => { self.eval_params.advancement_bonus = value; },
+            "space" => { self.eval_params.space = value; },
 
             "pawn_pt_offset" => { self.eval_params.pawn_pt_offset = value; },
             "pawn_pt_scale" => { self.eval_params.pawn_pt_scale = value; },

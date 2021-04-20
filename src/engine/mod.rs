@@ -294,7 +294,8 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
         let dp = node.doubled_pawns_value();
         let bp = node.backwards_pawns_value();
         let conn_p = node.connected_pawns_value();
-        let pv = pp + ip + dp + bp + cp + ncp + conn_p;
+        let p_space = node.space_control_value();
+        let pv = pp + ip + dp + bp + cp + ncp + conn_p + p_space;
         val += pv;
         pht.set(node.pawn_hash, pv);
     }
@@ -326,6 +327,7 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("backwards p: {}", node.backwards_pawns_value());
     eprintln!("passed p: {}", node.passed_pawns_value());
     eprintln!("connected p: {}", node.connected_pawns_value());
+    eprintln!("pawn space control: {}", node.space_control_value());
     eprintln!("Center: {}", node.center_value());
     eprintln!("Near Center: {}", node.near_center_value());
     eprintln!("Double bishop: {}", node.double_bishop_bonus());
@@ -478,7 +480,7 @@ unsafe fn negamax_search(node: &mut BB,
 ) -> (Mv, i32, u8) {
     node.nodes_evaluated += 1;
 
-    if is_terminal(&node) {
+    if is_terminal(&node) && !init {
         if node.is_threefold() {
             return (Mv::null_move(), 0, PV_NODE);
         }
@@ -597,7 +599,7 @@ unsafe fn negamax_search(node: &mut BB,
         // move detection with multi-cut in the same search
         //
         // I can't afford to do the super-tight cutoffs stockfish does though
-        let margin = 400;
+        let margin = 500;
         let depth_to_search = (2 * depth) / 3;
         let target = tt_entry.value - margin;
 
