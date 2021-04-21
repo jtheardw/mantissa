@@ -59,7 +59,8 @@ pub unsafe fn thread_handler(mut node: BB,
                              maximize: bool) {
     let mut h_table = h_tables[tnum];
     let mut k_table = k_tables[tnum];
-    let result = negamax_search(&mut node, depth, 0, alpha, beta, maximize, true, true, true, &mut k_table, &mut h_table, Mv::null_move());
+    let h_index = node.history.len();
+    let result = negamax_search(&mut node, depth, 0, alpha, beta, maximize, true, true, true, &mut k_table, &mut h_table, Mv::null_move(), h_index);
     move_tx.send(result).unwrap();
     evaled[tnum] += node.nodes_evaluated;
     hits[tnum] += node.tt_hits;
@@ -476,11 +477,17 @@ unsafe fn negamax_search(node: &mut BB,
                          is_pv: bool,
                          k_table: & mut [[(Mv, i32); 3]; 64],
                          h_table: & mut [[[u64; 64]; 6]; 2],
-                         sing_move: Mv
+                         sing_move: Mv,
+                         h_index: usize
 ) -> (Mv, i32, u8) {
     node.nodes_evaluated += 1;
 
-    if is_terminal(&node) && !init {
+    if !init {
+        if node.history[h_index..].iter().filter(|&n| *n == node.hash).count() > 0 {
+            return (Mv::null_move(), 0, PV_NODE);
+        }
+    }
+    if is_terminal(&node) {
         if node.is_threefold() {
             return (Mv::null_move(), 0, PV_NODE);
         }
@@ -534,7 +541,7 @@ unsafe fn negamax_search(node: &mut BB,
         }
     } else if depth >= 6 && is_pv {
         // internal iterative deepening
-        let (mv, val, _) = negamax_search(node, depth - 2, ply, alpha, beta, maximize, true, false, false, k_table, h_table, Mv::null_move());
+        let (mv, val, _) = negamax_search(node, depth - 2, ply, alpha, beta, maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index);
         first_move = mv;
     }
 
@@ -571,7 +578,7 @@ unsafe fn negamax_search(node: &mut BB,
         let depth_to_search = depth - if depth > 6 {5} else {4};
 
         node.do_null_move();
-        let nmr_val = -negamax_search(node, depth_to_search, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table, h_table, Mv::null_move()).1;
+        let nmr_val = -negamax_search(node, depth_to_search, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table, h_table, Mv::null_move(), h_index).1;
         node.undo_null_move();
 
         if nmr_val >= beta {
@@ -581,7 +588,7 @@ unsafe fn negamax_search(node: &mut BB,
             // return (Mv::null_move(), nmr_val, CUT_NODE)
             depth -= 4;
             if depth <= 0 {
-                return negamax_search(node, 0, ply, alpha, beta, maximize, false, false, false, k_table, h_table, Mv::null_move());
+                return negamax_search(node, 0, ply, alpha, beta, maximize, false, false, false, k_table, h_table, Mv::null_move(), h_index);
             }
         }
     }
@@ -603,7 +610,7 @@ unsafe fn negamax_search(node: &mut BB,
         let depth_to_search = (2 * depth) / 3;
         let target = tt_entry.value - margin;
 
-        let val = negamax_search(node, depth_to_search, ply, target - 1, target, maximize, false, true, false, k_table, h_table, tt_entry.mv).1;
+        let val = negamax_search(node, depth_to_search, ply, target - 1, target, maximize, false, false, false, k_table, h_table, tt_entry.mv, h_index).1;
 
         if (val < target) {
             // singular extension
@@ -674,12 +681,12 @@ unsafe fn negamax_search(node: &mut BB,
 
         let mut reduced = false;
         if num_moves == 0 {
-            res = negamax_search(node, depth - 1, ply+1, -beta, -alpha, !maximize, true, false, true, k_table, h_table, Mv::null_move());
+            res = negamax_search(node, depth - 1, ply+1, -beta, -alpha, !maximize, true, false, true, k_table, h_table, Mv::null_move(), h_index);
         } else {
             if depth > 3
-                && !is_pv
+                // && !is_pv
                 && quiet
-                && num_moves >= 4
+                && ((!is_pv && num_moves >= 4) || (is_pv && num_moves >= 5))
                 && !is_check
                 // && !is_terminal(node)
                 && !node.is_check(node.white_turn)
@@ -688,10 +695,14 @@ unsafe fn negamax_search(node: &mut BB,
                     let mut depth_to_search = depth - 1 - 1;
                     if num_moves >= 10 {
                         // later move reductions
-                        depth_to_search = depth - 1 - (depth / 3);
+                        if !is_pv {
+                            depth_to_search = depth - 1 - (depth / 3);
+                        } else if depth >= 5 {
+                            depth_to_search = depth - 1 - (depth / 5);
+                        }
                     }
 
-                    res = negamax_search(node, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table, Mv::null_move());
+                    res = negamax_search(node, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index);
 
                     if -res.1 <= alpha {
                         // if we fail to raise alpha we can move on
@@ -704,9 +715,9 @@ unsafe fn negamax_search(node: &mut BB,
                 }
 
             if !reduced {
-                res = negamax_search(node, depth - 1, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table, Mv::null_move());
+                res = negamax_search(node, depth - 1, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index);
                 if -res.1 > alpha && -res.1 < beta { // failed high
-                    res = negamax_search(node, depth - 1, ply + 1, -beta, -alpha, !maximize, true, false, true, k_table, h_table, Mv::null_move());
+                    res = negamax_search(node, depth - 1, ply + 1, -beta, -alpha, !maximize, true, false, true, k_table, h_table, Mv::null_move(), h_index);
                 }
             }
 

@@ -7,7 +7,7 @@ pub mod board_eval;
 // LSB bit is A1, second is B1, ninth is A2, ... MSB is H8
 
 const KING_VALUE: i32 = 200000;
-const QUEEN_VALUE: i32 = 9000;
+const QUEEN_VALUE: i32 = 9200;
 const ROOK_VALUE: i32 = 5000;
 const BISHOP_VALUE: i32 = 3200;
 const KNIGHT_VALUE: i32 = 3000;
@@ -193,7 +193,7 @@ impl EvalParams {
             rook_on_open: 76,
             early_queen_penalty: -252,
 
-            passed_pawn: 78,
+            passed_pawn: 100,
             center_pawn: 209,
             near_center_pawn: 23,
             isolated_pawn: -150,
@@ -203,24 +203,39 @@ impl EvalParams {
             advancement_bonus: 16,
             space: 30,
 
-            pawn_pt_offset: -7,
-            pawn_pt_scale: 92,
+            // pawn_pt_offset: -7,
+            // pawn_pt_scale: 92,
 
-            bishop_pt_offset: 25,
-            bishop_pt_scale: 97,
+            // bishop_pt_offset: 25,
+            // bishop_pt_scale: 97,
+
+            // knight_pt_offset: 102,
+            // knight_pt_scale: 125,
+
+            // king_mg_pt_offset: 8,
+            // king_mg_pt_scale: 90,
+
+            // king_eg_pt_offset: -3,
+            // king_eg_pt_scale: 115,
+
+            pawn_pt_offset: 0,
+            pawn_pt_scale: 100,
 
             knight_pt_offset: 102,
             knight_pt_scale: 125,
 
-            king_mg_pt_offset: 8,
+            bishop_pt_offset: 0,
+            bishop_pt_scale: 100,
+
+            king_mg_pt_offset: 0,
             king_mg_pt_scale: 90,
 
-            king_eg_pt_offset: -3,
+            king_eg_pt_offset: 0,
             king_eg_pt_scale: 115,
 
             tempo_bonus: 127,
             material_advantage: 224,
-            king_danger: -55,
+            king_danger: -60,
         }
     }
 }
