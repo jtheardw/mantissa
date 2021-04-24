@@ -154,6 +154,7 @@ pub struct EvalParams {
     pub supported_bonus: i32,
     pub advancement_bonus: i32,
     pub space: i32,
+    pub bishop_color: i32,
 
     // piece tables
     pub pawn_pt_offset: i32,
@@ -202,6 +203,7 @@ impl EvalParams {
             supported_bonus: 66,
             advancement_bonus: 16,
             space: 30,
+            bishop_color: -15,
 
             // pawn_pt_offset: -7,
             // pawn_pt_scale: 92,
@@ -235,7 +237,7 @@ impl EvalParams {
 
             tempo_bonus: 127,
             material_advantage: 224,
-            king_danger: -60,
+            king_danger: -70,
         }
     }
 }
@@ -2964,7 +2966,8 @@ impl BB {
             start_idx += c;
             loc_bb = loc_bb >> c;
 
-            let bishop_occ_bb = self.bishop_mask[start_idx as usize] & all_composite;
+            // x-ray through friendly queen
+            let bishop_occ_bb = self.bishop_mask[start_idx as usize] & (all_composite & !self.queen[white as usize]);
             let bishop_hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
             let bishop_bb = self.bishop_magic_table[start_idx as usize][bishop_hash as usize];
 
@@ -2994,7 +2997,8 @@ impl BB {
             start_idx += c;
             loc_bb = loc_bb >> c;
 
-            let rook_occ_bb = self.rook_mask[start_idx as usize] & all_composite;
+            // x-ray through friendly queen, rook
+            let rook_occ_bb = self.rook_mask[start_idx as usize] & (all_composite & !self.queen[white as usize] & !self.rook[white as usize]);
             let rook_hash = BB::rook_magic_hash(rook_occ_bb, start_idx as usize);
             let rook_bb = self.rook_magic_table[start_idx as usize][rook_hash as usize];
 
@@ -3413,6 +3417,29 @@ impl BB {
             }
         }
         return self.eval_params.rook_on_open * (2 * (open_file_rooks[1] - open_file_rooks[0]) + (semi_open_file_rooks[1] - semi_open_file_rooks[0]));
+    }
+
+    pub fn bishop_color_value(&self) -> i32 {
+        let mut bishop_color: [i32; 2] = [0, 0];
+
+        // remember the files are "backwards"
+        // i.e. msb is file 8
+        let dark_tiles_mask =
+            0b10101010_01010101_10101010_01010101_10101010_01010101_10101010_01010101;
+        let light_tiles_mask = !dark_tiles_mask;
+
+        for side in 0..2 {
+            let bishops_on_dark = (self.bishop[side] & dark_tiles_mask).count_ones() as i32;
+            let bishops_on_light = (self.bishop[side] & light_tiles_mask).count_ones() as i32;
+
+            let pawns_on_dark = (self.pawn[side] & dark_tiles_mask).count_ones() as i32;
+            let pawns_on_light = (self.pawn[side] & light_tiles_mask).count_ones() as i32;
+
+            bishop_color[side] = bishops_on_dark * pawns_on_dark + bishops_on_light * pawns_on_light;
+        }
+
+        return self.eval_params.bishop_color * (bishop_color[1] - bishop_color[0]);
+
     }
 
     pub fn double_bishop_bonus(&self) -> i32 {
