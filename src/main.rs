@@ -178,7 +178,7 @@ unsafe fn play() {
     let km = engine::bb::BB::gen_king_mask();
 
     let zobrist = engine::bb::BB::init_zobrist();
-    let num_threads = 2;
+    let num_threads = 1;
 
     let mut game : Game = Game::get_basic_game(
         num_threads,

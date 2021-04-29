@@ -1,6 +1,9 @@
 use rand::Rng;
+use std::cmp;
 use std::fmt;
 use std::vec::Vec;
+use std::thread;
+use std::time::Duration;
 
 pub mod board_eval;
 
@@ -1531,6 +1534,70 @@ impl BB {
         return false;
     }
 
+    fn lva(&self, atk_bb: u64, white: bool) -> (u64, u8) {
+        let side = white as usize;
+        if atk_bb & self.pawn[side] != 0 {
+            return (BB::idx_to_bb((atk_bb & self.pawn[side]).trailing_zeros() as i32), b'p');
+        }
+        if atk_bb & self.knight[side] != 0 {
+            return (BB::idx_to_bb((atk_bb & self.knight[side]).trailing_zeros() as i32), b'n');
+        }
+        if atk_bb & self.bishop[side] != 0 {
+            return (BB::idx_to_bb((atk_bb & self.bishop[side]).trailing_zeros() as i32), b'b');
+        }
+        if atk_bb & self.rook[side] != 0 {
+            return (BB::idx_to_bb((atk_bb & self.rook[side]).trailing_zeros() as i32), b'r');
+        }
+        if atk_bb & self.queen[side] != 0 {
+            return (BB::idx_to_bb((atk_bb & self.queen[side]).trailing_zeros() as i32), b'q');
+        }
+        if atk_bb & self.king[side] != 0 {
+            return (BB::idx_to_bb((atk_bb & self.king[side]).trailing_zeros() as i32), b'k');
+        }
+        return (0, 0);
+    }
+
+    fn idx_attacks(&self, idx: i32, occ: u64) -> u64 {
+        // process:
+        // create "virtual pieces" at the idx and see
+        // if they can attack enemy pieces of the appropriate
+        // types.  If so, there is an attack on this square
+        //
+        // should provide an alternative function to get all attacks
+        // by a side, but this is optimized for checking *just* a single
+        // square
+        let self_bb = BB::idx_to_bb(idx);
+        let mut attackers_bb: u64 = 0;
+
+        // knights
+        let virt_knight_bb = self.knight_mask[idx as usize];
+        attackers_bb |= virt_knight_bb & (self.knight[1] | self.knight[0]);
+
+        // king
+        let virt_king_bb = self.king_mask[idx as usize];
+        attackers_bb |= virt_king_bb & (self.king[1] | self.king[0]);
+
+        // pawns
+        let virt_pawn_white_bb = ((self_bb & !FILE_MASKS[0]) << 7) | ((self_bb & !FILE_MASKS[7]) << 9);
+        let virt_pawn_black_bb = ((self_bb & !FILE_MASKS[0]) >> 9) | ((self_bb & !FILE_MASKS[7]) >> 7);
+        attackers_bb |= virt_pawn_white_bb & self.pawn[0];
+        attackers_bb |= virt_pawn_black_bb & self.pawn[1];
+
+        // bishops & queens
+        let virt_bishop_occ_bb = self.bishop_mask[idx as usize] & occ;
+        let hash = BB::bishop_magic_hash(virt_bishop_occ_bb, idx as usize);
+        let virt_bishop_bb = self.bishop_magic_table[idx as usize][hash as usize];
+        attackers_bb |= virt_bishop_bb & (self.bishop[0] | self.bishop[1] | self.queen[0] | self.queen[1]);
+
+        // rooks & queens
+        let virt_rook_occ_bb = self.rook_mask[idx as usize] & occ;
+        let hash = BB::rook_magic_hash(virt_rook_occ_bb, idx as usize);
+        let virt_rook_bb = self.rook_magic_table[idx as usize][hash as usize];
+        attackers_bb |= virt_rook_bb & (self.rook[0] | self.rook[1] | self.queen[0] | self.queen[1]);
+
+        return attackers_bb;
+    }
+
     // condition checks
     fn can_castle(&self, white: bool, queenside: bool) -> bool {
         // check castling rights
@@ -2208,122 +2275,7 @@ impl BB {
         return atked_squares & self.composite[white as usize];
     }
 
-    pub fn order_capture_moves(&self, mvs: Vec<Mv>, k_array: &[Mv; 3], h_table: &[[[u64; 64]; 6]; 2]) -> Vec<Mv> {
-        let side = self.white_turn as usize;
-        let enemy_side = !self.white_turn as usize;
-        let enemy_occ = self.composite[enemy_side];
-        let def_pieces = self.get_defended_pieces(!self.white_turn);
-
-        let mut free_caps: Vec<Mv> = Vec::new();
-        let mut pawn_caps: Vec<Mv> = Vec::new();
-        let mut winning_caps: Vec<Mv> = Vec::new();
-        let mut equal_caps: Vec<Mv> = Vec::new();
-        let mut losing_caps: Vec<Mv> = Vec::new();
-        let mut killer_moves: Vec<Mv> = Vec::new();
-        let mut no_caps: Vec<Mv> = Vec::new();
-        let mut mv_q: Vec<Mv> = Vec::new();
-
-        for mv in mvs {
-            let dst_bb = BB::idx_to_bb(mv.end);
-            if (dst_bb & enemy_occ) != 0 {
-                // capture of some sort
-                if dst_bb & def_pieces == 0 {
-                    // undefended piece.  That's good
-                    free_caps.push(mv);
-                    continue;
-                }
-                match mv.piece {
-                    b'p' => {
-                        if (dst_bb & self.pawn[enemy_side]) != 0 {
-                            equal_caps.push(mv);
-                        } else {
-                            // must be capturing non-pawn
-                            pawn_caps.push(mv);
-                        }
-                    },
-                    b'n' => {
-                        // losing
-                        if (dst_bb & self.pawn[enemy_side]) != 0 {
-                            losing_caps.push(mv);
-                        } else if (dst_bb & (self.knight[enemy_side] | self.bishop[enemy_side])) != 0 {
-                            equal_caps.push(mv);
-                        } else {
-                            winning_caps.push(mv);
-                        }
-                    },
-                    b'b' => {
-                        // losing
-                        if (dst_bb & self.pawn[enemy_side]) != 0 {
-                            losing_caps.push(mv);
-                        } else if (dst_bb & (self.knight[enemy_side] | self.bishop[enemy_side])) != 0 {
-                            equal_caps.push(mv);
-                        } else {
-                            winning_caps.push(mv);
-                        }
-                    },
-                    b'r' => {
-                        // winning
-                        if (dst_bb & (self.queen[enemy_side] | self.king[enemy_side])) != 0 {
-                            winning_caps.push(mv);
-                        } else if (dst_bb & self.rook[enemy_side]) != 0 {
-                            equal_caps.push(mv);
-                        } else {
-                            losing_caps.push(mv);
-                        }
-                    },
-                    b'q' => {
-                        // winning
-                        if (dst_bb & self.king[enemy_side]) != 0 {
-                            winning_caps.push(mv);
-                        } else if (dst_bb & self.queen[enemy_side]) != 0 {
-                            equal_caps.push(mv);
-                        } else {
-                            losing_caps.push(mv);
-                        }
-                    },
-                    _ => {no_caps.push(mv);}
-                }
-            } else {
-                if BB::moves_equivalent(&mv, &k_array[0]) {
-                    killer_moves.push(mv);
-                } else if BB::moves_equivalent(&mv, &k_array[1]) {
-                    killer_moves.push(mv);
-                } else if BB::moves_equivalent(&mv, &k_array[2]) {
-                    killer_moves.push(mv);
-                } else {
-                    let history_value = h_table[side][mv.get_piece_num()][mv.end as usize];
-                    if history_value == 0 || no_caps.len() == 0 {
-                        no_caps.push(mv);
-                        continue;
-                    }
-                    let mut pushed = false;
-                    let mut i = 0;
-                    for other_mv in no_caps.iter() {
-                        if h_table[side][other_mv.get_piece_num()][other_mv.end as usize] <= history_value {
-                            no_caps.insert(i, mv);
-                            pushed = true;
-                            break;
-                        }
-                        i += 1;
-                    }
-                    if !pushed {
-                        no_caps.push(mv);
-                    }
-                }
-            }
-        }
-
-        mv_q.append(& mut free_caps);
-        mv_q.append(& mut pawn_caps);
-        mv_q.append(& mut winning_caps);
-        mv_q.append(& mut equal_caps);
-        mv_q.append(& mut killer_moves);
-        mv_q.append(& mut no_caps);
-        mv_q.append(& mut losing_caps);
-        return mv_q;
-    }
-
-    pub fn get_scored_moves(&self, mvs: Vec<Mv>, k_array: &[(Mv, i32); 3], h_table: &[[[u64; 64]; 6]; 2]) -> Vec<(Mv, u64)> {
+    pub fn get_scored_moves(&self, mvs: Vec<Mv>, k_array: &[(Mv, i32); 2], h_table: &[[[u64; 64]; 6]; 2]) -> Vec<(Mv, u64)> {
         let side = self.white_turn as usize;
         let enemy_side = !self.white_turn as usize;
         let enemy_occ = self.composite[enemy_side];
@@ -2342,8 +2294,8 @@ impl BB {
             if (dst_bb & enemy_occ) == 0 {
                 // not a capture
                 if BB::moves_equivalent(&mv, &k_array[0].0) ||
-                    BB::moves_equivalent(&mv, &k_array[1].0) ||
-                    BB::moves_equivalent(&mv, &k_array[2].0) {
+                    BB::moves_equivalent(&mv, &k_array[1].0) { //||
+                    // BB::moves_equivalent(&mv, &k_array[2].0) {
                     mv_score = killer_score_offset;
                 } else {
                     mv_score = no_cap_offset + h_table[side][mv.get_piece_num()][mv.end as usize];
@@ -2361,7 +2313,20 @@ impl BB {
 
                 if dst_bb & def_pieces == 0 {
                     // free capture.  That's good
-                    mv_score = free_cap_offset - my_val;
+                    let mut other_val: u64 = 0;
+                    if dst_bb & self.pawn[enemy_side] != 0 {
+                        other_val = 1000;
+                    } else if dst_bb & self.knight[enemy_side] != 0 {
+                        other_val = 3000;
+                    } else if dst_bb & self.bishop[enemy_side] != 0 {
+                        other_val = 3000;
+                    } else if dst_bb & self.rook[enemy_side] != 0 {
+                        other_val = 5000;
+                    } else if dst_bb & self.queen[enemy_side] != 0 {
+                        other_val = 9000;
+                    }
+                    mv_score = free_cap_offset + (other_val - my_val);
+                    // mv_score = cap_offset + other_val;
                 } else {
                     if mv.piece == b'k' {
                         // not legal
@@ -2386,6 +2351,7 @@ impl BB {
                     if my_val > other_val {
                         // "losing" capture
                         mv_score = 11000 - (my_val - other_val);
+                        // mv_score = cap_offset - (my_val - other_val);
                     } else {
                         mv_score = cap_offset + (other_val - my_val);
                     }
@@ -3252,6 +3218,60 @@ impl BB {
         }
 
         return connected_pawns[1] - connected_pawns[0];
+    }
+
+    fn get_piece_value(piece: u8) -> i32 {
+        return match piece {
+            b'k' => KING_VALUE,
+            b'q' => QUEEN_VALUE,
+            b'r' => ROOK_VALUE,
+            b'b' => BISHOP_VALUE,
+            b'n' => KNIGHT_VALUE,
+            b'p' => PAWN_VALUE,
+            _ => 0
+        };
+    }
+
+    pub fn see(&mut self, to_idx: i32, target_piece: u8, from_idx: i32, atk_piece: u8) -> i32 {
+        let mut gain: [i32; 64] = [0; 64];
+        let mut depth: usize = 0;
+        let mut xrayable_bb = self.pawn[0] | self.pawn[1] | self.rook[0] | self.rook[1] | self.bishop[0] | self.bishop[1] | self.queen[0] | self.queen[1];
+        let mut from_sq: u64 = BB::idx_to_bb(from_idx);
+        let mut occ = self.composite[0] | self.composite[1];
+        let mut attack_bb = self.idx_attacks(to_idx, occ);
+        let mut done_atks: u64 = 0;
+        let mut atk_piece = atk_piece;
+        let mut target_piece = target_piece;
+
+        while from_sq != 0 {
+            gain[depth] = BB::get_piece_value(target_piece) - if depth > 0 {gain[depth - 1]} else {0};
+
+            if depth > 0 {
+                if -gain[depth - 1] < 0 && gain[depth] < 0 {break;}
+            }
+
+            // remove the attacker from occupancy and attacks
+            occ ^= from_sq;
+            done_atks |= from_sq;
+            if (from_sq & xrayable_bb) != 0 {
+                // gotta add xrays to the board
+                attack_bb = self.idx_attacks(to_idx, occ);
+            }
+            attack_bb &= !done_atks;
+
+            target_piece = atk_piece;
+            (from_sq, atk_piece) = self.lva(attack_bb, if (depth % 2) != 0 {self.white_turn} else {!self.white_turn});
+            if atk_piece == 0 {
+                break;
+            }
+            depth += 1;
+        }
+        while depth > 0 {
+            gain[depth - 1] = -cmp::max(-gain[depth - 1], gain[depth]);
+            depth -= 1;
+        }
+
+        return gain[0];
     }
 
     pub fn isolated_pawns_value(&self) -> i32 {
