@@ -1,7 +1,8 @@
 #[derive(Copy, Clone)]
 pub struct PHTEntry {
     pub hash: u64,
-    pub val: i32,
+    pub mg_val: i32,
+    pub eg_val: i32,
     pub valid: bool
 }
 
@@ -16,7 +17,8 @@ impl PHTEntry {
     pub fn invalid_entry() -> PHTEntry {
         PHTEntry {
             hash: 0,
-            val: 0,
+            mg_val: 0,
+            eg_val: 0,
             valid: false
         }
     }
@@ -49,11 +51,12 @@ impl PHT {
         return if e.hash == hash {e} else {PHTEntry::invalid_entry()};
     }
 
-    pub fn set(& mut self, hash: u64, val: i32) {
+    pub fn set(& mut self, hash: u64, mg_val: i32, eg_val: i32) {
         let idx: usize = (hash & self.mask) as usize;
         self.pht[idx] = PHTEntry {
             hash: hash,
-            val: val,
+            mg_val: mg_val,
+            eg_val: eg_val,
             valid: true
         };
     }

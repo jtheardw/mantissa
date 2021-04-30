@@ -179,7 +179,41 @@ pub struct EvalParams {
     pub tempo_bonus: i32,
 
     // slight bonus to leader in material
-    pub material_advantage: i32
+    pub material_advantage: i32,
+
+    pub eg_queen_mobility: i32,
+    pub eg_rook_mobility: i32,
+    pub eg_bishop_mobility: i32,
+    pub eg_knight_mobility: i32,
+    pub eg_pdf: i32,         // pawn defense
+    pub eg_dbb: i32,         // double-bishop
+    pub eg_castle: i32,
+    pub eg_pav: i32,         // pawn advancement
+    pub eg_rook_on_seventh: i32,
+    pub eg_rook_on_open: i32,
+    pub eg_king_danger: i32,
+
+    // pawn structure
+    pub eg_passed_pawn: i32,
+    pub eg_center_pawn: i32,
+    pub eg_near_center_pawn: i32,
+    pub eg_isolated_pawn: i32,
+    pub eg_doubled_pawn: i32,
+    pub eg_backwards_pawn: i32,
+    pub eg_supported_bonus: i32,
+    pub eg_advancement_bonus: i32,
+    pub eg_space: i32,
+    pub eg_bishop_color: i32,
+
+    // piece tables
+    pub eg_pawn_pt_offset: i32,
+    pub eg_pawn_pt_scale: i32,
+
+    pub eg_bishop_pt_offset: i32,
+    pub eg_bishop_pt_scale: i32,
+
+    pub eg_knight_pt_offset: i32,
+    pub eg_knight_pt_scale: i32,
 }
 
 impl EvalParams {
@@ -241,6 +275,40 @@ impl EvalParams {
             tempo_bonus: 127,
             material_advantage: 224,
             king_danger: -70,
+
+            eg_queen_mobility: 24,
+            eg_rook_mobility: 30,
+            eg_bishop_mobility: 33,
+            eg_knight_mobility: 47,
+            eg_pdf: 51,         // pawn defense
+            eg_dbb: 532,         // double-bishop
+            eg_castle: 0,
+            eg_pav: 12,         // pawn advancement
+            eg_rook_on_seventh: 144,
+            eg_rook_on_open: 76,
+            eg_king_danger: -70,
+
+            // pawn structure
+            eg_passed_pawn: 100,
+            eg_center_pawn: 209,
+            eg_near_center_pawn: 23,
+            eg_isolated_pawn: -150,
+            eg_doubled_pawn: -203,
+            eg_backwards_pawn: -214,
+            eg_supported_bonus: 66,
+            eg_advancement_bonus: 16,
+            eg_space: 30,
+            eg_bishop_color: -15,
+
+            // piece tables
+            eg_pawn_pt_offset: 0,
+            eg_pawn_pt_scale: 100,
+
+            eg_bishop_pt_offset: 0,
+            eg_bishop_pt_scale: 100,
+
+            eg_knight_pt_offset: 102,
+            eg_knight_pt_scale: 125
         }
     }
 }
@@ -288,8 +356,11 @@ pub struct BB {
     pub king_mg_pt_score: i32,
     pub king_eg_pt_score: i32,
     pub pawn_pt_score: i32,
+    pub eg_pawn_pt_score: i32,
     pub knight_pt_score: i32,
+    pub eg_knight_pt_score: i32,
     pub bishop_pt_score: i32,
+    pub eg_bishop_pt_score: i32,
 
     pub eval_params: EvalParams,
 
@@ -387,6 +458,9 @@ impl BB {
             pawn_pt_score: self.pawn_pt_score,
             knight_pt_score: self.knight_pt_score,
             bishop_pt_score: self.bishop_pt_score,
+            eg_pawn_pt_score: self.eg_pawn_pt_score,
+            eg_knight_pt_score: self.eg_knight_pt_score,
+            eg_bishop_pt_score: self.eg_bishop_pt_score,
 
             eval_params: self.eval_params,
 
@@ -488,6 +562,9 @@ impl BB {
             pawn_pt_score: 0,
             knight_pt_score: 0,
             bishop_pt_score: 0,
+            eg_pawn_pt_score: 0,
+            eg_knight_pt_score: 0,
+            eg_bishop_pt_score: 0,
 
             nodes_evaluated: 0,
             tt_hits: 0
@@ -675,6 +752,9 @@ impl BB {
             pawn_pt_score: 0,
             knight_pt_score: 0,
             bishop_pt_score: 0,
+            eg_pawn_pt_score: 0,
+            eg_knight_pt_score: 0,
+            eg_bishop_pt_score: 0,
 
             nodes_evaluated: 0,
             tt_hits: 0
@@ -684,11 +764,15 @@ impl BB {
         bb.hash = bb.get_full_hash();
         bb.pawn_hash = bb.get_full_pawn_hash();
         bb.phase = bb.slow_get_phase();
+
         bb.king_mg_pt_score = bb.get_king_mg_pt_bonus();
         bb.king_eg_pt_score = bb.get_king_eg_pt_bonus();
         bb.pawn_pt_score = bb.get_pawn_pt_bonus();
         bb.knight_pt_score = bb.get_knight_pt_bonus();
         bb.bishop_pt_score = bb.get_bishop_pt_bonus();
+        bb.eg_pawn_pt_score = bb.get_eg_pawn_pt_bonus();
+        bb.eg_knight_pt_score = bb.get_eg_knight_pt_bonus();
+        bb.eg_bishop_pt_score = bb.get_eg_bishop_pt_bonus();
         return bb;
     }
 
@@ -756,6 +840,9 @@ impl BB {
         self.pawn_pt_score = self.get_pawn_pt_bonus();
         self.knight_pt_score = self.get_knight_pt_bonus();
         self.bishop_pt_score = self.get_bishop_pt_bonus();
+        self.eg_pawn_pt_score = self.get_eg_pawn_pt_bonus();
+        self.eg_knight_pt_score = self.get_eg_knight_pt_bonus();
+        self.eg_bishop_pt_score = self.get_eg_bishop_pt_bonus();
 
         self.nodes_evaluated = 0;
         self.tt_hits = 0;
@@ -916,6 +1003,9 @@ impl BB {
         self.pawn_pt_score = self.get_pawn_pt_bonus();
         self.knight_pt_score = self.get_knight_pt_bonus();
         self.bishop_pt_score = self.get_bishop_pt_bonus();
+        self.eg_pawn_pt_score = self.get_eg_pawn_pt_bonus();
+        self.eg_knight_pt_score = self.get_eg_knight_pt_bonus();
+        self.eg_bishop_pt_score = self.get_eg_bishop_pt_bonus();
 
         self.nodes_evaluated = 0;
         self.tt_hits = 0;
@@ -1332,19 +1422,51 @@ impl BB {
         }
     }
 
+    pub fn get_tapered_eval(&self, mg_ep: i32, eg_ep: i32) -> i32 {
+        let phase = self.get_phase();
+        return ((phase * eg_ep) + ((256 - phase) * mg_ep)) / 256;
+    }
+
     fn get_pawn_table_val(&self, idx: i32, white: bool) -> i32 {
-        let entry_value = (self.eval_params.pawn_pt_scale * board_eval::PAWN_TABLE[if white {idx} else {63-idx} as usize]) / 100;
-        return entry_value + self.eval_params.pawn_pt_offset;
+        let scale = self.eval_params.pawn_pt_scale;
+        let offset = self.eval_params.pawn_pt_offset;
+        let entry_value = (scale * board_eval::PAWN_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + offset;
+    }
+
+    fn get_eg_pawn_table_val(&self, idx: i32, white: bool) -> i32 {
+        let scale = self.eval_params.eg_pawn_pt_scale;
+        let offset = self.eval_params.eg_pawn_pt_offset;
+        let entry_value = (scale * board_eval::PAWN_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + offset;
     }
 
     fn get_knight_table_val(&self, idx: i32, white: bool) -> i32 {
-        let entry_value = (self.eval_params.knight_pt_scale * board_eval::KNIGHT_TABLE[if white {idx} else {63-idx} as usize]) / 100;
-        return entry_value + self.eval_params.knight_pt_offset;
+        let scale = self.eval_params.knight_pt_scale;
+        let offset = self.eval_params.knight_pt_offset;
+        let entry_value = (scale * board_eval::KNIGHT_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + offset;
+    }
+
+    fn get_eg_knight_table_val(&self, idx: i32, white: bool) -> i32 {
+        let scale = self.eval_params.eg_knight_pt_scale;
+        let offset = self.eval_params.eg_knight_pt_offset;
+        let entry_value = (scale * board_eval::KNIGHT_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + offset;
     }
 
     fn get_bishop_table_val(&self, idx: i32, white: bool) -> i32 {
-        let entry_value = (self.eval_params.bishop_pt_scale * board_eval::BISHOP_TABLE[if white {idx} else {63-idx} as usize]) / 100;
-        return entry_value + self.eval_params.bishop_pt_offset;
+        let scale = self.eval_params.bishop_pt_scale;
+        let offset = self.eval_params.bishop_pt_offset;
+        let entry_value = (scale * board_eval::BISHOP_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + offset;
+    }
+
+    fn get_eg_bishop_table_val(&self, idx: i32, white: bool) -> i32 {
+        let scale = self.eval_params.eg_bishop_pt_scale;
+        let offset = self.eval_params.eg_bishop_pt_offset;
+        let entry_value = (scale * board_eval::BISHOP_TABLE[if white {idx} else {63-idx} as usize]) / 100;
+        return entry_value + offset;
     }
 
     fn get_king_mg_table_val(&self, idx: i32, white: bool) -> i32 {
@@ -1364,19 +1486,32 @@ impl BB {
                 // remove score from before
                 self.pawn_pt_score -= side_factor * self.get_pawn_table_val(start, white);
                 match promotion {
-                    b'n' => {self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);},
-                    b'b' => {self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);},
-                    0 => {self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, white)},
+                    b'n' => {
+                        self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);
+                        self.eg_knight_pt_score += side_factor * self.get_eg_knight_table_val(end, white);
+                    },
+                    b'b' => {
+                        self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);
+                        self.eg_bishop_pt_score += side_factor * self.get_eg_bishop_table_val(end, white);
+                    },
+                    0 => {
+                        self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, white);
+                        self.eg_pawn_pt_score += side_factor * self.get_eg_pawn_table_val(end, white);
+                    },
                     _ => {}
                 }
             },
             b'n' => {
                 self.knight_pt_score -= side_factor * self.get_knight_table_val(start, white);
                 self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);
+                self.eg_knight_pt_score -= side_factor * self.get_eg_knight_table_val(start, white);
+                self.eg_knight_pt_score += side_factor * self.get_eg_knight_table_val(end, white);
             },
             b'b' => {
                 self.bishop_pt_score -= side_factor * self.get_bishop_table_val(start, white);
                 self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);
+                self.eg_bishop_pt_score -= side_factor * self.get_eg_bishop_table_val(start, white);
+                self.eg_bishop_pt_score += side_factor * self.get_eg_bishop_table_val(end, white);
             },
             b'k' => {
                 self.king_mg_pt_score -= side_factor * self.get_king_mg_table_val(start, white);
@@ -1390,12 +1525,15 @@ impl BB {
         match capture {
             b'p' => {
                 self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, !white);
+                self.eg_pawn_pt_score += side_factor * self.get_eg_pawn_table_val(end, !white);
             },
             b'n' => {
                 self.knight_pt_score += side_factor * self.get_knight_table_val(end, !white);
+                self.eg_knight_pt_score += side_factor * self.get_eg_knight_table_val(end, !white);
             },
             b'b' => {
                 self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, !white);
+                self.eg_bishop_pt_score += side_factor * self.get_eg_bishop_table_val(end, !white);
             },
             _ => {}
         };
@@ -1408,19 +1546,32 @@ impl BB {
                 // remove score from before
                 self.pawn_pt_score -= side_factor * self.get_pawn_table_val(start, white);
                 match promotion {
-                    b'n' => {self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);},
-                    b'b' => {self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);},
-                    0 => {self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, white)},
+                    b'n' => {
+                        self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);
+                        self.eg_knight_pt_score += side_factor * self.get_eg_knight_table_val(end, white);
+                    },
+                    b'b' => {
+                        self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);
+                        self.eg_bishop_pt_score += side_factor * self.get_eg_bishop_table_val(end, white);
+                    },
+                    0 => {
+                        self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, white);
+                        self.eg_pawn_pt_score += side_factor * self.get_eg_pawn_table_val(end, white);
+                    },
                     _ => {}
                 }
             },
             b'n' => {
                 self.knight_pt_score -= side_factor * self.get_knight_table_val(start, white);
                 self.knight_pt_score += side_factor * self.get_knight_table_val(end, white);
+                self.eg_knight_pt_score -= side_factor * self.get_eg_knight_table_val(start, white);
+                self.eg_knight_pt_score += side_factor * self.get_eg_knight_table_val(end, white);
             },
             b'b' => {
                 self.bishop_pt_score -= side_factor * self.get_bishop_table_val(start, white);
                 self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, white);
+                self.eg_bishop_pt_score -= side_factor * self.get_eg_bishop_table_val(start, white);
+                self.eg_bishop_pt_score += side_factor * self.get_eg_bishop_table_val(end, white);
             },
             b'k' => {
                 self.king_mg_pt_score -= side_factor * self.get_king_mg_table_val(start, white);
@@ -1434,12 +1585,15 @@ impl BB {
         match capture {
             b'p' => {
                 self.pawn_pt_score += side_factor * self.get_pawn_table_val(end, !white);
+                self.eg_pawn_pt_score += side_factor * self.get_eg_pawn_table_val(end, !white);
             },
             b'n' => {
                 self.knight_pt_score += side_factor * self.get_knight_table_val(end, !white);
+                self.eg_knight_pt_score += side_factor * self.get_eg_knight_table_val(end, !white);
             },
             b'b' => {
                 self.bishop_pt_score += side_factor * self.get_bishop_table_val(end, !white);
+                self.eg_bishop_pt_score += side_factor * self.get_eg_bishop_table_val(end, !white);
             },
             _ => {}
         };
@@ -3100,7 +3254,7 @@ impl BB {
         return self.eval_params.rook_on_seventh * (if white_cond {white_bonus} else {0} - if black_cond {black_bonus} else {0});
     }
 
-    pub fn doubled_pawns_value(&self) -> i32 {
+    pub fn doubled_pawns_value(&self, scale: i32) -> i32 {
         let mut doubled_pawns: [i32; 2] = [0, 0];
         for i in 0..2 {
             let side = i as usize;
@@ -3112,10 +3266,10 @@ impl BB {
                 }
             }
         }
-        return self.eval_params.doubled_pawn * (doubled_pawns[1] - doubled_pawns[0]);
+        return scale * (doubled_pawns[1] - doubled_pawns[0]);
     }
 
-    pub fn space_control_value(&self) -> i32 {
+    pub fn space_control_value(&self, scale: i32) -> i32 {
         let mut space_control: [i32; 2] = [0, 0];
         // white
         let w_pawn_capture_mask = ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9);
@@ -3139,13 +3293,13 @@ impl BB {
         space_control[1] = (base_w_space.count_ones() + bonus_w_space.count_ones()) as i32;
         space_control[0] = (base_b_space.count_ones() + bonus_b_space.count_ones()) as i32;
 
-        return self.eval_params.space * (space_control[1] - space_control[0])
+        return scale * (space_control[1] - space_control[0])
     }
 
-    pub fn connected_pawns_value(&self) -> i32 {
+    pub fn connected_pawns_value(&self, sup_scale: i32, adv_scale: i32) -> i32 {
         let mut connected_pawns: [i32; 2] = [0, 0];
-        let sup_bonus = self.eval_params.supported_bonus;
-        let advancement_bonus = self.eval_params.advancement_bonus;
+        let sup_bonus = sup_scale;
+        let advancement_bonus = adv_scale;
 
         // white
         let w_pawn_capture_mask = ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9);
@@ -3274,7 +3428,7 @@ impl BB {
         return gain[0];
     }
 
-    pub fn isolated_pawns_value(&self) -> i32 {
+    pub fn isolated_pawns_value(&self, scale: i32) -> i32 {
         let mut isolated_pawns: [i32; 2] = [0, 0];
         for i in 0..2 {
             let side = i as usize;
@@ -3296,10 +3450,36 @@ impl BB {
                 }
             }
         }
-        return self.eval_params.isolated_pawn * (isolated_pawns[1] - isolated_pawns[0]);
+        return scale * (isolated_pawns[1] - isolated_pawns[0]);
     }
 
-    pub fn passed_pawns_value(&self) -> i32 {
+    pub fn pawn_structure_value(&self) -> (i32, i32) {
+        // TODO dirty hack for mg vs. eg
+        // clean this up.
+        let pp = self.passed_pawns_value(self.eval_params.passed_pawn);
+        let cp = self.center_value(self.eval_params.center_pawn);
+        let ncp = self.near_center_value(self.eval_params.near_center_pawn);
+        let ip = self.isolated_pawns_value(self.eval_params.isolated_pawn);
+        let dp = self.doubled_pawns_value(self.eval_params.doubled_pawn);
+        let bp = self.backwards_pawns_value(self.eval_params.backwards_pawn);
+        let conn_p = self.connected_pawns_value(self.eval_params.supported_bonus, self.eval_params.advancement_bonus);
+        let p_space = self.space_control_value(self.eval_params.space);
+        let mg_pv = pp + ip + dp + bp + cp + ncp + conn_p + p_space;
+
+        let pp = self.passed_pawns_value(self.eval_params.eg_passed_pawn);
+        let cp = self.center_value(self.eval_params.eg_center_pawn);
+        let ncp = self.near_center_value(self.eval_params.eg_near_center_pawn);
+        let ip = self.isolated_pawns_value(self.eval_params.eg_isolated_pawn);
+        let dp = self.doubled_pawns_value(self.eval_params.eg_doubled_pawn);
+        let bp = self.backwards_pawns_value(self.eval_params.eg_backwards_pawn);
+        let conn_p = self.connected_pawns_value(self.eval_params.eg_supported_bonus, self.eval_params.eg_advancement_bonus);
+        let p_space = self.space_control_value(self.eval_params.eg_space);
+        let eg_pv = pp + ip + dp + bp + cp + ncp + conn_p + p_space;
+
+        return (mg_pv, eg_pv)
+    }
+
+    pub fn passed_pawns_value(&self, scale: i32) -> i32 {
         let mut passed_pawns: [i32; 2] = [0, 0];
         for i in 0..2 {
             let white = i != 0;
@@ -3334,7 +3514,7 @@ impl BB {
                     enemy_mask &= rank_mask;
 
                     if enemy_mask & self.pawn[!white as usize] == 0 {
-                        passed_pawns[side] += self.eval_params.passed_pawn * pp_rank as i32;
+                        passed_pawns[side] += scale * pp_rank as i32;
                     }
                 }
             }
@@ -3342,7 +3522,7 @@ impl BB {
         return (passed_pawns[1] - passed_pawns[0]);
     }
 
-    pub fn backwards_pawns_value(&self) -> i32 {
+    pub fn backwards_pawns_value(&self, scale: i32) -> i32 {
         let white_pawn_attacks = ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9);
 
         let black_pawn_attacks = ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7);
@@ -3358,11 +3538,12 @@ impl BB {
         let white_backwards_pawns = (self.pawn[1] << 8) & black_pawn_attacks & !white_pawn_attack_proj;
         let black_backwards_pawns = (self.pawn[0] >> 8) & white_pawn_attacks & !black_pawn_attack_proj;
 
-        return self.eval_params.backwards_pawn * (white_backwards_pawns.count_ones() as i32 - black_backwards_pawns.count_ones() as i32);
+        return scale * (white_backwards_pawns.count_ones() as i32 - black_backwards_pawns.count_ones() as i32);
     }
 
     pub fn pawn_advancement_value(&self) -> i32 {
         let mut pawn_advancement: [i32; 2] = [0, 0];
+        let scale = self.get_tapered_eval(self.eval_params.pav, self.eval_params.eg_pav);
         // white
         for r in 0..8 {
             let mask = RANK_MASKS[r as usize];
@@ -3381,30 +3562,30 @@ impl BB {
             }
         }
 
-        let scale_numerator = 256 + self.get_phase();
-        return self.eval_params.pav * (((pawn_advancement[1] - pawn_advancement[0]) * scale_numerator) / 256);
+        return self.eval_params.pav * scale;
     }
 
-    pub fn center_value(&self) -> i32 {
+    pub fn center_value(&self, scale: i32) -> i32 {
         let mut center_pieces: [i32; 2] = [0, 0];
         for i in 0..2 {
             let side = i as usize;
             center_pieces[side] = (CENTER_MASK & self.pawn[side]).count_ones() as i32;
         }
-        return self.eval_params.center_pawn * (center_pieces[1] - center_pieces[0]);
+        return scale * (center_pieces[1] - center_pieces[0]);
     }
 
-    pub fn near_center_value(&self) -> i32 {
+    pub fn near_center_value(&self, scale: i32) -> i32 {
         let mut center_pieces: [i32; 2] = [0, 0];
         for i in 0..2 {
             let side = i as usize;
             center_pieces[side] = (NEAR_CENTER_MASK & (self.pawn[side])).count_ones() as i32;
         }
-        return self.eval_params.near_center_pawn * (center_pieces[1] - center_pieces[0]);
+        return scale * (center_pieces[1] - center_pieces[0]);
     }
 
     pub fn pawn_defense_value(&self) -> i32 {
         let mut pdf: i32 = 0;
+        let scale = self.get_tapered_eval(self.eval_params.pdf, self.eval_params.eg_pdf);
 
         // white
         let pawn_capture_mask = ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9);
@@ -3414,12 +3595,13 @@ impl BB {
         let pawn_capture_mask = ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7);
         pdf -= (pawn_capture_mask & self.composite[0]).count_ones() as i32;
 
-        return self.eval_params.pdf * pdf;
+        return scale * pdf;
     }
 
     pub fn rook_on_open_file_value(&self) -> i32 {
         let mut open_file_rooks: [i32; 2] = [0, 0];
         let mut semi_open_file_rooks: [i32; 2] = [0, 0];
+        let scale = self.get_tapered_eval(self.eval_params.rook_on_open, self.eval_params.eg_rook_on_open);
         for i in 0..2 {
             let side = i as usize;
             let enemy_side = if i == 1 {0} else {1};
@@ -3436,11 +3618,12 @@ impl BB {
                 }
             }
         }
-        return self.eval_params.rook_on_open * (2 * (open_file_rooks[1] - open_file_rooks[0]) + (semi_open_file_rooks[1] - semi_open_file_rooks[0]));
+        return scale * (2 * (open_file_rooks[1] - open_file_rooks[0]) + (semi_open_file_rooks[1] - semi_open_file_rooks[0]));
     }
 
     pub fn bishop_color_value(&self) -> i32 {
         let mut bishop_color: [i32; 2] = [0, 0];
+        let scale = self.get_tapered_eval(self.eval_params.bishop_color, self.eval_params.eg_bishop_color);
 
         // remember the files are "backwards"
         // i.e. msb is file 8
@@ -3458,12 +3641,13 @@ impl BB {
             bishop_color[side] = bishops_on_dark * pawns_on_dark + bishops_on_light * pawns_on_light;
         }
 
-        return self.eval_params.bishop_color * (bishop_color[1] - bishop_color[0]);
+        return scale * (bishop_color[1] - bishop_color[0]);
 
     }
 
     pub fn double_bishop_bonus(&self) -> i32 {
-        return self.eval_params.dbb * ((self.bishop[1].count_ones() >= 2) as i32 - (self.bishop[0].count_ones() >= 2) as i32);
+        let scale = self.get_tapered_eval(self.eval_params.dbb, self.eval_params.eg_dbb);
+        return scale * ((self.bishop[1].count_ones() >= 2) as i32 - (self.bishop[0].count_ones() >= 2) as i32);
     }
 
     pub fn early_queen_penalty(&self) -> i32 {
@@ -3496,14 +3680,15 @@ impl BB {
     }
 
     pub fn castled_bonus(&self) -> i32 {
+        let scale = self.get_tapered_eval(self.eval_params.castle, self.eval_params.eg_castle);
         let castled_diff = self.castled[1] as i32 - self.castled[0] as i32;
-        return castled_diff * (self.eval_params.castle * (256 - self.get_phase()) / 256)
+        return castled_diff * scale;
     }
 
     pub fn get_all_pt_bonus(&self) -> i32 {
-        let pawn_pt_bonus = self.pawn_pt_score;
-        let bishop_pt_bonus = self.bishop_pt_score;
-        let knight_pt_bonus = self.knight_pt_score;
+        let pawn_pt_bonus = self.get_tapered_eval(self.pawn_pt_score, self.eg_pawn_pt_score);
+        let knight_pt_bonus = self.get_tapered_eval(self.knight_pt_score, self.eg_knight_pt_score);
+        let bishop_pt_bonus = self.get_tapered_eval(self.bishop_pt_score, self.eg_bishop_pt_score);
         let king_mg_pt_bonus = self.king_mg_pt_score;
         let king_eg_pt_bonus = self.king_eg_pt_score;
 
@@ -3540,6 +3725,16 @@ impl BB {
         return white_bonus - black_bonus;
     }
 
+    pub fn get_eg_pawn_pt_bonus(&self) -> i32 {
+        let offset = self.eval_params.eg_pawn_pt_offset;
+        let white_bonus = self.get_pt_bonus(self.pawn[1], &board_eval::PAWN_TABLE, offset, true);
+        let white_bonus = (white_bonus * self.eval_params.eg_pawn_pt_scale) / 100;
+        let black_bonus = self.get_pt_bonus(self.pawn[0], &board_eval::PAWN_TABLE, offset, false);
+        let black_bonus = (black_bonus * self.eval_params.eg_pawn_pt_scale) / 100;
+
+        return white_bonus - black_bonus;
+    }
+
     pub fn get_knight_pt_bonus(&self) -> i32 {
         let offset = self.eval_params.knight_pt_offset;
         let white_bonus = self.get_pt_bonus(self.knight[1], &board_eval::KNIGHT_TABLE, offset, true);
@@ -3550,12 +3745,32 @@ impl BB {
         return white_bonus - black_bonus;
     }
 
+    pub fn get_eg_knight_pt_bonus(&self) -> i32 {
+        let offset = self.eval_params.eg_knight_pt_offset;
+        let white_bonus = self.get_pt_bonus(self.knight[1], &board_eval::KNIGHT_TABLE, offset, true);
+        let white_bonus = (white_bonus * self.eval_params.eg_knight_pt_scale) / 100;
+        let black_bonus = self.get_pt_bonus(self.knight[0], &board_eval::KNIGHT_TABLE, offset, false);
+        let black_bonus = (black_bonus * self.eval_params.eg_knight_pt_scale) / 100;
+
+        return white_bonus - black_bonus;
+    }
+
     pub fn get_bishop_pt_bonus(&self) -> i32 {
         let offset = self.eval_params.bishop_pt_offset;
         let white_bonus = self.get_pt_bonus(self.bishop[1], &board_eval::BISHOP_TABLE, offset, true);
         let white_bonus = (white_bonus * self.eval_params.bishop_pt_scale) / 100;
         let black_bonus = self.get_pt_bonus(self.bishop[0], &board_eval::BISHOP_TABLE, offset, false);
         let black_bonus = (black_bonus * self.eval_params.bishop_pt_scale) / 100;
+
+        return white_bonus - black_bonus;
+    }
+
+    pub fn get_eg_bishop_pt_bonus(&self) -> i32 {
+        let offset = self.eval_params.eg_bishop_pt_offset;
+        let white_bonus = self.get_pt_bonus(self.bishop[1], &board_eval::BISHOP_TABLE, offset, true);
+        let white_bonus = (white_bonus * self.eval_params.eg_bishop_pt_scale) / 100;
+        let black_bonus = self.get_pt_bonus(self.bishop[0], &board_eval::BISHOP_TABLE, offset, false);
+        let black_bonus = (black_bonus * self.eval_params.eg_bishop_pt_scale) / 100;
 
         return white_bonus - black_bonus;
     }

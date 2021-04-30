@@ -134,12 +134,16 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
         let (move_tx, move_rx) = mpsc::channel();
         kill_threads = false;
         let mut threads = vec![];
+        let mut extra_depth = 0;
         for t_num in 0..nthreads {
-            let extra_depth = if nthreads > 1 {
-                if t_num > 0 {t_num.trailing_zeros() as i32} else {1}
-            } else {
-                0
-            };
+            // let extra_depth = if nthreads > 1 {
+            //     if t_num > 0 {t_num.trailing_zeros() as i32} else {1}
+            // } else {
+            //     0
+            // };
+            if t_num % 2 == 0 && t_num >= 2 {
+                extra_depth += 1;
+            }
             // let extra_depth = 0;
             let mut node = node.copy();
             let move_tx = move_tx.clone();
@@ -273,19 +277,11 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
     // pawn values
     let pht_entry = pht.get(node.pawn_hash);
     if pht_entry.valid {
-        val += pht_entry.val;
+        val += node.get_tapered_eval(pht_entry.mg_val, pht_entry.eg_val);
     } else {
-        let pp = node.passed_pawns_value();
-        let cp = node.center_value();
-        let ncp = node.near_center_value();
-        let ip = node.isolated_pawns_value();
-        let dp = node.doubled_pawns_value();
-        let bp = node.backwards_pawns_value();
-        let conn_p = node.connected_pawns_value();
-        let p_space = node.space_control_value();
-        let pv = pp + ip + dp + bp + cp + ncp + conn_p + p_space;
-        val += pv;
-        pht.set(node.pawn_hash, pv);
+        let (mg_pv, eg_pv) = node.pawn_structure_value();
+        val += node.get_tapered_eval(mg_pv, eg_pv);
+        pht.set(node.pawn_hash, mg_pv, eg_pv);
     }
     val += node.material;
     val += node.pawn_defense_value();
@@ -308,18 +304,19 @@ unsafe fn evaluate_position(node: &BB) -> i32 {
 
 pub unsafe fn print_evaluate(node: &BB) {
     let (mob, kdf) = node.mobility_kdf_combo();
+
     eprintln!("Material: {}", node.material);
     eprintln!("Mobility: {}", mob);
     eprintln!("King danger value: {}", kdf);
-    eprintln!("doubled p: {}", node.doubled_pawns_value());
-    eprintln!("isolated p: {}", node.isolated_pawns_value());
-    eprintln!("backwards p: {}", node.backwards_pawns_value());
-    eprintln!("passed p: {}", node.passed_pawns_value());
-    eprintln!("connected p: {}", node.connected_pawns_value());
-    eprintln!("pawn space control: {}", node.space_control_value());
+    eprintln!("doubled p: {}", node.doubled_pawns_value(node.get_tapered_eval(node.eval_params.doubled_pawn, node.eval_params.eg_doubled_pawn)));
+    eprintln!("isolated p: {}", node.isolated_pawns_value(node.get_tapered_eval(node.eval_params.isolated_pawn, node.eval_params.eg_isolated_pawn)));
+    eprintln!("backwards p: {}", node.backwards_pawns_value(node.get_tapered_eval(node.eval_params.backwards_pawn, node.eval_params.eg_backwards_pawn)));
+    eprintln!("passed p: {}", node.passed_pawns_value(node.get_tapered_eval(node.eval_params.passed_pawn, node.eval_params.eg_passed_pawn)));
+    eprintln!("connected p: {}", node.connected_pawns_value(node.get_tapered_eval(node.eval_params.supported_bonus, node.eval_params.eg_supported_bonus), node.get_tapered_eval(node.eval_params.advancement_bonus, node.eval_params.eg_advancement_bonus)));
+    eprintln!("pawn space control: {}", node.space_control_value(node.get_tapered_eval(node.eval_params.space, node.eval_params.eg_space)));
     eprintln!("bishop color value: {}", node.bishop_color_value());
-    eprintln!("Center: {}", node.center_value());
-    eprintln!("Near Center: {}", node.near_center_value());
+    eprintln!("Center: {}", node.center_value(node.get_tapered_eval(node.eval_params.center_pawn, node.eval_params.eg_center_pawn)));
+    eprintln!("Near Center: {}", node.near_center_value(node.get_tapered_eval(node.eval_params.near_center_pawn, node.eval_params.eg_near_center_pawn)));
     eprintln!("Double bishop: {}", node.double_bishop_bonus());
     eprintln!("Pawn Defense: {}", node.pawn_defense_value());
     eprintln!("Pawn advancement: {}", node.pawn_advancement_value());
@@ -330,12 +327,12 @@ pub unsafe fn print_evaluate(node: &BB) {
     eprintln!("Rook on 7th: {}", node.rook_on_seventh_bonus());
     eprintln!("Rook on (semi-)open file: {}", node.rook_on_open_file_value());
     eprintln!("Material lead bonus: {}", node.material_advantage_bonus());
-    if pht.valid {
-        let pht_entry = pht.get(node.pawn_hash);
-        if pht_entry.valid {
-            eprintln!("pawn entry: {}", pht_entry.val);
-        }
-    }
+    // if pht.valid {
+    //     let pht_entry = pht.get(node.pawn_hash);
+    //     if pht_entry.valid {
+    //         eprintln!("pawn entry: {}", pht_entry.val);
+    //     }
+    // }
     eprintln!("Phase {} / 256", node.get_phase());
 }
 
