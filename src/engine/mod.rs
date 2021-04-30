@@ -156,7 +156,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
         let mut ply_val = 0;
         let mut node_type = PV_NODE;
         loop {
-            thread::sleep(Duration::from_millis(10));
+            thread::sleep(Duration::from_millis(5));
             match move_rx.try_recv() {
                 Ok((mv, score, n_type)) => {
                     ply_move = mv;
@@ -392,28 +392,33 @@ fn update_k_table(k_table: & mut [[(Mv, i32); 2]; 64], mv: Mv, depth: i32, ply: 
         }
         return;
     }
-    if moves_equivalent(&k_table[ply][1].0, &mv) {
-        if depth > k_table[ply][1].1 {
-            k_table[ply][1] = (mv, depth);
-        }
-        return;
-    }
 
-    if k_table[ply][0].0.is_null {
-        k_table[ply][0] = (mv, depth);
-        return;
-    }
-    if k_table[ply][1].0.is_null {
-        k_table[ply][1] = (mv, depth);
-        return;
-    }
+    k_table[ply][1] = k_table[ply][0];
+    k_table[ply][0] = (mv, depth);
+    // if moves_equivalent(&k_table[ply][1].0, &mv) {
+    //     if depth > k_table[ply][1].1 {
+    //         k_table[ply][1] = (mv, depth);
+    //     }
+    //     return;
+    // }
 
-    if k_table[ply][0].1 <= depth {
-        k_table[ply][0] = (mv, depth);
-        return;
-    } else { // if k_table[ply][1].1 <= depth {
-        k_table[ply][1] = (mv, depth);
-    }
+    // if k_table[ply][0]
+
+    // if k_table[ply][0].0.is_null {
+    //     k_table[ply][0] = (mv, depth);
+    //     return;
+    // }
+    // if k_table[ply][1].0.is_null {
+    //     k_table[ply][1] = (mv, depth);
+    //     return;
+    // }
+
+    // if k_table[ply][0].1 <= depth {
+    //     k_table[ply][0] = (mv, depth);
+    //     return;
+    // } else { // if k_table[ply][1].1 <= depth {
+    //     k_table[ply][1] = (mv, depth);
+    // }
 }
 
 fn move_sort(mvs: & mut Vec<(Mv, u64)>, cur_i: usize) {
@@ -494,8 +499,8 @@ unsafe fn negamax_search(node: &mut BB,
         let mv = tt_entry.mv;
         first_move = mv;
         if (sing_move.is_null && !is_pv && tt_entry.depth >= depth) {
-            if ((tt_entry.value < alpha || tt_entry.value >= beta) && tt_entry.node_type == PV_NODE)
-                || (tt_entry.value < alpha && tt_entry.node_type == ALL_NODE) // all node is upper bound
+            if ((tt_entry.value <= alpha || tt_entry.value >= beta) && tt_entry.node_type == PV_NODE)
+                || (tt_entry.value <= alpha && tt_entry.node_type == ALL_NODE) // all node is upper bound
                 || (tt_entry.value >= beta && tt_entry.node_type == CUT_NODE) // cut node is lower bound
             {
                 // we do a janky legality check just in case of freak collisions
@@ -507,7 +512,18 @@ unsafe fn negamax_search(node: &mut BB,
                     if moves_equivalent(&first_move, &fm) {
                         // check 3 fold
                         if !node.is_repitition() {
+
+                            // TODO: update history here
                             let node_type = if tt_entry.value > alpha {if tt_entry.value >= beta {CUT_NODE} else {PV_NODE}} else {ALL_NODE};
+                            if node_type == CUT_NODE {
+                                node.do_move(&mv);
+                                let quiet = !is_capture(node) && mv.promote_to == 0 && !mv.is_ep;
+                                node.undo_move(&mv);
+                                if quiet {
+                                    update_k_table(k_table, mv, depth, ply);
+                                    h_table[maximize as usize][mv.get_piece_num()][mv.end as usize] += 1 << depth;
+                                }
+                            }
                             return (mv, if node_type ==  CUT_NODE {beta} else {tt_entry.value}, node_type);
                         }
                     } else {
@@ -581,6 +597,7 @@ unsafe fn negamax_search(node: &mut BB,
             }
         }
 
+    let mut sing_extend = false;
     if  !init
         && !is_check
         && depth >= 6
@@ -604,6 +621,7 @@ unsafe fn negamax_search(node: &mut BB,
         if (val < target) {
             // singular extension
             depth += 1;
+            sing_extend = true;
         } else if !is_pv && target >= beta {
             // if we're not doing pv node we might want to prune here with
             // multi-cut.  This indicates multiple moves failed high
@@ -615,7 +633,7 @@ unsafe fn negamax_search(node: &mut BB,
     }
 
     let mut moves: Vec<(Mv, u64)>;
-    if init {
+    if init && depth > 4 {
         moves = score_root_moves(node, node.moves());
     } else {
         moves = order_moves(node.get_scored_moves(node.moves(), &k_table[ply as usize], &h_table), first_move);
@@ -688,7 +706,7 @@ unsafe fn negamax_search(node: &mut BB,
                 // && !is_terminal(node)
                 && !node.is_check(node.white_turn)
                 && !is_killer(&k_table, mv, ply)
-                && (ply < 2 || !is_killer(&k_table, mv, ply - 2))
+                // && (ply < 2 || !is_killer(&k_table, mv, ply - 2))
                 && !is_tactical_move {
                     // late move reductions
                     // let mut r = (0.75 + ((num_moves as f64).ln() * (depth as f64).ln()) / 2.25) as i32;
@@ -704,24 +722,37 @@ unsafe fn negamax_search(node: &mut BB,
 
                     if score > (1 << 16) {
                         if score > (1 << (16 + (depth - 4))) {
+                        // if score > ((1 << 16) + (depth-3) * (depth-3)) as u64 {
                             r -= 1;
                         }
+                        // if score > ((1 << 16) + (depth-1) * (depth-1)) as u64 {
                         if score > (1 << (16 + (depth - 2))) {
                             r -= 1;
                         }
                     }
 
-                    let tte = tt.get(node.hash);
-                    if tte.valid && tte.node_type == PV_NODE && tte.value > (alpha - 1000) {
+                    // let tte = tt.get(node.hash);
+                    let tte = tt_entry;
+                    if tte.valid && tte.node_type == PV_NODE {// && tte.value > (alpha - 500) {
                         r -= 1;
                     } else if tte.valid && tte.node_type != PV_NODE {
                         r += 1;
                     }
+                    // else if tte.valid && tte.node_type != PV_NODE {
+                    //     r += 1;
+                    // }
 
                     if !quiet && score > 8000 {
                         // not very bad capture
                         r -= 1;
+                    } else if !quiet && score < 8000 {
+                        // very bad capture
+                        r += 1;
                     }
+
+                    // if sing_extend {
+                    //     r -= 1;
+                    // }
 
                     // if num_moves >= 10 {
                     //     // later move reductions
@@ -732,7 +763,7 @@ unsafe fn negamax_search(node: &mut BB,
                     //     }
                     // }
                     // }
-                    if is_pv { r = (r * 2) / 3; }
+                    if is_pv && r > 0 { r = (r * 2) / 3; }
                     let depth_to_search = depth - 1 - r;
 
                     res = negamax_search(node, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index);
@@ -779,7 +810,7 @@ unsafe fn negamax_search(node: &mut BB,
                 // killer moves
                 // and history moves
                 update_k_table(k_table, mv, depth, ply);
-                h_table[maximize as usize][mv.get_piece_num()][mv.end as usize] += 1 << depth;
+                h_table[maximize as usize][mv.get_piece_num()][mv.end as usize] += 1 << depth; // (depth * depth) as u64;
             }
             tt.set(node.hash, best_move, val, CUT_NODE, depth);
             return (best_move, beta, CUT_NODE);

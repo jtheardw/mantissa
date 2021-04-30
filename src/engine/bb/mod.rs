@@ -219,96 +219,81 @@ pub struct EvalParams {
 impl EvalParams {
     pub fn default_params() -> EvalParams {
         EvalParams {
-            queen_mobility: 24,
-            rook_mobility: 30,
-            knight_mobility: 33,
-            bishop_mobility: 47,
-            pdf: 51,
-            dbb: 532,
-            castle: 450,
-            pav: 12,
-            rook_on_seventh: 144,
-            rook_on_open: 76,
-            early_queen_penalty: -252,
+            queen_mobility: 16,
+            rook_mobility: 9,
+            knight_mobility: 25,
+            bishop_mobility: 68,
+            pdf: 60,
+            dbb: 515,
+            castle: 468,
+            pav: 0,
+            rook_on_seventh: 93,
+            rook_on_open: 114,
+            early_queen_penalty: -236,
 
-            passed_pawn: 100,
-            center_pawn: 209,
-            near_center_pawn: 23,
-            isolated_pawn: -150,
-            doubled_pawn: -203,
-            backwards_pawn: -214,
-            supported_bonus: 66,
-            advancement_bonus: 16,
-            space: 30,
-            bishop_color: -15,
+            passed_pawn: 116,
+            center_pawn: 256,
+            near_center_pawn: 41,
+            isolated_pawn: -181,
+            doubled_pawn: -162,
+            backwards_pawn: -215,
+            supported_bonus: 26,
+            advancement_bonus: 15,
+            space: 43,
+            bishop_color: -16,
 
-            // pawn_pt_offset: -7,
-            // pawn_pt_scale: 92,
+            pawn_pt_offset: 4,
+            pawn_pt_scale: 75,
 
-            // bishop_pt_offset: 25,
-            // bishop_pt_scale: 97,
+            knight_pt_offset: 15,
+            knight_pt_scale: 117,
 
-            // knight_pt_offset: 102,
-            // knight_pt_scale: 125,
+            bishop_pt_offset: -9,
+            bishop_pt_scale: 98,
 
-            // king_mg_pt_offset: 8,
-            // king_mg_pt_scale: 90,
+            king_mg_pt_offset: 104,
+            king_mg_pt_scale: 108,
 
-            // king_eg_pt_offset: -3,
-            // king_eg_pt_scale: 115,
+            king_eg_pt_offset: 56,
+            king_eg_pt_scale: 108,
 
-            pawn_pt_offset: 0,
-            pawn_pt_scale: 100,
+            tempo_bonus: 113,
+            material_advantage: 263,
+            king_danger: -80,
 
-            knight_pt_offset: 102,
-            knight_pt_scale: 125,
-
-            bishop_pt_offset: 0,
-            bishop_pt_scale: 100,
-
-            king_mg_pt_offset: 0,
-            king_mg_pt_scale: 90,
-
-            king_eg_pt_offset: 0,
-            king_eg_pt_scale: 115,
-
-            tempo_bonus: 127,
-            material_advantage: 224,
-            king_danger: -70,
-
-            eg_queen_mobility: 24,
-            eg_rook_mobility: 30,
-            eg_bishop_mobility: 33,
-            eg_knight_mobility: 47,
-            eg_pdf: 51,         // pawn defense
-            eg_dbb: 532,         // double-bishop
+            eg_queen_mobility: 36,
+            eg_rook_mobility: 58,
+            eg_bishop_mobility: 0,
+            eg_knight_mobility: 27,
+            eg_pdf: 101,         // pawn defense
+            eg_dbb: 632,         // double-bishop
             eg_castle: 0,
-            eg_pav: 12,         // pawn advancement
-            eg_rook_on_seventh: 144,
-            eg_rook_on_open: 76,
-            eg_king_danger: -70,
+            eg_pav: 18,         // pawn advancement
+            eg_rook_on_seventh: 138,
+            eg_rook_on_open: 101,
+            eg_king_danger: -82,
 
             // pawn structure
-            eg_passed_pawn: 100,
-            eg_center_pawn: 209,
-            eg_near_center_pawn: 23,
-            eg_isolated_pawn: -150,
-            eg_doubled_pawn: -203,
-            eg_backwards_pawn: -214,
-            eg_supported_bonus: 66,
-            eg_advancement_bonus: 16,
-            eg_space: 30,
-            eg_bishop_color: -15,
+            eg_passed_pawn: 199,
+            eg_center_pawn: 282,
+            eg_near_center_pawn: 15,
+            eg_isolated_pawn: -181,
+            eg_doubled_pawn: -344,
+            eg_backwards_pawn: -233,
+            eg_supported_bonus: 88,
+            eg_advancement_bonus: 21,
+            eg_space: 19,
+            eg_bishop_color: -14,
 
             // piece tables
-            eg_pawn_pt_offset: 0,
-            eg_pawn_pt_scale: 100,
+            eg_pawn_pt_offset: 46,
+            eg_pawn_pt_scale: 112,
 
-            eg_bishop_pt_offset: 0,
-            eg_bishop_pt_scale: 100,
+            eg_bishop_pt_offset: 64,
+            eg_bishop_pt_scale: 89,
 
-            eg_knight_pt_offset: 102,
-            eg_knight_pt_scale: 125
+            eg_knight_pt_offset: 57,
+            eg_knight_pt_scale: 88
         }
     }
 }
@@ -3044,6 +3029,12 @@ impl BB {
         let all_composite = self.composite[!white as usize] | self.composite[white as usize];
         let mut moves = 0;
         let mut center = 3;
+        let scale = self.get_tapered_eval(self.eval_params.queen_mobility, self.eval_params.eg_queen_mobility);
+        let enemy_pawn_capture_bb = if !white {
+            ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9)
+        } else {
+            ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7)
+        };
 
         let mut c = 0;
         while loc_bb != 0 && c < 64 {
@@ -3061,14 +3052,14 @@ impl BB {
             let bishop_hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
             let bishop_bb = self.bishop_magic_table[start_idx as usize][bishop_hash as usize];
 
-            moves += ((rook_bb | bishop_bb) & !self.composite[white as usize]).count_ones() as i32;
+            moves += ((rook_bb | bishop_bb) & !(self.king[white as usize] | enemy_pawn_capture_bb)).count_ones() as i32;
             let piece_attacks = ((rook_bb | bishop_bb) & king_bb).count_ones() as i32;
             if piece_attacks > 0 {
                 attackers += 1;
             }
             attacks += piece_attacks;
         }
-        return ((moves - center) * self.eval_params.queen_mobility, attackers, attacks);
+        return ((moves - center) * scale, attackers, attacks);
     }
 
     fn bishop_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
@@ -3079,6 +3070,12 @@ impl BB {
         let all_composite = self.composite[!white as usize] | self.composite[white as usize];
         let mut moves = 0;
         let center = 2;
+        let scale = self.get_tapered_eval(self.eval_params.bishop_mobility, self.eval_params.eg_bishop_mobility);
+        let enemy_pawn_capture_bb = if !white {
+            ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9)
+        } else {
+            ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7)
+        };
 
         let mut c = 0;
         while loc_bb != 0 && c < 64 {
@@ -3091,7 +3088,7 @@ impl BB {
             let bishop_hash = BB::bishop_magic_hash(bishop_occ_bb, start_idx as usize);
             let bishop_bb = self.bishop_magic_table[start_idx as usize][bishop_hash as usize];
 
-            moves += (bishop_bb & !self.composite[white as usize]).count_ones() as i32;
+            moves += (bishop_bb & !(self.king[white as usize] | enemy_pawn_capture_bb)).count_ones() as i32;
             let piece_attacks = (bishop_bb & king_bb).count_ones() as i32;
             if piece_attacks > 0 {
                 attackers += 1;
@@ -3099,7 +3096,7 @@ impl BB {
             attacks += piece_attacks
 
         }
-        return ((moves - center) * self.eval_params.bishop_mobility, attackers, attacks);
+        return ((moves - center) * scale, attackers, attacks);
     }
 
     fn rook_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
@@ -3110,6 +3107,12 @@ impl BB {
         let all_composite = self.composite[!white as usize] | self.composite[white as usize];
         let mut moves = 0;
         let center = 2;
+        let scale = self.get_tapered_eval(self.eval_params.rook_mobility, self.eval_params.eg_rook_mobility);
+        let enemy_pawn_capture_bb = if !white {
+            ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9)
+        } else {
+            ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7)
+        };
 
         let mut c = 0;
         while loc_bb != 0 && c < 64 {
@@ -3122,14 +3125,14 @@ impl BB {
             let rook_hash = BB::rook_magic_hash(rook_occ_bb, start_idx as usize);
             let rook_bb = self.rook_magic_table[start_idx as usize][rook_hash as usize];
 
-            moves += (rook_bb & !self.composite[white as usize]).count_ones() as i32;
+            moves += (rook_bb & !(self.king[white as usize] | enemy_pawn_capture_bb)).count_ones() as i32;
             let piece_attacks = (rook_bb & king_bb).count_ones() as i32;
             if piece_attacks > 0 {
                 attackers += 1;
             }
             attacks += piece_attacks;
         }
-        return ((moves - center) * self.eval_params.rook_mobility, attackers, attacks);
+        return ((moves - center) * scale, attackers, attacks);
     }
 
     fn knight_mobility_kdf_attacks(&self, white: bool, king_bb: u64) -> (i32, i32, i32) {
@@ -3139,6 +3142,12 @@ impl BB {
         let mut knight_loc_bb = self.knight[white as usize];
         let mut moves = 0;
         let center = 2;
+        let scale = self.get_tapered_eval(self.eval_params.knight_mobility, self.eval_params.eg_knight_mobility);
+        let enemy_pawn_capture_bb = if !white {
+            ((self.pawn[1] & !FILE_MASKS[0]) << 7) | ((self.pawn[1] & !FILE_MASKS[7]) << 9)
+        } else {
+            ((self.pawn[0] & !FILE_MASKS[0]) >> 9) | ((self.pawn[0] & !FILE_MASKS[7]) >> 7)
+        };
 
         let mut kc = 0;
         while knight_loc_bb != 0 && kc < 64 {
@@ -3147,14 +3156,14 @@ impl BB {
             knight_loc_bb = knight_loc_bb >> kc;
 
             let knight_bb = self.knight_mask[start_idx as usize];
-            moves += (knight_bb & !self.composite[white as usize]).count_ones() as i32;
+            moves += (knight_bb & !(self.king[white as usize] | enemy_pawn_capture_bb)).count_ones() as i32;
             let piece_attacks = (knight_bb & king_bb).count_ones() as i32;
             if piece_attacks > 0 {
                 attackers += 1;
             }
             attacks += piece_attacks;
         }
-        return ((moves - center) * self.eval_params.knight_mobility, attackers, attacks);
+        return ((moves - center) * scale, attackers, attacks);
     }
 
     fn pawn_mobility(&self, white: bool) -> i32 {
@@ -3239,12 +3248,14 @@ impl BB {
             king_danger[side] = ((atk_weights[num_attackers as usize] * attack_value) / 100) as i32;
         }
 
-        let king_danger_value = (self.eval_params.king_danger * (king_danger[1] - king_danger[0])) / 100;
+        let scale = self.get_tapered_eval(self.eval_params.king_danger, self.eval_params.eg_king_danger);
+        let king_danger_value = (scale * (king_danger[1] - king_danger[0])) / 100;
         let mobility = mobility[1] - mobility[0];
         return (mobility, king_danger_value);
     }
 
     pub fn rook_on_seventh_bonus(&self) -> i32 {
+        let scale = self.get_tapered_eval(self.eval_params.rook_on_seventh, self.eval_params.eg_rook_on_seventh);
         let white_bonus = (self.rook[1] & RANK_MASKS[6]).count_ones() as i32;
         // has to be a good reason to bonus 7th rank
         let white_cond = (self.king[0] & RANK_MASKS[7]) != 0 || (self.pawn[0] & RANK_MASKS[6]) != 0;

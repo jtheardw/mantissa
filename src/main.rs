@@ -58,6 +58,17 @@ impl Game {
             "rook_on_open" => { self.eval_params.rook_on_open = value; },
             "early_queen_penalty" => { self.eval_params.early_queen_penalty = value; },
 
+            "eg_queen_mobility" => { self.eval_params.eg_queen_mobility = value; },
+            "eg_rook_mobility" => { self.eval_params.eg_rook_mobility = value; },
+            "eg_bishop_mobility" => { self.eval_params.eg_bishop_mobility = value; },
+            "eg_knight_mobility" => { self.eval_params.eg_knight_mobility = value; },
+            "eg_pdf" => { self.eval_params.eg_pdf = value; },
+            "eg_dbb" => { self.eval_params.eg_dbb = value; },
+            "eg_castle" => { self.eval_params.eg_castle = value; },
+            "eg_pav" => { self.eval_params.eg_pav = value; },
+            "eg_rook_on_seventh" => { self.eval_params.eg_rook_on_seventh = value; },
+            "eg_rook_on_open" => { self.eval_params.eg_rook_on_open = value; },
+
             "passed_pawn" => { self.eval_params.passed_pawn = value; },
             "center_pawn" => { self.eval_params.center_pawn = value; },
             "near_center_pawn" => { self.eval_params.near_center_pawn = value; },
@@ -67,6 +78,18 @@ impl Game {
             "supported_bonus" => { self.eval_params.supported_bonus = value; },
             "advancement_bonus" => { self.eval_params.advancement_bonus = value; },
             "space" => { self.eval_params.space = value; },
+            "bishop_color" => { self.eval_params.bishop_color = value; }
+
+            "eg_passed_pawn" => { self.eval_params.eg_passed_pawn = value; },
+            "eg_center_pawn" => { self.eval_params.eg_center_pawn = value; },
+            "eg_near_center_pawn" => { self.eval_params.eg_near_center_pawn = value; },
+            "eg_isolated_pawn" => { self.eval_params.eg_isolated_pawn = value; },
+            "eg_doubled_pawn" => { self.eval_params.eg_doubled_pawn = value; },
+            "eg_backwards_pawn" => { self.eval_params.eg_backwards_pawn = value; },
+            "eg_supported_bonus" => { self.eval_params.eg_supported_bonus = value; },
+            "eg_advancement_bonus" => { self.eval_params.eg_advancement_bonus = value; },
+            "eg_space" => { self.eval_params.eg_space = value; },
+            "eg_bishop_color" => { self.eval_params.eg_bishop_color = value; }
 
             "pawn_pt_offset" => { self.eval_params.pawn_pt_offset = value; },
             "pawn_pt_scale" => { self.eval_params.pawn_pt_scale = value; },
@@ -77,6 +100,15 @@ impl Game {
             "knight_pt_offset" => { self.eval_params.knight_pt_offset = value; },
             "knight_pt_scale" => { self.eval_params.knight_pt_scale = value; },
 
+            "eg_pawn_pt_offset" => { self.eval_params.eg_pawn_pt_offset = value; },
+            "eg_pawn_pt_scale" => { self.eval_params.eg_pawn_pt_scale = value; },
+
+            "eg_bishop_pt_offset" => { self.eval_params.eg_bishop_pt_offset = value; },
+            "eg_bishop_pt_scale" => { self.eval_params.eg_bishop_pt_scale = value; },
+
+            "eg_knight_pt_offset" => { self.eval_params.eg_knight_pt_offset = value; },
+            "eg_knight_pt_scale" => { self.eval_params.eg_knight_pt_scale = value; },
+
             "king_mg_pt_offset" => { self.eval_params.king_mg_pt_offset = value; },
             "king_mg_pt_scale" => { self.eval_params.king_mg_pt_scale = value; },
 
@@ -86,6 +118,7 @@ impl Game {
             "tempo_bonus" => { self.eval_params.tempo_bonus = value; },
             "material_advantage" => { self.eval_params.material_advantage = value; },
             "king_danger" => { self.eval_params.king_danger = value; },
+            "eg_king_danger" => { self.eval_params.eg_king_danger = value; },
             _ => {}
         }
 
