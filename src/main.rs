@@ -4,11 +4,16 @@
 use std::io;
 mod engine;
 
+const BH_NONE: u8 = 0;
+const BH_BRAIN: u8 = 1;
+const BH_HAND: u8 = 2;
+
 struct Game {
     pub board: engine::bb::BB,
     pub eval_params: engine::bb::EvalParams,
     white_turn: bool,
     num_threads: usize,
+    pub bh_mode: u8
 }
 
 impl Game {
@@ -35,7 +40,8 @@ impl Game {
             board: board,
             eval_params: eval_params,
             white_turn: true,
-            num_threads: num_threads
+            num_threads: num_threads,
+            bh_mode: BH_NONE
         }
     }
 
@@ -165,11 +171,15 @@ impl Game {
         self.white_turn = !self.white_turn;
     }
 
-    unsafe fn make_move(&mut self, compute_time: u128) -> engine::bb::Mv {
-        eprintln!("current eval:");
-        engine::print_evaluate(&self.board);
-        let (best_move, _) = engine::best_move(& mut self.board, self.white_turn, compute_time, self.num_threads);
-        eprintln!("best move is {}", best_move);
+    unsafe fn make_move(&mut self, compute_time: u128, hand_piece: i32) -> engine::bb::Mv {
+        if self.bh_mode == BH_NONE {
+            eprintln!("current eval:");
+            engine::print_evaluate(&self.board);
+        }
+        let (best_move, _) = engine::best_move(& mut self.board, self.white_turn, compute_time, self.num_threads, self.bh_mode, hand_piece);
+        if self.bh_mode == BH_NONE {
+            eprintln!("best move is {}", best_move);
+        }
         return best_move;
     }
 
@@ -255,8 +265,17 @@ unsafe fn play() {
                 }
                 None => {}
             }
-        }
-        else if cmd == "ucinewgame" {
+        } else if cmd == "bh_mode" {
+            match params.next() {
+                Some(mode) => match mode {
+                    "brain" => {game.bh_mode = BH_BRAIN;},
+                    "hand" => {game.bh_mode = BH_HAND;},
+                    "none" => {game.bh_mode = BH_NONE;},
+                    _ => {}
+                },
+                None => {}
+            };
+        } else if cmd == "ucinewgame" {
             game.reset();
         }
         else if cmd == "position" {
@@ -293,6 +312,7 @@ unsafe fn play() {
             let mut clock_time = 0;
             let mut inc_time = 0;
             let mut time = 10000;
+            let mut hand_piece: i32 = -1;
             loop {
                 let p = match params.next() {
                     Some(p) => p,
@@ -324,11 +344,18 @@ unsafe fn play() {
                         },
                         None => panic!("empty time!")
                     };
+                } else if p == "hand_piece" {
+                    hand_piece = match params.next() {
+                        Some(p) => engine::bb::BB::str_to_idx(String::from(p.trim())),
+                        None => panic!("empty hand piece!")
+                    };
                 }
             }
             if on_clock { time = get_calc_time(clock_time, inc_time, game.board.history.len() as i32); }
-            let mv = game.make_move(time);
-            println!("bestmove {}", mv);
+            let mv = game.make_move(time, hand_piece);
+            if game.bh_mode == BH_NONE {
+                println!("bestmove {}", mv);
+            }
         }
         else if cmd == "eval" {
             let val: i32 = game.eval();

@@ -25,6 +25,10 @@ const PV_NODE: u8 = 1;
 const CUT_NODE: u8 = 2;
 const ALL_NODE: u8 = 3;
 
+const BH_NONE: u8 = 0;
+const BH_BRAIN: u8 = 1;
+const BH_HAND: u8 = 2;
+
 pub fn get_time_millis() -> u128 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_millis(),
@@ -57,11 +61,13 @@ pub unsafe fn thread_handler(mut node: BB,
                              depth: i32,
                              alpha: i32,
                              beta: i32,
-                             maximize: bool) {
+                             maximize: bool,
+                             forced_piece_idx: i32
+) {
     let mut h_table = h_tables[tnum];
     let mut k_table = k_tables[tnum];
     let h_index = node.history.len();
-    let result = negamax_search(&mut node, depth, 0, alpha, beta, maximize, true, true, true, &mut k_table, &mut h_table, Mv::null_move(), h_index);
+    let result = negamax_search(&mut node, depth, 0, alpha, beta, maximize, true, true, true, &mut k_table, &mut h_table, Mv::null_move(), h_index, forced_piece_idx);
     move_tx.send(result).unwrap();
     evaled[tnum] += node.nodes_evaluated;
     hits[tnum] += node.tt_hits;
@@ -75,7 +81,7 @@ static mut hits: Vec<u64> = Vec::new();
 static mut k_tables: Vec<[[(Mv, i32); 2]; 64]> = Vec::new();
 static mut h_tables: Vec<[[[u64; 64]; 6]; 2]> = Vec::new();
 
-pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthreads: usize) -> (Mv, f64) {
+pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthreads: usize, bh_mode: u8, h_idx: i32) -> (Mv, f64) {
     node.nodes_evaluated = 0;
     node.tt_hits = 0;
     if is_terminal(&node) { return (Mv::null_move(), 0.0); }
@@ -97,6 +103,29 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
     }
     if !pht.valid {
         pht = PHT::get_pht(18);
+    }
+
+    if bh_mode == BH_HAND {
+        // we need to verify that the piece we were given has legal moves
+        if h_idx < 0 || h_idx > 63 {
+            eprintln!("I need you to tell me a piece");
+            return (Mv::null_move(), 0.0);
+        }
+        let moves = node.moves();
+        let mut legal_move = false;
+        for mv in moves {
+            if mv.start != h_idx {continue;}
+            node.do_move(&mv);
+            legal_move = !node.is_check(maximize);
+            node.undo_move(&mv);
+            if legal_move {
+                break;
+            }
+        }
+        if !legal_move {
+            eprintln!("There aren't any legal moves for that piece :/");
+            return (Mv::null_move(), 0.0);
+        }
     }
 
     evaled = Vec::new();
@@ -148,7 +177,7 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
             let mut node = node.copy();
             let move_tx = move_tx.clone();
             threads.push(thread::spawn(move || {
-                thread_handler(node, t_num, move_tx, m_depth+extra_depth, alpha, beta, maximize);
+                thread_handler(node, t_num, move_tx, m_depth+extra_depth, alpha, beta, maximize, h_idx);
             }));
         }
 
@@ -207,14 +236,16 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
             tt_hits += hits[i];
         }
 
-        // for debugging
-        eprintln!(
-            "{} eval'd {} this time got val {} and recommends {} with piece {}",
-            m_depth,
-            nodes_evaled,
-            best_val,
-            best_move,
-            best_move.piece);
+        if bh_mode == BH_NONE {
+            // for debugging
+            eprintln!(
+                "{} eval'd {} this time got val {} and recommends {} with piece {}",
+                m_depth,
+                nodes_evaled,
+                best_val,
+                best_move,
+                best_move.piece);
+        }
 
         if best_val.abs() == 1000000 {
             // checkmate
@@ -234,17 +265,23 @@ pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthre
         tt_hits += hits[i];
     }
 
-    // all for debugging
-    eprintln!("{} tt hits", tt_hits);
-    eprintln!("{} ply evaluated", m_depth - 1);
-    eprintln!("{} nodes evaluated", nodes_evaled);
-    eprintln!("projected value: {}", best_val);
-    eprintln!("elapsed time: {}", get_time_millis() - start_time);
-    eprintln!("expected PV:");
-    print_pv(node, m_depth - 1);
+    if bh_mode == BH_NONE {
+        // all for debugging
+        eprintln!("{} tt hits", tt_hits);
+        eprintln!("{} ply evaluated", m_depth - 1);
+        eprintln!("{} nodes evaluated", nodes_evaled);
+        eprintln!("projected value: {}", best_val);
+        eprintln!("elapsed time: {}", get_time_millis() - start_time);
+        eprintln!("expected PV:");
+        print_pv(node, m_depth - 1);
 
-    // update info for spectators, &c
-    println!("info depth {} score cp {}", m_depth - 1, (best_val / 10) * if maximize {1} else {-1});
+        // update info for spectators, &c
+        println!("info depth {} score cp {}", m_depth - 1, (best_val / 10) * if maximize {1} else {-1});
+    } else if bh_mode == BH_BRAIN {
+        eprintln!("Piece to move: {} at {}", best_move.piece as char, BB::idx_to_str(best_move.start));
+    } else if bh_mode == BH_HAND {
+        eprintln!("Best move for chosen pieces is: {}", best_move);
+    }
     return (best_move, best_val as f64 / 1000.);
 }
 
@@ -465,7 +502,8 @@ unsafe fn negamax_search(node: &mut BB,
                          k_table: & mut [[(Mv, i32); 2]; 64],
                          h_table: & mut [[[u64; 64]; 6]; 2],
                          sing_move: Mv,
-                         h_index: usize
+                         h_index: usize,
+                         forced_piece_idx: i32
 ) -> (Mv, i32, u8) {
     node.nodes_evaluated += 1;
     x86_64::_mm_prefetch(tt.get_ptr(node.hash), x86_64::_MM_HINT_NTA);
@@ -537,7 +575,7 @@ unsafe fn negamax_search(node: &mut BB,
         }
     } else if depth >= 6 && is_pv {
         // internal iterative deepening
-        let (mv, val, _) = negamax_search(node, depth - 2, ply, alpha, beta, maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index);
+        let (mv, val, _) = negamax_search(node, depth - 2, ply, alpha, beta, maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index, -1);
         first_move = mv;
     }
 
@@ -580,7 +618,7 @@ unsafe fn negamax_search(node: &mut BB,
                 r += ((static_eval - beta) / 1000) as i32;
 
                 node.do_null_move();
-                let nmr_val = -negamax_search(node, depth - 1 - r, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table, h_table, Mv::null_move(), h_index).1;
+                let nmr_val = -negamax_search(node, depth - 1 - r, ply+1, -beta, -beta + 1, !maximize, false, false, false, k_table, h_table, Mv::null_move(), h_index, -1).1;
                 node.undo_null_move();
 
                 if nmr_val >= beta {
@@ -616,7 +654,7 @@ unsafe fn negamax_search(node: &mut BB,
         // let depth_to_search = (2 * depth) / 3;
         let target = tt_entry.value - margin;
 
-        let val = negamax_search(node, depth_to_search, ply, target - 1, target, maximize, false, false, false, k_table, h_table, tt_entry.mv, h_index).1;
+        let val = negamax_search(node, depth_to_search, ply, target - 1, target, maximize, false, false, false, k_table, h_table, tt_entry.mv, h_index, -1).1;
 
         if (val < target) {
             // singular extension
@@ -628,13 +666,28 @@ unsafe fn negamax_search(node: &mut BB,
             // so this is probably a cutnode
             return (Mv::null_move(), target, CUT_NODE);
         } else if !is_pv && tt_entry.value >= beta {
-            let val = negamax_search(node, (depth + 3) / 2, ply, beta - 1, beta, maximize, true, false, false, k_table, h_table, tt_entry.mv, h_index).1;
+            let val = negamax_search(node, (depth + 3) / 2, ply, beta - 1, beta, maximize, true, false, false, k_table, h_table, tt_entry.mv, h_index, -1).1;
         }
     }
 
     let mut moves: Vec<(Mv, u64)>;
-    if init && depth > 4 {
-        moves = score_root_moves(node, node.moves());
+    if init {
+        let mut unscored_moves = node.moves();
+        if forced_piece_idx != -1 {
+            let mut filtered_moves: Vec<Mv> = Vec::new();
+            for mv in unscored_moves {
+                if mv.start == forced_piece_idx {
+                    filtered_moves.push(mv);
+                }
+            }
+            unscored_moves = filtered_moves;
+        }
+
+        if depth > 4 {
+            moves = score_root_moves(node, unscored_moves);
+        } else {
+            moves = order_moves(node.get_scored_moves(unscored_moves, &k_table[ply as usize], &h_table), first_move);
+        }
     } else {
         moves = order_moves(node.get_scored_moves(node.moves(), &k_table[ply as usize], &h_table), first_move);
     }
@@ -695,7 +748,7 @@ unsafe fn negamax_search(node: &mut BB,
 
         let mut reduced = false;
         if num_moves == 0 {
-            res = negamax_search(node, depth - 1, ply+1, -beta, -alpha, !maximize, true, false, true, k_table, h_table, Mv::null_move(), h_index);
+            res = negamax_search(node, depth - 1, ply+1, -beta, -alpha, !maximize, true, false, true, k_table, h_table, Mv::null_move(), h_index, -1);
         } else {
             if depth > 3
             // && !is_pv
@@ -766,7 +819,7 @@ unsafe fn negamax_search(node: &mut BB,
                     if is_pv && r > 0 { r = (r * 2) / 3; }
                     let depth_to_search = depth - 1 - r;
 
-                    res = negamax_search(node, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index);
+                    res = negamax_search(node, depth_to_search, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index, -1);
 
                     if -res.1 <= alpha {
                         // if we fail to raise alpha we can move on
@@ -779,9 +832,9 @@ unsafe fn negamax_search(node: &mut BB,
                 }
 
             if !reduced {
-                res = negamax_search(node, depth - 1, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index);
+                res = negamax_search(node, depth - 1, ply + 1, -alpha - 1, -alpha, !maximize, true, false, false, k_table, h_table, Mv::null_move(), h_index, -1);
                 if -res.1 > alpha && -res.1 < beta { // failed high
-                    res = negamax_search(node, depth - 1, ply + 1, -beta, -alpha, !maximize, true, false, true, k_table, h_table, Mv::null_move(), h_index);
+                    res = negamax_search(node, depth - 1, ply + 1, -beta, -alpha, !maximize, true, false, true, k_table, h_table, Mv::null_move(), h_index, -1);
                 }
             }
 

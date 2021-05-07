@@ -1264,6 +1264,19 @@ impl BB {
         return (masked_composite * BISHOP_MAGIC_NUMBERS[square]) >> BISHOP_MAGIC_SHIFTS[square];
     }
 
+    pub fn idx_to_str(idx: i32) -> String {
+        let mut s = String::new();
+        let coords = (idx % 8, idx >> 3);
+        let f = "abcdefgh".as_bytes()[coords.0 as usize] as char;
+        let r = (coords.1 + 1).to_string();
+        return format!("{}{}", f.to_string(), r);
+    }
+
+    pub fn str_to_idx(s: String) -> i32 {
+        let s = s.as_bytes();
+        return BB::coord_to_idx(((s[0] - b'a') as i32, (s[1] - b'1') as i32));
+    }
+
     pub fn bb_str(bb: u64) -> String {
         let mut s = String::new();
         let mut b = bb;
