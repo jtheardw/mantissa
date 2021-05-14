@@ -38,6 +38,11 @@ pub fn get_time_millis() -> u128 {
 
 static mut tt: TT = TT {tt: Vec::new(), bits: 0, mask: 0, valid: false};
 static mut pht: PHT = PHT {pht: Vec::new(), bits: 0, mask: 0, valid: false};
+static mut kill_threads: bool = false;
+static mut evaled: Vec<u64> = Vec::new();
+static mut hits: Vec<u64> = Vec::new();
+static mut k_tables: Vec<[[(Mv, i32); 2]; 64]> = Vec::new();
+static mut h_tables: Vec<[[[u64; 64]; 6]; 2]> = Vec::new();
 
 pub unsafe fn print_pv(node: & mut BB, depth: i32) {
     if depth < 0 {
@@ -74,12 +79,6 @@ pub unsafe fn thread_handler(mut node: BB,
     k_tables[tnum] = k_table;
     h_tables[tnum] = h_table;
 }
-
-static mut kill_threads: bool = false;
-static mut evaled: Vec<u64> = Vec::new();
-static mut hits: Vec<u64> = Vec::new();
-static mut k_tables: Vec<[[(Mv, i32); 2]; 64]> = Vec::new();
-static mut h_tables: Vec<[[[u64; 64]; 6]; 2]> = Vec::new();
 
 pub unsafe fn best_move(node: &mut BB, maximize: bool, compute_time: u128, nthreads: usize, bh_mode: u8, h_idx: i32) -> (Mv, f64) {
     node.nodes_evaluated = 0;
