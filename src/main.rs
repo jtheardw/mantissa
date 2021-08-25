@@ -14,7 +14,7 @@ fn init() {
 
 fn main() {
     init();
-    // let mut board = Bitboard::from_position(format!("rnbqkbnr/ppp3pp/3p1p2/4p3/4P3/3B1N2/PPPP1PPP/RNBQK2R w KQkq - 0 4"));
+    // let mut board = Bitboard::from_position(format!("r1bqk2r/pP2b1pp/n4p1n/6N1/2BP4/8/PPPQpPPP/RNB2RK1 b kq - 0 12"));
     // let moves = moves(&board);
     // for mv in moves {
     //     println!("{}", mv);

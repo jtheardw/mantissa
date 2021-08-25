@@ -341,7 +341,7 @@ pub fn pawn_moves(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let occ = pos.composite[0] | pos.composite[1];
     let enemy_occ = pos.composite[!pos.side_to_move as usize];
 
-    let promotions;
+    let mut promotions;
     let mut captures = pawn_capture_board(enemy_occ, idx, pos.ep_file, pos.side_to_move);
     let mut walks = pawn_walk_board(occ, idx, pos.side_to_move);
 
@@ -377,6 +377,7 @@ pub fn pawn_moves(pos: &Bitboard, idx: i32) -> Vec<Move> {
         for p in [b'q', b'r', b'b', b'n'] {
             moves.push(Move::promotion(idx, end_idx, p));
         }
+        promotions &= promotions - 1;
     }
 
     return moves;
