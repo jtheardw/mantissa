@@ -1,5 +1,110 @@
+use std::fmt;
+
+use crate::bitboard::Bitboard;
 use crate::magic::*;
 use crate::util::*;
+
+pub static mut KING_MASK: [u64; 64] = [0; 64];
+pub static mut KNIGHT_MASK: [u64; 64] = [0; 64];
+pub static mut BISHOP_MASK: [u64; 64] = [0; 64];
+pub static mut ROOK_MASK: [u64; 64] = [0; 64];
+
+fn gen_knight_mask() {
+    for idx in 0..64 {
+        let mut bb: u64 = 0;
+        let (kx, ky) = idx_to_coord(idx);
+        for (dx, dy) in [
+            (-1, 2),
+            ( 1, 2),
+            (-2, 1),
+            ( 2, 1),
+            (-2,-1),
+            ( 2,-1),
+            (-1,-2),
+            ( 1,-2)
+        ].iter() {
+            let (nx, ny) = (kx + dx, ky + dy);
+            if (nx >= 8 || nx < 0) || (ny >= 8 || ny < 0) { continue; }
+            let new_idx = coord_to_idx((nx, ny));
+            bb |= 1 << new_idx;
+        }
+        unsafe {
+            KNIGHT_MASK[idx as usize] = bb;
+        }
+    }
+}
+
+fn gen_rook_mask() {
+    for idx in 0..64 {
+        let mut bb: u64 = 0;
+        let (rx, ry) = idx_to_coord(idx);
+        for (sx, sy) in [(0, 1), (0, -1), (-1, 0), (1, 0)].iter() {
+            let mut d = 1;
+            while d < 8 {
+                let (nx, ny) = (rx + (sx * d), ry + (sy * d));
+                if ((nx < 1 || nx >= 7) && (nx != rx)) || ((ny < 1 || ny >= 7) && (ny != ry)) {
+                    break;
+                }
+                let new_idx = coord_to_idx((nx, ny));
+                bb |= 1 << new_idx;
+                d += 1;
+            }
+        }
+        unsafe {
+            ROOK_MASK[idx as usize] = bb;
+        }
+    }
+}
+
+pub fn gen_bishop_mask() {
+    for idx in 0..64 {
+        let mut bb: u64 = 0;
+        let (bx, by) = idx_to_coord(idx);
+        for (sx, sy) in [(-1, 1), (1, 1), (-1, -1), (1, -1)].iter() {
+            let mut d = 1;
+            while d < 8 {
+                let (nx, ny) = (bx + (sx * d), by + (sy * d));
+                if ((nx < 1 || nx >= 7) && (nx != bx)) || ((ny < 1 || ny >= 7) && (ny != by)) {
+                    break;
+                }
+                let new_idx = coord_to_idx((nx, ny));
+                bb |= 1 << new_idx;
+                d += 1;
+            }
+        }
+        unsafe {
+            BISHOP_MASK[idx as usize] = bb;
+        }
+    }
+}
+
+pub fn gen_king_mask() {
+    for idx in 0..64 {
+        let mut bb: u64 = 0;
+        let (kx, ky) = idx_to_coord(idx);
+        for (dx, dy) in [
+            (-1, 1), (1, 1), (-1, -1), (1, -1),
+            (0, 1), (0, -1), (-1, 0), (1, 0)
+        ].iter() {
+            let (nx, ny) = (kx + dx, ky + dy);
+            if (nx < 0 || nx >= 8) || (ny < 0 || ny >= 8) {
+                continue;
+            }
+            let new_idx = coord_to_idx((nx, ny));
+            bb |= 1 << new_idx;
+        }
+        unsafe {
+            KING_MASK[idx as usize] = bb;
+        }
+    }
+}
+
+pub fn initialize_masks() {
+    gen_knight_mask();
+    gen_king_mask();
+    gen_bishop_mask();
+    gen_rook_mask();
+}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Move {
@@ -16,7 +121,7 @@ impl Move {
     pub fn get_repr(&self) -> String {
         // UCI compatible representation of move
         if self.is_null {
-            return "0000";
+            return format!("0000");
         }
         let start = idx_to_str(self.start);
         let end = idx_to_str(self.end);
@@ -102,7 +207,7 @@ impl Move {
     }
 }
 
-impl fmt::Display for Mv {
+impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.get_repr())
     }
@@ -111,12 +216,12 @@ impl fmt::Display for Mv {
 fn get_piece_movelist(pos: &Bitboard, idx: i32, piece: u8, move_board: u64) -> Vec<Move> {
     // gets *all* pseudo-legal moves from the moveboard (not just quiet ones)
     // this should appropriately filter out capturing own pieces, etc.
-    let mut own_occ = pos.composite[pos.side_to_move as usize];
+    let own_occ = pos.composite[pos.side_to_move as usize];
     let mut move_board = move_board & !own_occ;
     let mut moves: Vec<Move> = Vec::new();
 
     while move_board != 0 {
-        let end_idx = move_board.trailing_zeros();
+        let end_idx = move_board.trailing_zeros() as i32;
         moves.push(Move::piece_move(idx, end_idx, piece));
         move_board &= move_board - 1; // cute trick I learned from Expositor code
     }
@@ -131,7 +236,7 @@ fn get_piece_captures(pos: &Bitboard, idx: i32, piece: u8, move_board: u64) -> V
     let mut captures: Vec<Move> = Vec::new();
 
     while move_board != 0 {
-        let end_idx = move_board.trailing_zeros();
+        let end_idx = move_board.trailing_zeros() as i32;
         captures.push(Move::piece_move(idx, end_idx, piece));
         move_board &= move_board - 1;
     }
@@ -139,8 +244,8 @@ fn get_piece_captures(pos: &Bitboard, idx: i32, piece: u8, move_board: u64) -> V
     return captures;
 }
 
-pub fn pawn_walk_board(occ: u64, idx: i32, side_to_move: Color) {
-    let mut move_board: u64 = 0;
+pub fn pawn_walk_board(occ: u64, idx: i32, side_to_move: Color) -> u64 {
+    let mut move_board: u64;
     if side_to_move == Color::White {
         // walk forward one if unoccupied
         move_board = idx_to_bb(idx + 8) & !occ;
@@ -159,15 +264,31 @@ pub fn pawn_walk_board(occ: u64, idx: i32, side_to_move: Color) {
     return move_board
 }
 
-pub fn pawn_capture_board(enemy_occ: u64, idx: i32, ep_file: i32, side_to_move: Color) {
-    let mut move_board: u64 = 0;
+pub fn pawn_attack_board(idx: i32, side_to_move: Color) -> u64 {
     let start_idx_bb = idx_to_bb(idx);
-    let attacks = if side_to_move == Color::White {
-        ((start_idx_bb & !FILE_MASKS[0]) << 7) | ((start_idx_bb & !FILE_MASKS[7]) << 9)
+    if side_to_move == Color::White {
+        return ((start_idx_bb & !FILE_MASKS[0]) << 7) | ((start_idx_bb & !FILE_MASKS[7]) << 9);
     } else {
-        ((start_idx_bb & !FILE_MASKS[0]) >> 9) | ((start_idx_bb & !FILE_MASKS[7]) >> 7)
+        return ((start_idx_bb & !FILE_MASKS[0]) >> 9) | ((start_idx_bb & !FILE_MASKS[7]) >> 7);
     };
-    let en_passant = if ep_file != -1 {attacks & FILE_MASKS[ep_file]} else {0};
+}
+
+
+pub fn pawn_capture_board(enemy_occ: u64, idx: i32, ep_file: i32, side_to_move: Color) -> u64 {
+    let start_idx_bb = idx_to_bb(idx);
+    let mut en_passant = 0;
+    let attacks;
+    if side_to_move == Color::White {
+        attacks = ((start_idx_bb & !FILE_MASKS[0]) << 7) | ((start_idx_bb & !FILE_MASKS[7]) << 9);
+        if ep_file != -1 {
+            en_passant = attacks & coord_to_bb((ep_file, 5));
+        }
+    } else {
+        attacks = ((start_idx_bb & !FILE_MASKS[0]) >> 9) | ((start_idx_bb & !FILE_MASKS[7]) >> 7);
+        if ep_file != -1 {
+            en_passant = attacks & coord_to_bb((ep_file, 2));
+        }
+    };
     let captures = (attacks & enemy_occ) | en_passant;
 
     return captures;
@@ -181,13 +302,13 @@ pub fn pawn_qmoves(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let mut promotions = 0;
     let mut captures = pawn_capture_board(enemy_occ, idx, pos.ep_file, pos.side_to_move);
     if pos.side_to_move == Color::White {
-        if idx_to_bb(idx) & RANK_MASKS[6] {
+        if (idx_to_bb(idx) & RANK_MASKS[6]) != 0 {
             promotions = pawn_walk_board(occ, idx, pos.side_to_move);
             promotions |= captures & RANK_MASKS[7];
             captures &= !RANK_MASKS[7];
         }
     } else {
-        if idx_to_bb(idx) & RANK_MASKS[1] {
+        if (idx_to_bb(idx) & RANK_MASKS[1]) != 0 {
             promotions = pawn_walk_board(occ, idx, pos.side_to_move);
             promotions |= captures & RANK_MASKS[0];
             captures &= !RANK_MASKS[0];
@@ -195,7 +316,7 @@ pub fn pawn_qmoves(pos: &Bitboard, idx: i32) -> Vec<Move> {
     }
 
     while captures != 0 {
-        let end_idx = captures.trailing_zeros();
+        let end_idx = captures.trailing_zeros() as i32;
         if (idx_to_bb(end_idx) & occ) == 0 {
             // capturing "empty" space.  This is en passant
             moves.push(Move::ep_capture(idx, end_idx));
@@ -206,21 +327,21 @@ pub fn pawn_qmoves(pos: &Bitboard, idx: i32) -> Vec<Move> {
     }
 
     while promotions != 0 {
-        let end_idx = promotions.trailing_zeros();
+        let end_idx = promotions.trailing_zeros() as i32;
         for p in [b'q', b'r', b'b', b'n'] {
             moves.push(Move::promotion(idx, end_idx, p));
         }
     }
     return moves;
-};
+}
 
 // all moves
-pub fn pawn_moves() -> Vec<Move> {
+pub fn pawn_moves(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let mut moves: Vec<Move> = Vec::new();
     let occ = pos.composite[0] | pos.composite[1];
     let enemy_occ = pos.composite[!pos.side_to_move as usize];
 
-    let mut promotions = 0;
+    let promotions;
     let mut captures = pawn_capture_board(enemy_occ, idx, pos.ep_file, pos.side_to_move);
     let mut walks = pawn_walk_board(occ, idx, pos.side_to_move);
 
@@ -235,7 +356,7 @@ pub fn pawn_moves() -> Vec<Move> {
     }
 
     while captures != 0 {
-        let end_idx = captures.trailing_zeros();
+        let end_idx = captures.trailing_zeros() as i32;
         if (idx_to_bb(end_idx) & occ) == 0 {
             // capturing "empty" space.  This is en passant
             moves.push(Move::ep_capture(idx, end_idx));
@@ -246,99 +367,168 @@ pub fn pawn_moves() -> Vec<Move> {
     }
 
     while walks != 0 {
-        let end_idx = walks.trailing_zeros();
+        let end_idx = walks.trailing_zeros() as i32;
         moves.push(Move::pawn_move(idx, end_idx));
         walks &= walks - 1;
     }
 
     while promotions != 0 {
-        let end_idx = promotions.trailing_zeros();
+        let end_idx = promotions.trailing_zeros() as i32;
         for p in [b'q', b'r', b'b', b'n'] {
             moves.push(Move::promotion(idx, end_idx, p));
         }
     }
 
     return moves;
-};
+}
 
 pub fn knight_moves_board(idx: i32) -> u64 {
-    knight_mask[idx as usize]
-};
+    unsafe {
+        return KNIGHT_MASK[idx as usize];
+    }
+}
 
 pub fn knight_captures(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let move_board = knight_moves_board(idx);
     return get_piece_captures(pos, idx, b'n', move_board);
-};
+}
 
 pub fn knight_moves(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let move_board = knight_moves_board(idx);
     return get_piece_movelist(pos, idx, b'n', move_board);
-};
+}
 
-pub fn bishop_moves_board(occ: u64, idx: i32) -> u64 {
-    let occupancy = bishop_mask[idx as usize] & occ;
-    let hash = bishop_magic_hash(occupancy, idx as usize);
-    return bishop_magic_table[idx as usize][hash as usize];
-};
+pub fn bishop_moves_board(idx: i32, occ: u64) -> u64 {
+    unsafe {
+        let occupancy = BISHOP_MASK[idx as usize] & occ;
+        let hash = bishop_magic_hash(occupancy, idx as usize);
+        return BISHOP_MAGIC_TABLE[idx as usize][hash as usize];
+    }
+}
 
 pub fn bishop_captures(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let occ = pos.composite[0] | pos.composite[1];
-    let move_board = bishop_moves_board(occ, idx);
+    let move_board = bishop_moves_board(idx, occ);
     return get_piece_captures(pos, idx, b'b', move_board);
-};
+}
 
 pub fn bishop_moves(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let occ = pos.composite[0] | pos.composite[1];
-    let move_board = bishop_moves_board(occ, idx);
+    let move_board = bishop_moves_board(idx, occ);
     return get_piece_movelist(pos, idx, b'b', move_board);
-};
+}
 
-pub fn rook_moves_board(occ: u64, idx: i32) -> u64 {
-    let occupancy = rook_mask[idx as usize] & occ
-    let hash = rook_magic_hash(occupancy, idx as usize);
-    return rook_magic_table[idx as usize][hash as usize];
-};
+pub fn rook_moves_board(idx: i32, occ: u64) -> u64 {
+    unsafe {
+        let occupancy = ROOK_MASK[idx as usize] & occ;
+        let hash = rook_magic_hash(occupancy, idx as usize);
+        return ROOK_MAGIC_TABLE[idx as usize][hash as usize];
+    }
+}
 
 pub fn rook_captures(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let occ = pos.composite[0] | pos.composite[1];
-    let move_board = rook_moves_board(occ, idx);
+    let move_board = rook_moves_board(idx, occ);
     return get_piece_captures(pos, idx, b'r', move_board);
-};
+}
 
 pub fn rook_moves(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let occ = pos.composite[0] | pos.composite[1];
-    let move_board = rook_moves_board(occ, idx);
+    let move_board = rook_moves_board(idx, occ);
     return get_piece_movelist(pos, idx, b'r', move_board);
-};
+}
 
-pub fn queen_moves_board(occ: u64, idx: i32) -> u64 {
-    return bishop_moves_board(pos, idx) | rook_moves_board(pos, idx);
-};
+pub fn queen_moves_board(idx: i32, occ: u64) -> u64 {
+    return bishop_moves_board(idx, occ) | rook_moves_board(idx, occ);
+}
 
 pub fn queen_captures(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let occ = pos.composite[0] | pos.composite[1];
-    let move_board = queen_moves_board(occ, idx);
+    let move_board = queen_moves_board(idx, occ);
     return get_piece_captures(pos, idx, b'q', move_board);
-};
+}
 
 pub fn queen_moves(pos: &Bitboard, idx: i32) -> Vec<Move> {
     let occ = pos.composite[0] | pos.composite[1];
-    let move_board = queen_moves_board(occ, idx);
+    let move_board = queen_moves_board(idx, occ);
     return get_piece_movelist(pos, idx, b'q', move_board);
-};
+}
 
 pub fn king_normal_moves_board(idx: i32) -> u64 {
-    king_mask[idx as usize]
-};
+    unsafe {
+        return KING_MASK[idx as usize];
+    }
+}
 
 pub fn king_captures(pos: &Bitboard, idx: i32) -> Vec<Move> {
-    let move_board = king_moves_board(idx);
+    let move_board = king_normal_moves_board(idx);
     return get_piece_captures(pos, idx, b'k', move_board);
-};
+}
 
 pub fn king_moves(pos: &Bitboard, idx: i32) -> Vec<Move> {
-    let move_board = king_moves_board(idx);
-    let mut normal_moves = get_piece_movelist(pos, idx, b'k', move_board);
+    let move_board = king_normal_moves_board(idx);
+    let mut moves = get_piece_movelist(pos, idx, b'k', move_board);
 
-    // TODO: castling
-};
+    // kingside castle
+    if pos.can_castle(pos.side_to_move, false) {
+        let end_idx = idx + 2;
+        moves.push(Move::piece_move(idx, end_idx, b'k'));
+    }
+    // queenside castle
+    if pos.can_castle(pos.side_to_move, true) {
+        let end_idx = idx - 2;
+        moves.push(Move::piece_move(idx, end_idx, b'k'));
+    }
+
+    return moves;
+}
+
+pub fn moves(pos: &Bitboard) -> Vec<Move> {
+    let mut moves: Vec<Move> = Vec::new();
+
+    let me = pos.side_to_move as usize;
+    let mut pawns = pos.pawn[me];
+    let mut knights = pos.knight[me];
+    let mut bishops = pos.bishop[me];
+    let mut rooks = pos.rook[me];
+    let mut queens = pos.queen[me];
+    let mut kings = pos.king[me];
+
+    while pawns != 0 {
+        let idx = pawns.trailing_zeros() as i32;
+        moves.append(&mut pawn_moves(pos, idx));
+        pawns &= pawns - 1;
+    }
+
+    while knights != 0 {
+        let idx = knights.trailing_zeros() as i32;
+        moves.append(&mut knight_moves(pos, idx));
+        knights &= knights - 1;
+    }
+
+    while bishops != 0 {
+        let idx = bishops.trailing_zeros() as i32;
+        moves.append(&mut bishop_moves(pos, idx));
+        bishops &= bishops - 1;
+    }
+
+    while rooks != 0 {
+        let idx = rooks.trailing_zeros() as i32;
+        moves.append(&mut rook_moves(pos, idx));
+        rooks &= rooks - 1;
+    }
+
+    while queens != 0 {
+        let idx = queens.trailing_zeros() as i32;
+        moves.append(&mut queen_moves(pos, idx));
+        queens &= queens - 1;
+    }
+
+    while kings != 0 {
+        let idx = kings.trailing_zeros() as i32;
+        moves.append(&mut king_moves(pos, idx));
+        kings &= kings - 1;
+    }
+
+    return moves;
+}
