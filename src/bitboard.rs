@@ -359,13 +359,13 @@ impl Bitboard {
             if (move_bb & coord_to_bb((0, 0))) != 0 {
                 new_castling_rights &= !WHITE_QUEENSIDE_CR_MASK;
             }
-            if (move_bb * coord_to_bb((7, 0))) != 0 {
+            if (move_bb & coord_to_bb((7, 0))) != 0 {
                 new_castling_rights &= !WHITE_KINGSIDE_CR_MASK;
             }
-            if (move_bb * coord_to_bb((0, 7))) != 0 {
+            if (move_bb & coord_to_bb((0, 7))) != 0 {
                 new_castling_rights &= !BLACK_QUEENSIDE_CR_MASK;
             }
-            if (move_bb * coord_to_bb((7, 7))) != 0 {
+            if (move_bb & coord_to_bb((7, 7))) != 0 {
                 new_castling_rights &= !BLACK_KINGSIDE_CR_MASK;
             }
         }
@@ -516,7 +516,6 @@ impl Bitboard {
             };
         }
 
-        // castling
         // castling
         if mv.piece == b'k' && (mv.end - mv.start).abs() == 2 {
             let old_rook_idx: i32 = if mv.end > mv.start { mv.start + 3 } else { mv.start - 4 };
