@@ -35,7 +35,7 @@ pub struct Bitboard {
 impl Bitboard {
     // constructors
     pub fn default_board() -> Bitboard {
-        let mut bb = Bitboard {
+        let mut bitboard = Bitboard {
             side_to_move: Color::White,
 
             // black, white
@@ -73,10 +73,10 @@ impl Bitboard {
             pawn_hash: 0
         };
 
-        bb.hash = calculate_hash(&bb);
-        bb.pawn_hash = calculate_pawn_hash(&bb);
+        bitboard.hash = calculate_hash(&bitboard);
+        bitboard.pawn_hash = calculate_pawn_hash(&bitboard);
 
-        return bb;
+        return bitboard;
     }
 
     pub fn from_position(fen: String) -> Bitboard {
@@ -183,7 +183,7 @@ impl Bitboard {
         let white_composite = white_king | white_queen | white_rook | white_bishop | white_knight | white_pawn;
         let black_composite = black_king | black_queen | black_rook | black_bishop | black_knight | black_pawn;
 
-        let bitboard = Bitboard {
+        let mut bitboard = Bitboard {
             side_to_move: side_to_move,
             king: [black_king, white_king],
             queen: [black_queen, white_queen],
@@ -207,8 +207,8 @@ impl Bitboard {
         };
 
         // update things that have to be calculated from a board
-        // bitboard.hash = get_position_hash(&bitboard);
-        // bitboard.pawn_hash = get_position_pawn_hash(&bitboard);
+        bitboard.hash = calculate_hash(&bitboard);
+        bitboard.pawn_hash = calculate_pawn_hash(&bitboard);
 
         return bitboard;
     }
@@ -478,6 +478,16 @@ impl Bitboard {
                 mv.ep_file,
                 old_castling_rights,
                 self.castling_rights,
+                self.side_to_move
+            );
+
+            self.pawn_hash = update_pawn_hash(
+                self.pawn_hash,
+                mv.piece,
+                mv.start,
+                mv.end,
+                captured_piece,
+                mv.promote_to,
                 self.side_to_move
             );
         }
