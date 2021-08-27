@@ -1,5 +1,6 @@
 use crate::movegen::*;
 use crate::util::*;
+use crate::zobrist::*;
 
 const WHITE_KINGSIDE_CR_MASK: u8 = 0b1000;
 const WHITE_QUEENSIDE_CR_MASK: u8 = 0b0100;
@@ -17,7 +18,7 @@ pub struct Bitboard {
     pub pawn: [u64; 2],
     pub composite: [u64; 2],
 
-    castling_rights: u8,         // 4-bit number KQkq
+    pub castling_rights: u8,         // 4-bit number KQkq
     pub ep_file: i32,
 
     pub history: Vec<u64>,
@@ -33,8 +34,8 @@ pub struct Bitboard {
 
 impl Bitboard {
     // constructors
-    pub fn default_board() -> Bitboard{
-        Bitboard {
+    pub fn default_board() -> Bitboard {
+        let mut bb = Bitboard {
             side_to_move: Color::White,
 
             // black, white
@@ -68,9 +69,14 @@ impl Bitboard {
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),
 
-            hash: 0,// get_starting_hash(),
-            pawn_hash: 0//get_starting_pawn_hash(),
-        }
+            hash: 0,
+            pawn_hash: 0
+        };
+
+        bb.hash = calculate_hash(&bb);
+        bb.pawn_hash = calculate_pawn_hash(&bb);
+
+        return bb;
     }
 
     pub fn from_position(fen: String) -> Bitboard {
@@ -456,10 +462,25 @@ impl Bitboard {
             }
         }
 
-        // TODO update hash
-
+        let old_castling_rights = self.castling_rights;
         // update castling rights
         self.void_castling_rights(mv.start, mv.end);
+
+        unsafe {
+            self.hash = update_hash(
+                self.hash,
+                mv.piece,
+                mv.start,
+                mv.end,
+                captured_piece,
+                mv.promote_to,
+                self.ep_file,
+                mv.ep_file,
+                old_castling_rights,
+                self.castling_rights,
+                self.side_to_move
+            );
+        }
 
         // update ep_file
         self.ep_file = mv.ep_file;
@@ -472,6 +493,7 @@ impl Bitboard {
             self.rook[them] | self.queen[them] | self.king[them];
 
         self.side_to_move = !self.side_to_move;
+
     }
 
     pub fn undo_move(&mut self, mv: &Move) {

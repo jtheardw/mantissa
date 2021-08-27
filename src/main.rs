@@ -14,14 +14,14 @@ fn init() {
 
 fn main() {
     init();
-    // let mut board = Bitboard::from_position(format!("r1bqk2r/pP2b1pp/n4p1n/6N1/2BP4/8/PPPQpPPP/RNB2RK1 b kq - 0 12"));
+    let mut starting_board = Bitboard::from_position(format!("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"));
     // let moves = moves(&board);
     // for mv in moves {
     //     println!("{}", mv);
     // }
 
-    let mut starting_board = Bitboard::default_board();
-    perft(&mut starting_board, 6, 0);
+    // let mut starting_board = Bitboard::default_board();
+    perft(&mut starting_board, 4, 0);
     let mut i = 0;
     unsafe {
         for n in PERFT_NODES {

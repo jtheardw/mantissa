@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use crate::bitboard::Bitboard;
 use crate::util::*;
 
 // 6 * 64 entries for white pieces
@@ -13,7 +14,7 @@ static mut ZOBRIST_TABLE: [u64; 781] = [0; 781];
 const WHITE_PIECE_OFFSET: usize = 0; // KQRBNP
 const BLACK_PIECE_OFFSET: usize = 384; // KQRBNP
 const CR_OFFSET: usize = 768;          // KQkq
-const EP_OFFSET: usize = 776;          // abcdefgh
+const EP_OFFSET: usize = 772;          // abcdefgh
 const STM_OFFSET: usize = 780;         // on if white is stm
 
 pub fn initialize_zobrist_table() {
@@ -46,6 +47,75 @@ fn get_piece_tile_idx(piece_num: usize, idx: i32) -> usize {
     piece_num * 64 + idx as usize
 }
 
+fn get_piece_zobrist(piece: u8, side: Color, idx: i32) -> u64 {
+    unsafe {
+        return ZOBRIST_TABLE[get_piece_tile_idx(get_piece_num(piece, side), idx)];
+    }
+}
+
+fn get_zobrist_for_piece_board(piece: u8, side: Color, board: u64) -> u64 {
+    let mut board = board;
+    let mut hash = 0;
+    while board != 0 {
+        let idx = board.trailing_zeros() as i32;
+        hash ^= get_piece_zobrist(piece, side, idx);
+        board &= board - 1;
+    }
+    return hash;
+}
+
+pub fn calculate_hash(pos: &Bitboard) -> u64 {
+    let mut hash: u64 = 0;
+
+    for side_to_move in [Color::Black, Color::White] {
+        let side = side_to_move as usize;
+
+        let pawns = pos.pawn[side];
+        hash ^= get_zobrist_for_piece_board(b'p', side_to_move, pawns);
+
+        let knights = pos.knight[side];
+        hash ^= get_zobrist_for_piece_board(b'n', side_to_move, knights);
+
+        let bishops = pos.bishop[side];
+        hash ^= get_zobrist_for_piece_board(b'b', side_to_move, bishops);
+
+        let rooks = pos.rook[side];
+        hash ^= get_zobrist_for_piece_board(b'r', side_to_move, rooks);
+
+        let queens = pos.queen[side];
+        hash ^= get_zobrist_for_piece_board(b'q', side_to_move, queens);
+
+        let kings = pos.king[side];
+        hash ^= get_zobrist_for_piece_board(b'k', side_to_move, kings);
+    }
+
+    unsafe {
+        for i in 0..4 {
+            let mask: u8 = 1 << i;
+            if pos.castling_rights & mask != 0 { hash ^= ZOBRIST_TABLE[CR_OFFSET + (3 - i) as usize]; }
+        }
+
+        if pos.ep_file != -1 {
+            hash ^= ZOBRIST_TABLE[EP_OFFSET + pos.ep_file as usize];
+        }
+
+        if pos.side_to_move == Color::White {
+            hash ^= ZOBRIST_TABLE[STM_OFFSET];
+        }
+    }
+
+    return hash;
+}
+
+pub fn calculate_pawn_hash(pos: &Bitboard) -> u64 {
+    let mut hash: u64 = 0;
+    for side_to_move in [Color::Black, Color::White] {
+        let pawns = pos.pawn[side_to_move as usize];
+        hash ^= get_zobrist_for_piece_board(b'p', side_to_move, pawns);
+    }
+    return hash;
+}
+
 pub unsafe fn update_hash(current_hash: u64,
                    piece: u8,
                    start_idx: i32,
@@ -54,8 +124,8 @@ pub unsafe fn update_hash(current_hash: u64,
                    promoted_piece: u8,
                    old_ep_file: i32, // -1 if none
                    new_ep_file: i32, // -1 if none
-                   old_cr: (bool, bool, bool, bool),
-                   new_cr: (bool, bool, bool, bool),
+                   old_cr: u8,
+                   new_cr: u8,
                    side_to_move: Color) -> u64 {
     // A bit cumbersome, but this is meant to be called
     // by other, more convenient functions, so it has to be flexible
@@ -87,10 +157,10 @@ pub unsafe fn update_hash(current_hash: u64,
         hash ^= ZOBRIST_TABLE[EP_OFFSET + new_ep_file as usize];
     }
 
-    if old_cr.0 != new_cr.0 { hash ^= ZOBRIST_TABLE[CR_OFFSET + 0]; }
-    if old_cr.1 != new_cr.1 { hash ^= ZOBRIST_TABLE[CR_OFFSET + 1]; }
-    if old_cr.2 != new_cr.2 { hash ^= ZOBRIST_TABLE[CR_OFFSET + 2]; }
-    if old_cr.3 != new_cr.3 { hash ^= ZOBRIST_TABLE[CR_OFFSET + 3]; }
+    for i in 0..4 {
+        let mask: u8 = 1 << i;
+        if old_cr & mask != new_cr & mask { hash ^= ZOBRIST_TABLE[CR_OFFSET + (3 - i) as usize]; }
+    }
 
     hash ^= ZOBRIST_TABLE[STM_OFFSET];
     return hash;
