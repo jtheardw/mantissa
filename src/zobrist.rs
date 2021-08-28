@@ -44,7 +44,7 @@ pub fn get_piece_num(piece: u8, side: Color) -> usize {
 }
 
 fn get_piece_tile_idx(piece_num: usize, idx: i32) -> usize {
-    piece_num * 64 + idx as usize
+    (piece_num << 6) + idx as usize
 }
 
 fn get_piece_zobrist(piece: u8, side: Color, idx: i32) -> u64 {
@@ -149,17 +149,19 @@ pub unsafe fn update_hash(current_hash: u64,
         hash ^= ZOBRIST_TABLE[get_piece_tile_idx(captured_num, end_idx)];
     }
 
-    if old_ep_file > 0 {
+    if old_ep_file >= 0 {
         hash ^= ZOBRIST_TABLE[EP_OFFSET + old_ep_file as usize];
     }
 
-    if new_ep_file > 0 {
+    if new_ep_file >= 0 {
         hash ^= ZOBRIST_TABLE[EP_OFFSET + new_ep_file as usize];
     }
 
-    for i in 0..4 {
-        let mask: u8 = 1 << i;
-        if old_cr & mask != new_cr & mask { hash ^= ZOBRIST_TABLE[CR_OFFSET + (3 - i) as usize]; }
+    let mut changed_cr = old_cr ^ new_cr;
+    while changed_cr != 0 {
+        let idx = changed_cr.trailing_zeros() as i32;
+        hash ^= ZOBRIST_TABLE[CR_OFFSET + (3 - idx) as usize];
+        changed_cr &= changed_cr - 1;
     }
 
     hash ^= ZOBRIST_TABLE[STM_OFFSET];
