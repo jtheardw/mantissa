@@ -116,8 +116,27 @@ pub fn calculate_pawn_hash(pos: &Bitboard) -> u64 {
     return hash;
 }
 
-pub unsafe fn update_hash(current_hash: u64,
-                   piece: u8,
+pub fn simple_move_hash(piece: u8,
+                        start_idx: i32,
+                        end_idx: i32,
+                        side_to_move: Color) -> u64 {
+    let piece_num = get_piece_num(piece, side_to_move);
+    let mut hash = 0;
+    unsafe {
+        hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, start_idx)];
+        hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, end_idx)];
+    }
+    return hash;
+}
+
+pub fn en_passant_hash(ep_idx: i32, removed_side: Color) -> u64 {
+    let captured_num = get_piece_num(b'p', removed_side);
+    unsafe {
+        return ZOBRIST_TABLE[get_piece_tile_idx(captured_num, ep_idx)];
+    }
+}
+
+pub fn update_hash(piece: u8,
                    start_idx: i32,
                    end_idx: i32,
                    captured_piece: u8,
@@ -131,64 +150,66 @@ pub unsafe fn update_hash(current_hash: u64,
     // by other, more convenient functions, so it has to be flexible
 
     let piece_num = get_piece_num(piece, side_to_move);
-    let mut hash = current_hash;
-    // undo current location of piece
-    hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, start_idx)];
+    let mut hash = 0;
+    unsafe {
+        // undo current location of piece
+        hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, start_idx)];
 
-    // apply the piece showing up at the end
-    if promoted_piece != 0 {
-        let promoted_num = get_piece_num(promoted_piece, side_to_move);
-        hash ^= ZOBRIST_TABLE[get_piece_tile_idx(promoted_num, end_idx)];
-    } else {
-        hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, end_idx)];
+        // apply the piece showing up at the end
+        if promoted_piece != 0 {
+            let promoted_num = get_piece_num(promoted_piece, side_to_move);
+            hash ^= ZOBRIST_TABLE[get_piece_tile_idx(promoted_num, end_idx)];
+        } else {
+            hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, end_idx)];
+        }
+
+        // if we captured, we need to "remove" that piece
+        if captured_piece != 0 {
+            let captured_num = get_piece_num(captured_piece, !side_to_move);
+            hash ^= ZOBRIST_TABLE[get_piece_tile_idx(captured_num, end_idx)];
+        }
+
+        if old_ep_file >= 0 {
+            hash ^= ZOBRIST_TABLE[EP_OFFSET + old_ep_file as usize];
+        }
+
+        if new_ep_file >= 0 {
+            hash ^= ZOBRIST_TABLE[EP_OFFSET + new_ep_file as usize];
+        }
+
+        let mut changed_cr = old_cr ^ new_cr;
+        while changed_cr != 0 {
+            let idx = changed_cr.trailing_zeros() as i32;
+            hash ^= ZOBRIST_TABLE[CR_OFFSET + (3 - idx) as usize];
+            changed_cr &= changed_cr - 1;
+        }
+
+        hash ^= ZOBRIST_TABLE[STM_OFFSET];
     }
-
-    // if we captured, we need to "remove" that piece
-    if captured_piece != 0 {
-        let captured_num = get_piece_num(captured_piece, !side_to_move);
-        hash ^= ZOBRIST_TABLE[get_piece_tile_idx(captured_num, end_idx)];
-    }
-
-    if old_ep_file >= 0 {
-        hash ^= ZOBRIST_TABLE[EP_OFFSET + old_ep_file as usize];
-    }
-
-    if new_ep_file >= 0 {
-        hash ^= ZOBRIST_TABLE[EP_OFFSET + new_ep_file as usize];
-    }
-
-    let mut changed_cr = old_cr ^ new_cr;
-    while changed_cr != 0 {
-        let idx = changed_cr.trailing_zeros() as i32;
-        hash ^= ZOBRIST_TABLE[CR_OFFSET + (3 - idx) as usize];
-        changed_cr &= changed_cr - 1;
-    }
-
-    hash ^= ZOBRIST_TABLE[STM_OFFSET];
     return hash;
 }
 
-pub unsafe fn update_pawn_hash(current_hash: u64,
-                        piece: u8,
-                        start_idx: i32,
-                        end_idx: i32,
-                        captured_piece: u8,
-                        promoted_piece: u8,
-                        side_to_move: Color) -> u64 {
-    let mut hash = current_hash;
-    if piece == b'p' {
-        // undo current location of pawn
-        let piece_num = get_piece_num(b'p', side_to_move);
-        hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, start_idx)];
-        if promoted_piece == 0 {
+pub fn update_pawn_hash(piece: u8,
+                               start_idx: i32,
+                               end_idx: i32,
+                               captured_piece: u8,
+                               promoted_piece: u8,
+                               side_to_move: Color) -> u64 {
+    let mut hash = 0;
+    unsafe {
+        if piece == b'p' {
+            // undo current location of pawn
+            let piece_num = get_piece_num(b'p', side_to_move);
+            hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, start_idx)];
+            if promoted_piece == 0 {
+                hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, end_idx)];
+            }
+        }
+
+        if captured_piece == b'p' {
+            let piece_num = get_piece_num(b'p', !side_to_move);
             hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, end_idx)];
         }
     }
-
-    if captured_piece == b'p' {
-        let piece_num = get_piece_num(b'p', !side_to_move);
-        hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, end_idx)];
-    }
-
     return hash;
 }

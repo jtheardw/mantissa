@@ -14,9 +14,9 @@ impl std::ops::Not for Color {
 // Node types
 // 2-bit number where LSB means lower bound, MSB means upper bound
 // so PV is both!
-const ALL_NODE: u8 = 1;
-const CUT_NODE: u8 = 2;
-const PV_NODE: u8 = 3;
+pub const ALL_NODE: u8 = 1;
+pub const CUT_NODE: u8 = 2;
+pub const PV_NODE: u8 = 3;
 
 // coordinate-related convenience functions
 

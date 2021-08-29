@@ -416,7 +416,7 @@ impl Bitboard {
 
             // remove enemy pawn
             self.pawn[them] ^= idx_to_bb(actual_pawn_idx);
-            // TODO: hash
+            self.hash ^= en_passant_hash(actual_pawn_idx, !self.side_to_move);
         } else if captured_piece != 0 {
             match captured_piece {
                 b'p' => { self.pawn[them] ^= end_point; },
@@ -437,6 +437,7 @@ impl Bitboard {
             // move the rook
             let rook_mask = idx_to_bb(old_rook_idx) | idx_to_bb(new_rook_idx);
             self.rook[me] ^= rook_mask;
+            self.hash ^= simple_move_hash(b'r', old_rook_idx, new_rook_idx, self.side_to_move);
         }
 
         // move piece
@@ -466,31 +467,27 @@ impl Bitboard {
         // update castling rights
         self.void_castling_rights(mv.start, mv.end);
 
-        unsafe {
-            self.hash = update_hash(
-                self.hash,
-                mv.piece,
-                mv.start,
-                mv.end,
-                captured_piece,
-                mv.promote_to,
-                self.ep_file,
-                mv.ep_file,
-                old_castling_rights,
-                self.castling_rights,
-                self.side_to_move
-            );
+        self.hash ^= update_hash(
+            mv.piece,
+            mv.start,
+            mv.end,
+            captured_piece,
+            mv.promote_to,
+            self.ep_file,
+            mv.ep_file,
+            old_castling_rights,
+            self.castling_rights,
+            self.side_to_move
+        );
 
-            self.pawn_hash = update_pawn_hash(
-                self.pawn_hash,
-                mv.piece,
-                mv.start,
-                mv.end,
-                captured_piece,
-                mv.promote_to,
-                self.side_to_move
-            );
-        }
+        self.pawn_hash ^= update_pawn_hash(
+            mv.piece,
+            mv.start,
+            mv.end,
+            captured_piece,
+            mv.promote_to,
+            self.side_to_move
+        );
 
         // update ep_file
         self.ep_file = mv.ep_file;
