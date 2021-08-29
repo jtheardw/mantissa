@@ -1288,6 +1288,16 @@ impl BB {
         return s.chars().rev().collect();
     }
 
+    pub fn get_material_simple(&self) -> i32 {
+        let mut mat = 0;
+        mat += (self.queen[1].count_ones() as i32 - self.queen[0].count_ones() as i32) * 9;
+        mat += (self.rook[1].count_ones() as i32 - self.rook[0].count_ones() as i32) * 5;
+        mat += (self.bishop[1].count_ones() as i32 - self.bishop[0].count_ones() as i32) * 3;
+        mat += (self.knight[1].count_ones() as i32 - self.knight[0].count_ones() as i32) * 3;
+        mat += (self.pawn[1].count_ones() as i32 - self.pawn[0].count_ones() as i32) * 1;
+
+        return mat;
+    }
 
     // these functions are useful for resetting and debugging
     // but their values are usually handled incrementally for speed
@@ -3425,7 +3435,7 @@ impl BB {
             gain[depth] = BB::get_piece_value(target_piece) - if depth > 0 {gain[depth - 1]} else {0};
 
             if depth > 0 {
-                if -gain[depth - 1] < 0 && gain[depth] < 0 {break;}
+                if gain[depth - 1] > 0 && gain[depth] < 0 {break;}
             }
 
             // remove the attacker from occupancy and attacks

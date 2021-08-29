@@ -195,18 +195,59 @@ fn main() {
     }
 }
 
-fn get_calc_time(time: i32, inc: i32, ply: i32) -> u128 {
+fn get_ply_remaining_simple(p: f64) -> f64 {
+    return 59.3 + (72830.0 - p*2330.0) / (p*p + p*10.0 + 2644.0);
+}
+
+fn get_ply_remaining_complex(x: f64, m: i32) -> f64 {
+    let mut m = m.abs() as usize;
+    if m < 4 {
+        let bk1 = [ 32.0  ,  31.0   ,  34.0   ,  51.0   ];
+        let bk2 = [114.0  , 124.0   , 121.0   , 124.0   ];
+        let a1  = [81.5 ,  80.0 ,  75.0 ,  82.0 ];
+        let b1  = [ 0.9 ,   1.1 ,   1.08,   1.0 ];
+        let a2  = [65.0 ,  54.5 ,  46.5 ,  40.0 ];
+        let b2  = [ 0.38,   0.28,   0.22,   0.17];
+        let c   = [ 22.0  ,  20.0   ,  20.0   ,  19.0   ];
+        if x >= bk2[m] {
+            return c[m]
+        }
+        else if x >= bk1[m] {
+            return a2[m] - x*b2[m]
+        } else {
+            return a1[m] - x*b1[m]
+        }
+    }
+
+    if m > 19 { m = 19; }
+    m -= 4;
+
+    let bk = [ 0.0,  0.0,  0.0, 29.0   , 21.0   ,  76.0   ,  67.0   ,  71.0   , 57.0   ,  0.0  , 157.0   , 140.0   , 138.0   , 138.0   , 150.0   , 150.0   ];
+    let a  = [ 0.0,  0.0,  0.0, 76.0   , 88.0   ,  87.0   ,  76.0   ,  57.0   , 46.0   ,  0.0  ,  17.0   ,  14.0   ,  12.5 ,  11.5 ,   9.5 ,   8.0   ];
+    let b  = [ 0.0,  0.0,  0.0,  1.30,  1.36,   0.87,   0.81,   0.55,  0.45,  0.0  ,   0.07,   0.05,   0.04,   0.04,   0.03,   0.02];
+    let c  = [16.0, 12.0, 16.0, 12.0   , 10.5 ,   9.0   ,  10.0   ,  10.0   ,  9.0   ,  8.5,   6.0   ,   7.0   ,   7.0   ,   6.0   ,   5.0   ,   5.0   ];
+    let d  = [64.0, 56.0, 56.0, 61.0   , 89.5 , 106.0   , 130.0   , 100.0   , 86.0   , 38.5,   0.0   ,   0.0   ,   0.0   ,   0.0   ,   0.0   ,   0.0   ];
+    let p  = [35.0, 49.0, 35.0, 35.0   , 35.0   ,  35.0   ,  28.0   ,  28.0   , 28.0   , 35.0  ,  35.0   ,  35.0   ,  35.0   ,  35.0   ,  35.0   ,  35.0   ];
+    if x >= bk[m] {
+        return (c[m] + d[m] * (x * -1.0 / p[m]).exp());
+    } else {
+        return (a[m] - x * b[m])
+    }
+}
+
+fn get_calc_time(time: i32, inc: i32, ply: i32, mat_diff: i32) -> u128 {
     // All credit for this calculation goes to Kade Phillips and Thomas Ahle
     let p = ply as f64;
-    let ply_remaining = 59.3 + (72830.0 - p*2330.0) / (p*p + p*10.0 + 2644.0);
+    // let ply_remaining = get_ply_remaining_simple(p);
+    let ply_remaining = get_ply_remaining_complex(p, mat_diff);
     let moves_remaining = ply_remaining / 2.0;
     let mut calc_time = (((time - inc) as f64 / moves_remaining) as i32 + inc) as i32;
 
-    if calc_time > 30000 {
-        calc_time = 30000;
+    if calc_time > 60000 {
+        calc_time = 60000;
     }
-    if calc_time > time - 100 {
-        calc_time = time - 100;
+    if calc_time > time - 20 {
+        calc_time = time - 20;
     }
     if calc_time < 0 {
         calc_time = 0;          // single ply
@@ -248,7 +289,7 @@ unsafe fn play() {
             break;
         }
         else if cmd == "uci" {
-            println!("id name Mantissa");
+            println!("id name Mantissa check");
             println!("id author jtwright");
             println!("uciok");
         }
@@ -351,7 +392,7 @@ unsafe fn play() {
                     };
                 }
             }
-            if on_clock { time = get_calc_time(clock_time, inc_time, game.board.history.len() as i32); }
+            if on_clock { time = get_calc_time(clock_time, inc_time, game.board.history.len() as i32, game.board.get_material_simple()); }
             let mv = game.make_move(time, hand_piece);
             if game.bh_mode == BH_NONE {
                 println!("bestmove {}", mv);
