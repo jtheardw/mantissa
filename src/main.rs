@@ -16,10 +16,12 @@ fn init() {
 fn main() {
     init();
     let mut starting_board = Bitboard::from_position(format!("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"));
+    // let mut starting_board = Bitboard::default_board();
+    println!("{}", bb_str(starting_board.composite[0] | starting_board.composite[1]));
 
-    // println!("SCORE {}", evaluate_position(&starting_board, 0));
-    // println!("SCORE {}", evaluate_position(&starting_board, 128));
-    // println!("SCORE {}", evaluate_position(&starting_board, 256));
+    println!("SCORE {}", evaluate_position(&starting_board, 0));
+    println!("SCORE {}", evaluate_position(&starting_board, 128));
+    println!("SCORE {}", evaluate_position(&starting_board, 256));
     perft(&mut starting_board, 4, 0);
     let mut i = 0;
     unsafe {
