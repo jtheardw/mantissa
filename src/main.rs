@@ -23,6 +23,7 @@ fn main() {
 
     // let mut starting_board = Bitboard::default_board();
     println!("SCORE {}", evaluate_position(&starting_board, 0));
+    println!("SCORE {}", evaluate_position(&starting_board, 128));
     println!("SCORE {}", evaluate_position(&starting_board, 256));
     // perft(&mut starting_board, 5, 0);
     // let mut i = 0;

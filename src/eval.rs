@@ -3,10 +3,8 @@ use crate::movegen::*;
 use crate::util::*;
 
 type Score = i64;        // mg, eg
-const NEGATIVE_EG_MASK: i64 = -4294967296;
-const POSITIVE_EG_MASK: i64 = 4294967295;
 
-// This is an idea I'm stealing from stockfish's source
+// This is an idea I'm stealing from Stockfish's source
 // and an older version of Ethereal
 // essentially you store 2 scores
 const fn make_score(mg_value: i32, eg_value: i32) -> Score {
@@ -30,18 +28,13 @@ static mut KNIGHT_VALUE: Score = S!(3000, 3000);
 static mut PAWN_VALUE: Score = S!(1000, 1000);
 
 fn mg_score(score: Score) -> i32 {
+    // this is a fun quirk required to handle the way the
+    // eg value was added in (particularly if it was a negative number)
     ((score + 0x80000000) >> 32) as i32
 }
 
 fn eg_score(score: Score) -> i32 {
     ((score << 32) >> 32) as i32
-    // if score & (1 << 31) != 0 {
-    //     // negative.  extend the sign
-    //     (score | NEGATIVE_EG_MASK) as i32
-    // } else {
-    //     // positive, remove the mg_score
-    //     (score & POSITIVE_EG_MASK) as i32
-    // }
 }
 
 fn taper_score(s: Score, phase: i32) -> i32 {
