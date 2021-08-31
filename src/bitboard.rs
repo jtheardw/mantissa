@@ -594,4 +594,8 @@ impl Bitboard {
             None => panic!("Pawn History stack empty!")
         }
     }
+
+    pub fn is_repetition(&self) -> bool {
+        self.history.iter().filter(|&n| *n == self.hash).count() > 0
+    }
 }

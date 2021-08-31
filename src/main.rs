@@ -2,7 +2,10 @@ mod bitboard; use crate::bitboard::*;
 mod eval; use crate::eval::*;
 mod magic; use crate::magic::*;
 mod movegen; use crate::movegen::*;
+mod movegen; use crate::moveorder::*;
+mod movegen; use crate::moveutil::*;
 mod perft; use crate::perft::*;
+mod tt; use crate::tt::*;
 mod util; use crate::util::*;
 mod zobrist; use crate::zobrist::*;
 
@@ -10,6 +13,7 @@ fn init() {
     initialize_masks();
     initialize_magic_tables();
     initialize_zobrist_table();
+    allocate_tt(64);
     // initialize_transposition_table();
 }
 

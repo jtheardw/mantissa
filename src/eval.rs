@@ -66,6 +66,11 @@ const QUEEN_MOBILITY: [Score; 28] = [
     S!(400, 900), S!(416, 936), S!(432, 972)
 ];
 
+pub fn static_eval(pos: &Bitboard) -> i32 {
+    let score = evaluate_position(pos, 0); // pos.get_phase()
+    return if pos.side_to_move == Color::White {score} else {-score};
+}
+
 pub fn evaluate_position(pos: &Bitboard, phase: i32) -> i32 {
     // positive is white-favored, negative black-favored
     let mut score: Score = make_score(0, 0);

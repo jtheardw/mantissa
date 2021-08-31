@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::bitboard::Bitboard;
 use crate::magic::*;
+use crate::moveutil::*;
 use crate::util::*;
 
 pub static mut KING_MASK: [u64; 64] = [0; 64];
@@ -104,113 +105,6 @@ pub fn initialize_masks() {
     gen_king_mask();
     gen_bishop_mask();
     gen_rook_mask();
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Move {
-    pub start: i32,
-    pub end: i32,
-    pub piece: u8,
-    pub is_ep: bool,
-    pub ep_file: i32,
-    pub promote_to: u8,
-    pub is_null: bool
-}
-
-impl Move {
-    pub fn get_repr(&self) -> String {
-        // UCI compatible representation of move
-        if self.is_null {
-            return format!("0000");
-        }
-        let start = idx_to_str(self.start);
-        let end = idx_to_str(self.end);
-        let mut promote = "".to_string();
-
-        if self.promote_to != 0 {
-            promote = (self.promote_to as char).to_string();
-        }
-
-        return format!("{}{}{}", start, end, promote)
-    }
-
-    pub fn piece_move(start: i32, end: i32, piece: u8) -> Move {
-        // standard type of move for all pieces except pawns
-        Move {
-            start: start,
-            end: end,
-            piece: piece,
-            ep_file: -1,
-            is_ep: false,
-            promote_to: 0,
-            is_null: false,
-        }
-    }
-
-    pub fn pawn_move(start: i32, end: i32) -> Move {
-        // pawn walk, double walk, or typical capture
-        let mut ep_file = -1;
-        if (end - start).abs() == 16 {
-            ep_file = start % 8;
-        }
-        Move {
-            start: start,
-            end: end,
-            piece: b'p',
-            is_ep: false,
-            ep_file: ep_file,
-            promote_to: 0,
-            is_null: false
-        }
-    }
-
-    // Next are the pawn move constructors
-    pub fn ep_capture(start: i32, end: i32) -> Move {
-        // capture en-passant
-        Move {
-            start: start,
-            end: end,
-            piece: b'p',
-            ep_file: -1,
-            is_ep: true,
-            promote_to: 0,
-            is_null: false,
-        }
-    }
-
-    pub fn promotion(start: i32, end: i32, piece: u8) -> Move {
-        Move {
-            start: start,
-            end: end,
-            piece: b'p',
-            is_ep: false,
-            ep_file: -1,
-            promote_to: piece,
-            is_null: false
-        }
-    }
-
-    pub fn null_move() -> Move {
-        // technically there are a lot
-        // of "null moves" valid in this scheme
-        // (i.e. any move with is_null set to true)
-        // this is merely one of them.
-        Move {
-            start: 0,
-            end: 0,
-            piece: 0,
-            is_ep: false,
-            ep_file: -1,
-            promote_to: 0,
-            is_null: true
-        }
-    }
-}
-
-impl fmt::Display for Move {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.get_repr())
-    }
 }
 
 fn get_piece_movelist(pos: &Bitboard, idx: i32, piece: u8, move_board: u64) -> Vec<Move> {
@@ -528,6 +422,56 @@ pub fn moves(pos: &Bitboard) -> Vec<Move> {
     while kings != 0 {
         let idx = kings.trailing_zeros() as i32;
         moves.append(&mut king_moves(pos, idx));
+        kings &= kings - 1;
+    }
+
+    return moves;
+}
+
+pub fn qmoves(pos: &Bitboard) -> Vec<Move> {
+    let mut moves: Vec<Move> = Vec::new();
+
+    let me = pos.side_to_move as usize;
+    let mut pawns = pos.pawn[me];
+    let mut knights = pos.knight[me];
+    let mut bishops = pos.bishop[me];
+    let mut rooks = pos.rook[me];
+    let mut queens = pos.queen[me];
+    let mut kings = pos.king[me];
+
+    while pawns != 0 {
+        let idx = pawns.trailing_zeros() as i32;
+        moves.append(&mut pawn_qmoves(pos, idx));
+        pawns &= pawns - 1;
+    }
+
+    while knights != 0 {
+        let idx = knights.trailing_zeros() as i32;
+        moves.append(&mut knight_captures(pos, idx));
+        knights &= knights - 1;
+    }
+
+    while bishops != 0 {
+        let idx = bishops.trailing_zeros() as i32;
+        moves.append(&mut bishop_captures(pos, idx));
+        bishops &= bishops - 1;
+    }
+
+    while rooks != 0 {
+        let idx = rooks.trailing_zeros() as i32;
+        moves.append(&mut rook_captures(pos, idx));
+        rooks &= rooks - 1;
+    }
+
+    while queens != 0 {
+        let idx = queens.trailing_zeros() as i32;
+        moves.append(&mut queen_captures(pos, idx));
+        queens &= queens - 1;
+    }
+
+    while kings != 0 {
+        let idx = kings.trailing_zeros() as i32;
+        moves.append(&mut king_captures(pos, idx));
         kings &= kings - 1;
     }
 

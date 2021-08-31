@@ -26,23 +26,6 @@ pub fn initialize_zobrist_table() {
     }
 }
 
-pub fn get_piece_num(piece: u8, side: Color) -> usize {
-    let piece_offset = match piece {
-        b'k'=> 0,
-        b'q'=> 1,
-        b'r'=> 2,
-        b'b'=> 3,
-        b'n'=> 4,
-        b'p'=> 5,
-        _ => panic!("bad piece for getting num")
-    };
-    if side == Color::Black {
-        return piece_offset + 6;
-    } else {
-        return piece_offset;
-    }
-}
-
 fn get_piece_tile_idx(piece_num: usize, idx: i32) -> usize {
     (piece_num << 6) + idx as usize
 }

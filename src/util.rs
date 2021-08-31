@@ -1,3 +1,15 @@
+// Node types
+// 2-bit number where LSB means lower bound, MSB means upper bound
+// so PV is both!
+pub const ALL_NODE: u8 = 1;
+pub const CUT_NODE: u8 = 2;
+pub const PV_NODE: u8 = 3;
+
+pub const MATE_SCORE: i32 = 1000000;
+pub const DRAW_SCORE: i32 = 0;
+
+pub const MAX_DEPTH: i32 = 64;
+
 #[derive(Copy, Clone, PartialEq)]
 pub enum Color {
     Black = 0,
@@ -10,13 +22,6 @@ impl std::ops::Not for Color {
         return [Color::White, Color::Black][self as usize];
     }
 }
-
-// Node types
-// 2-bit number where LSB means lower bound, MSB means upper bound
-// so PV is both!
-pub const ALL_NODE: u8 = 1;
-pub const CUT_NODE: u8 = 2;
-pub const PV_NODE: u8 = 3;
 
 // coordinate-related convenience functions
 
@@ -72,6 +77,22 @@ pub fn bb_str(bb: u64) -> String {
     return s.chars().rev().collect();
 }
 
+pub fn get_piece_num(piece: u8, side: Color) -> usize {
+    let piece_offset = match piece {
+        b'k'=> 0,
+        b'q'=> 1,
+        b'r'=> 2,
+        b'b'=> 3,
+        b'n'=> 4,
+        b'p'=> 5,
+        _ => panic!("bad piece for getting num")
+    };
+    if side == Color::Black {
+        return piece_offset + 6;
+    } else {
+        return piece_offset;
+    }
+}
 
 // various convenience bitboard masks
 
