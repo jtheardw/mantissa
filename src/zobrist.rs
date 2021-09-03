@@ -196,3 +196,9 @@ pub fn update_pawn_hash(piece: u8,
     }
     return hash;
 }
+
+pub fn null_move_hash() -> u64 {
+    unsafe {
+        ZOBRIST_TABLE[STM_OFFSET]
+    }
+}

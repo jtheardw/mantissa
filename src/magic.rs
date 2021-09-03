@@ -186,11 +186,11 @@ fn get_bishop_start_coords(coord: (i32, i32)) -> ((i32, i32), (i32, i32)) {
 }
 
 pub fn rook_magic_hash(masked_composite: u64, square: usize) -> u64 {
-    return (masked_composite * ROOK_MAGIC_NUMBERS[square]) >> ROOK_MAGIC_SHIFTS[square];
+    return masked_composite.wrapping_mul(ROOK_MAGIC_NUMBERS[square]) >> ROOK_MAGIC_SHIFTS[square];
 }
 
 pub fn bishop_magic_hash(masked_composite: u64, square: usize) -> u64 {
-    return (masked_composite * BISHOP_MAGIC_NUMBERS[square]) >> BISHOP_MAGIC_SHIFTS[square];
+    return masked_composite.wrapping_mul(BISHOP_MAGIC_NUMBERS[square]) >> BISHOP_MAGIC_SHIFTS[square];
 }
 
 fn initialize_rook_magic_table() {

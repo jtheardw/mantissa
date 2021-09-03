@@ -1,13 +1,12 @@
 use std::mem;
 
-use crate::movegen::*;
+use crate::moveutil::*;
 use crate::util::*;
 
-pub static mut TT: TT;
+pub static mut TT: TT = TT {tt: Vec::new(), bits: 0, mask: 0};
 
 pub fn allocate_tt(size_mb: usize) {
-    let entry_size = mem::size_of::<TTEntry>();
-    println!("entry_size {}", entry_size);
+    let entry_size = mem::size_of::<TTEntry>() * 2;
     let mut pow = 1;
     while (entry_size << pow) <= (size_mb * 1024 * 1024) {
         pow += 1;
@@ -44,7 +43,7 @@ impl TTEntry {
     pub fn invalid_entry() -> TTEntry {
         TTEntry {
             hash: 0,
-            mv: Mv::null_move(),
+            mv: Move::null_move(),
             node_type: PV_NODE,
             depth: 0,
             value: 0,

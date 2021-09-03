@@ -8,7 +8,7 @@ pub const PV_NODE: u8 = 3;
 pub const MATE_SCORE: i32 = 1000000;
 pub const DRAW_SCORE: i32 = 0;
 
-pub const MAX_DEPTH: i32 = 64;
+pub const MAX_DEPTH: usize = 64;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Color {
@@ -145,3 +145,8 @@ pub const AHEAD_RANKS: [[u64; 8]; 2] =
             0x0000000000000000
         ],
     ];
+
+pub const QUEEN_PHASE: i32 = 40; // 2 queens = 80
+pub const ROOK_PHASE: i32 = 22;  // 4 rooks = 88
+pub const BISHOP_PHASE: i32 = 12; // 4 bishops = 48
+pub const KNIGHT_PHASE: i32 = 10; // 4 knights = 40

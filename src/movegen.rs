@@ -1,5 +1,3 @@
-use std::fmt;
-
 use crate::bitboard::Bitboard;
 use crate::magic::*;
 use crate::moveutil::*;
@@ -225,6 +223,7 @@ pub fn pawn_qmoves(pos: &Bitboard, idx: i32) -> Vec<Move> {
         for p in [b'q', b'r', b'b', b'n'] {
             moves.push(Move::promotion(idx, end_idx, p));
         }
+        promotions &= promotions - 1;
     }
     return moves;
 }

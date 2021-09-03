@@ -1,4 +1,5 @@
 use crate::movegen::*;
+use crate::moveutil::*;
 use crate::util::*;
 use crate::zobrist::*;
 
@@ -28,8 +29,8 @@ pub struct Bitboard {
     cap_stack: Vec<u8>,
     castling_rights_stack: Vec<u8>,
 
-    hash: u64,
-    pawn_hash: u64,
+    pub hash: u64,
+    pub pawn_hash: u64,
 }
 
 impl Bitboard {
@@ -378,6 +379,26 @@ impl Bitboard {
         self.castling_rights = new_castling_rights;
     }
 
+    pub fn do_null_move(&mut self) {
+        self.side_to_move = !self.side_to_move;
+        self.history.push(self.hash);
+        self.ep_stack.push(self.ep_file);
+        self.ep_file = -1;
+        self.hash ^= null_move_hash();
+    }
+
+    pub fn undo_null_move(&mut self) {
+        self.side_to_move = !self.side_to_move;
+        self.hash = match self.history.pop() {
+            Some(p) => p,
+            None => panic!("empty history!")
+        };
+        self.ep_file = match self.ep_stack.pop() {
+            Some(p) => p,
+            None => panic!("empty ep stack!")
+        };
+    }
+
     pub fn do_move(&mut self, mv: &Move) {
         // push stacks
 
@@ -597,5 +618,94 @@ impl Bitboard {
 
     pub fn is_repetition(&self) -> bool {
         self.history.iter().filter(|&n| *n == self.hash).count() > 0
+    }
+
+    pub fn is_quiet(&self) -> bool {
+        let me = self.side_to_move as usize;
+        let them = !self.side_to_move as usize;
+        let occ = self.composite[0] | self.composite[1];
+        let enemy_occ = self.composite[them];
+
+        let mut queens = self.queen[me];
+        while queens != 0 {
+            let idx = queens.trailing_zeros() as i32;
+            let atks = queen_moves_board(idx, occ) & enemy_occ;
+            if atks != 0 { return false; }
+            queens &= queens - 1;
+        }
+
+        let mut rooks = self.rook[me];
+        while rooks != 0 {
+            let idx = rooks.trailing_zeros() as i32;
+            let atks = rook_moves_board(idx, occ) & enemy_occ;
+            if atks != 0 { return false; }
+            rooks &= rooks - 1;
+        }
+
+        let mut bishops = self.bishop[me];
+        while bishops != 0 {
+            let idx = bishops.trailing_zeros() as i32;
+            let atks = bishop_moves_board(idx, occ) & enemy_occ;
+            if atks != 0 { return false; }
+            bishops &= bishops - 1;
+        }
+
+        let mut knights = self.knight[me];
+        while knights != 0 {
+            let idx = knights.trailing_zeros() as i32;
+            let atks = knight_moves_board(idx) & enemy_occ;
+            if atks != 0 { return false; }
+            knights &= knights - 1;
+        }
+
+        let pawns = self.pawn[me];
+        let pawn_atks = if self.side_to_move == Color::White {
+            ((pawns & !FILE_MASKS[0]) << 7) | ((pawns & !FILE_MASKS[7]) << 9)
+        } else {
+            ((pawns & !FILE_MASKS[0]) >> 9) | ((pawns & !FILE_MASKS[7]) >> 7)
+        };
+        if pawn_atks & enemy_occ != 0 { return false; }
+
+        let pawn_promotions = if self.side_to_move == Color::White {
+            ((pawns << 8) & !occ) & RANK_MASKS[7]
+        } else {
+            ((pawns >> 8) & !occ) & RANK_MASKS[0]
+        };
+        if pawn_promotions != 0 { return false; }
+
+        let mut kings = self.king[me];
+        while kings != 0 {
+            let idx = kings.trailing_zeros() as i32;
+            let atks = king_normal_moves_board(idx) & enemy_occ;
+            if atks != 0 { return false; }
+            kings &= kings - 1;
+        }
+
+        return true;
+    }
+
+    pub fn has_non_pawn_material(&self) -> bool {
+        if (self.pawn[0] | self.king[0]) != self.composite[0] { return true; }
+        if (self.pawn[1] | self.king[1]) != self.composite[1] { return true; }
+        return false;
+    }
+
+    pub fn get_last_capture(&self) -> u8 {
+        return self.cap_stack[self.cap_stack.len() - 1];
+    }
+
+    pub fn get_phase(&self) -> i32 {
+        let mut phase = 256;
+        // beginning should be 0, end (all pawns) should be 256
+        // divide up like
+        phase -= ((self.queen[0] | self.queen[1]).count_ones() as i32) * QUEEN_PHASE;
+        phase -= ((self.rook[0] | self.rook[1]).count_ones() as i32) * ROOK_PHASE;
+        phase -= ((self.bishop[0] | self.bishop[1]).count_ones() as i32) * BISHOP_PHASE;
+        phase -= ((self.knight[0] | self.knight[1]).count_ones() as i32) * KNIGHT_PHASE;
+
+        if phase < 0 {
+            return 0;
+        }
+        return phase;
     }
 }
