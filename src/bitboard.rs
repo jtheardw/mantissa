@@ -521,7 +521,6 @@ impl Bitboard {
             self.rook[them] | self.queen[them] | self.king[them];
 
         self.side_to_move = !self.side_to_move;
-
     }
 
     pub fn undo_move(&mut self, mv: &Move) {
@@ -613,7 +612,7 @@ impl Bitboard {
         self.pawn_hash = match self.pawn_history.pop() {
             Some(p) => p,
             None => panic!("Pawn History stack empty!")
-        }
+        };
     }
 
     pub fn is_repetition(&self) -> bool {

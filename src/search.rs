@@ -144,7 +144,7 @@ fn search(node: &mut Bitboard,
         if tt_entry.valid {
             sse.tt_hit = true;
             sse.tt_move = tt_entry.mv;
-            sse.tt_val = tt_entry.value;
+            sse.tt_val = TTEntry::read_tt_score(tt_entry.value, ply);
             sse.tt_depth = tt_entry.depth;
             sse.tt_node_type = tt_entry.node_type;
         } else {
@@ -156,7 +156,7 @@ fn search(node: &mut Bitboard,
         }
     }
     if sse.tt_hit {
-        if !is_pv && sse.tt_depth >= depth {
+        if !is_pv && sse.tt_depth >= depth && sse.excluded_move.is_null {
             let node_type = sse.tt_node_type;
             let tt_val = sse.tt_val;
             if (node_type & CUT_NODE) != 0 && tt_val >= beta {
@@ -174,6 +174,7 @@ fn search(node: &mut Bitboard,
         // internal iterative deepening
         // if we fail to get a tt hit on a PV node, which should be fairly rare
         // at high depths, we'll do a reduced search to get a good guess for first move
+        sse.pv = Vec::new();
         let val = search(node, alpha, beta, depth - 2, ply, true, false, thread_num);
         if sse.pv.len() > 0 {
             sse.tt_move = sse.pv[0];
@@ -196,7 +197,7 @@ fn search(node: &mut Bitboard,
     }
 
     // Null Move Reductions
-    if !is_pv && depth >= NMP_DEPTH && !is_check && !init_node && (!ss[(ply - 1) as usize].searching_null_move) {
+    if !is_pv && depth >= NMP_DEPTH && !is_check && !init_node && (!ss[(ply - 1) as usize].searching_null_move) && sse.excluded_move.is_null {
         if sse.static_eval >= beta {
             let r = null_move_r(sse.static_eval, beta, depth);
             sse.searching_null_move = true;
@@ -210,13 +211,45 @@ fn search(node: &mut Bitboard,
                 // in the paper of the same name
                 depth -= 4;
                 if depth <= 0 {
-                    return search(node, alpha, beta, 0, ply, is_pv, true, thread_num);
+                    return search(node, alpha, beta, 0, ply, false, false, thread_num);
                 }
             }
         }
     }
 
-    // TODO singular extensions and multi-cut
+    let mut sing_extend = false;
+    if false && !init_node
+        && depth >= 8
+        && sse.tt_hit
+        && sse.excluded_move.is_null
+        && sse.tt_val.abs() < MATE_SCORE - 100000 // TODO give this a name
+        && (sse.tt_node_type == CUT_NODE || sse.tt_node_type == PV_NODE)
+        && sse.tt_depth >= depth - 3
+    {
+        // I've stolen stockfish's idea here to combine singular
+        // move detection with multi-cut in the same search
+        //
+        // I can't afford to do the super-tight cutoffs stockfish does though
+        let margin = if sse.tt_node_type == PV_NODE {25 * (depth / 2)} else {20 * (depth / 2)}; // 200
+        let depth_to_search = if sse.tt_node_type == PV_NODE {(depth + 2) / 2} else {(depth - 1) / 2};
+        let target = sse.tt_val - margin;
+
+        sse.excluded_move = sse.tt_move;
+        let val = search(node, target - 1, target, depth_to_search, ply, false, false, thread_num);
+        sse.excluded_move = Move::null_move();
+
+        if val < target {
+            // println!("val {} tt_val {} target {}", val, sse.tt_val, target);
+            // singularly extend
+            depth += 1;
+            sing_extend = true;
+        } else if !is_pv && target >= beta {
+            // if we're not doing pv node we might want to prune here with
+            // multi-cut.  This indicates multiple moves failed high
+            // so this is probably a cutnode
+            return target;
+        }
+    }
 
     let mut raised_alpha = false;
     let mut best_move = Move::null_move();
@@ -238,6 +271,10 @@ fn search(node: &mut Bitboard,
         if mv.is_null {
             // we've exhausted all the moves
             break;
+        }
+
+        if !init_node && mv == sse.excluded_move {
+            continue;
         }
 
         let is_tactical = is_tactical_move(&mv, node);
@@ -267,23 +304,28 @@ fn search(node: &mut Bitboard,
             let mut do_full_zw_search = true;
             if depth > LMR_DEPTH
                 && !init_node
-                && moves_searched > 2
-                && (is_quiet || cut_node) {
+                && moves_searched >= 4
+                && !is_check
+            // && (is_quiet || cut_node) {
+                && (is_quiet || score < QUIET_OFFSET) {
                     do_full_zw_search = false;
                     let mut r = lmr_reduction(depth, moves_searched);
                     if gives_check { r -= 1; }
 
-                    if cut_node { r += 1; }
+                    // if cut_node { r += 1; }
 
                     if score >= KILLER_OFFSET { r -= 1; }
 
                     if !is_quiet { r -= 1; }
 
+                    if sse.tt_hit && sse.tt_node_type == PV_NODE { r -= 1; }
+                    if sse.tt_hit && sse.tt_node_type != PV_NODE { r += 1; }
+
                     if is_pv && r > 0 {
                         r = (r * 2) / 3;
                     }
 
-                    let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);
+                    let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth);
 
                     val = -search(node, -alpha - 1, -alpha, lmr_depth, ply + 1, false, true, thread_num);
                     if val > alpha && lmr_depth < depth - 1 {
@@ -322,7 +364,7 @@ fn search(node: &mut Bitboard,
                 ti.update_move_history(mv, node.side_to_move, depth);
             }
             unsafe {
-                TT.set(node.hash, best_move, val, CUT_NODE, depth, node.history.len() as i32);
+                TT.set(node.hash, best_move, TTEntry::make_tt_score(val, ply), CUT_NODE, depth, node.history.len() as i32);
             }
             return alpha;
         }
@@ -338,7 +380,9 @@ fn search(node: &mut Bitboard,
     }
 
     unsafe {
-        TT.set(node.hash, best_move, best_val, if raised_alpha {PV_NODE} else {ALL_NODE}, depth, node.history.len() as i32);
+        if sse.excluded_move.is_null {
+            TT.set(node.hash, best_move, TTEntry::make_tt_score(best_val, ply), if raised_alpha {PV_NODE} else {ALL_NODE}, depth, node.history.len() as i32);
+        }
     }
     return best_val;
 }
@@ -416,5 +460,5 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
         }
     }
 
-    return alpha;
+    return best_val;
 }

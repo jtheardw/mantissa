@@ -67,6 +67,12 @@ const QUEEN_MOBILITY: [Score; 28] = [
     S!(400, 900), S!(416, 936), S!(432, 972)
 ];
 
+const QUEEN_KING_DANGER: i32 = 8;
+const ROOK_KING_DANGER: i32 = 4;
+const BISHOP_KING_DANGER: i32 = 2;
+const KNIGHT_KING_DANGER: i32 = 2;
+const KING_DANGER_SCALE: [i32; 8] = [0, 0, 50, 75, 85, 90, 95, 100];
+
 const DOUBLE_BISHOP_BONUS: Score = S!(500, 500);
 
 const PASSED_PAWN_VALUE: [Score; 8] = [
@@ -88,6 +94,9 @@ const BISHOP_COLOR_PENALTY: Score = S!(-50, -30);
 
 const TEMPO_BONUS: Score = S!(130, 130);
 
+const ROOK_ON_SEVENTH: Score = S!(93, 128);
+const ROOK_ON_OPEN: Score = S!(114, 101);
+
 pub fn static_eval(pos: &Bitboard) -> i32 {
     let score = evaluate_position(pos);
     return if pos.side_to_move == Color::White {score} else {-score};
@@ -97,7 +106,7 @@ pub fn evaluate_position(pos: &Bitboard) -> i32 {
     // positive is white-favored, negative black-favored
     let mut score: Score = make_score(0, 0);
     score += material_score(pos);
-    score += mobility(pos);
+    score += mobility_and_king_danger(pos);
     score += pawn_structure_value(pos);
     score += double_bishop_bonus(pos);
     score += if pos.side_to_move == Color::White {TEMPO_BONUS} else {-TEMPO_BONUS};
@@ -136,21 +145,34 @@ fn pawn_attacks(pawn_bb: u64, side_to_move: Color) -> u64 {
     }
 }
 
-fn mobility(pos: &Bitboard) -> Score {
-    let mut score: Score = make_score(0, 0);
+fn mobility_and_king_danger(pos: &Bitboard) -> Score {
+    let mut mobility: Score = make_score(0, 0);
+    let mut king_danger: [i32; 2] = [0, 0];
     let white = Color::White as usize;
     let black = Color::Black as usize;
     let occ = pos.composite[white] | pos.composite[black];
 
     for side in [white, black] {
+        let other_side = if side == white {black} else {white};
         let multiplier = if side == white {1} else {-1};
+
+        let king_bb = pos.king[other_side];
+        let mut attackers = 0;
+        let mut attack_value: i32 = 0;
+        let king_idx = king_bb.trailing_zeros() as i32;
+        let king_zone = king_bb | unsafe{ KING_MASK[king_idx as usize] };
 
         let mut board = pos.queen[side];
         while board != 0 {
             let start_idx = board.trailing_zeros() as i32;
             let move_board = queen_moves_board(start_idx, occ);
             let moves = move_board.count_ones() as usize;
-            score += multiplier * QUEEN_MOBILITY[moves];
+            let attacks = move_board & king_zone;
+            if attacks != 0 {
+                attackers += 1;
+                attack_value += QUEEN_KING_DANGER * attacks.count_ones() as i32;
+            }
+            mobility += multiplier * QUEEN_MOBILITY[moves];
             board &= board - 1;
         }
 
@@ -159,7 +181,12 @@ fn mobility(pos: &Bitboard) -> Score {
             let start_idx = board.trailing_zeros() as i32;
             let move_board = rook_moves_board(start_idx, occ & !(pos.queen[side] | pos.rook[side]));
             let moves = move_board.count_ones() as usize;
-            score += multiplier * ROOK_MOBILITY[moves];
+            let attacks = move_board & king_zone;
+            if attacks != 0 {
+                attackers += 1;
+                attack_value += ROOK_KING_DANGER * attacks.count_ones() as i32;
+            }
+            mobility += multiplier * ROOK_MOBILITY[moves];
             board &= board - 1;
         }
 
@@ -168,7 +195,12 @@ fn mobility(pos: &Bitboard) -> Score {
             let start_idx = board.trailing_zeros() as i32;
             let move_board = bishop_moves_board(start_idx, occ & !(pos.queen[side] | pos.bishop[side]));
             let moves = move_board.count_ones() as usize;
-            score += multiplier * BISHOP_MOBILITY[moves];
+            let attacks = move_board & king_zone;
+            if attacks != 0 {
+                attackers += 1;
+                attack_value += BISHOP_KING_DANGER * attacks.count_ones() as i32;
+            }
+            mobility += multiplier * BISHOP_MOBILITY[moves];
             board &= board - 1;
         }
 
@@ -178,11 +210,20 @@ fn mobility(pos: &Bitboard) -> Score {
             let enemy = if side == white {black} else {white};
             let move_board = knight_moves_board(start_idx) & !pawn_attacks(pos.pawn[enemy], !pos.side_to_move);
             let moves = move_board.count_ones() as usize;
-            score += multiplier * KNIGHT_MOBILITY[moves];
+            let attacks = move_board & king_zone;
+            if attacks != 0 {
+                attackers += 1;
+                attack_value += KNIGHT_KING_DANGER * attacks.count_ones() as i32;
+            }
+            mobility += multiplier * KNIGHT_MOBILITY[moves];
             board &= board - 1;
         }
+
+        if attackers > 7 { attackers = 7; }
+        king_danger[side] = KING_DANGER_SCALE[attackers] * attack_value;
     }
 
+    let score = mobility + (make_score(1, 1) * (king_danger[white] - king_danger[black]) as i64);
     return score;
 }
 
@@ -198,6 +239,19 @@ fn double_bishop_bonus(pos: &Bitboard) -> Score {
     }
 
     return score;
+}
+
+pub fn print_value(pos: &Bitboard) {
+    println!("passed_pawns: {}", taper_score(passed_pawns_value(pos), pos.get_phase()));
+    println!("center_pawns: {}", taper_score(center_pawns_value(pos), pos.get_phase()));
+    println!("isolated_pawns: {}", taper_score(isolated_pawns_value(pos), pos.get_phase()));
+    println!("doubled_pawns: {}", taper_score(doubled_pawns_value(pos), pos.get_phase()));
+    println!("backwards_pawns: {}", taper_score(backwards_pawns_value(pos), pos.get_phase()));
+    println!("connected_pawns: {}", taper_score(connected_pawns_value(pos), pos.get_phase()));
+    println!("space: {}", taper_score(space_control_value(pos), pos.get_phase()));
+    println!("material: {}", taper_score(material_score(pos), pos.get_phase()));
+    println!("mobility and king_danger: {}", taper_score(mobility_and_king_danger(pos), pos.get_phase()));
+    println!("double_bishop_bonus: {}", taper_score(double_bishop_bonus(pos), pos.get_phase()));
 }
 
 fn pawn_structure_value(pos: &Bitboard) -> Score {
@@ -217,7 +271,6 @@ fn pawn_structure_value(pos: &Bitboard) -> Score {
         val += backwards_pawns_value(pos);
         val += connected_pawns_value(pos);
         val += space_control_value(pos);
-
         pht.set(pos.pawn_hash, val);
     }
     return val;
@@ -292,14 +345,12 @@ fn isolated_pawns_value(pos: &Bitboard) -> Score {
                 if f < 7 {
                     neighbor_files |= FILE_MASKS[(f + 1) as usize];
                 }
-            }
-
-            if neighbor_files & pos.pawn[side] == 0 {
-                isolated_pawns[side] += 1;
+                if neighbor_files & pos.pawn[side] == 0 {
+                    isolated_pawns[side] += 1;
+                }
             }
         }
     }
-
     return ISOLATED_PAWN_VALUE * (isolated_pawns[white] - isolated_pawns[black]) as i64;
 }
 
@@ -401,10 +452,46 @@ fn space_control_value(pos: &Bitboard) -> Score {
 
     // bonus for sheltering behing a pawn
     let bonus_white_space = (pos.pawn[white] >> 8 | pos.pawn[white] >> 16) & base_white_space;
-    let bonus_black_space = (pos.pawn[black] >> 8 | pos.pawn[black] >> 16) & base_black_space;
+    let bonus_black_space = (pos.pawn[black] << 8 | pos.pawn[black] << 16) & base_black_space;
 
     space_control[white] = (base_white_space.count_ones() + bonus_white_space.count_ones()) as i32;
     space_control[black] = (base_black_space.count_ones() + bonus_black_space.count_ones()) as i32;
 
     return SPACE_VALUE * (space_control[white] - space_control[black]) as i64;
 }
+
+// fn rook_on_seventh_value(pos: &Bitboard) -> Score {
+//     let white = Color::White as usize;
+//     let black = Color::Black as usize;
+//     let white_seventh_rooks = (self.rook[white] & RANK_MASKS[6]).count_ones() as i32;
+//     let black_seventh_rooks = (self.rook[black] & RANK_MASKS[1]).count_ones() as i32;
+
+//     let white_condition = (self.king[black] & RANK_MASKS[7]) != 0 || (self.pawn[black] & RANK_MASKS[6]) != 0;
+//     let black_condition = (self.king[white] & RANK_MASKS[7]) != 0 || (self.pawn[white] & RANK_MASKS[6]) != 0;
+
+//     return ROOK_ON_SEVENTH
+//         * (if white_condition {white_seventh_rooks} else 0
+//          - if black_condition {black_seventh_rooks} else 0);
+// }
+
+// fn rook_on_open_file_value(pos: &Bitboard) -> Score {
+//     let white = Color::White as usize;
+//     let black = Color::Black as usize;
+//     let mut open_file_rooks: [i32; 2] = [0, 0];
+//     let mut semi_open_file_rooks: [i32; 2] = [0, 0];
+//     for side in [white, black] {
+//         let enemy_side = if side == white {black} else {white};
+//         let rook_bb = self.rook[side];
+//         for f in 0..8 {
+//             let rooks = (FILE_MASKS[f] & rook_bb).count_ones();
+//             if rooks > 0 && ((FILE_MASKS[f] & self.pawn[side]) == 0) {
+//                 // at least semi-open
+//                 if (FILE_MASKS[f] & self.pawn[enemy_side]) == 0 {
+//                     open_file_rooks[side] += rooks as i32;
+//                 } else {
+//                     semi_open_file_rooks[side] += rooks as i32;
+//                 }
+//             }
+//         }
+//     }
+// }

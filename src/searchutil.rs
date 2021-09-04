@@ -9,8 +9,8 @@ pub const LMR_DEPTH: i32 = 3;         // late move reductions
 
 pub fn efp_margin(depth: i32) -> i32 {
     if depth <= 0 { return 0; }
-    let base = 1500;
-    return base + 1500 * (depth - 1);
+    let base = 2000;
+    return base + 1000 * (depth - 1);
 }
 
 pub fn rfp_margin(depth: i32) -> i32 {
@@ -72,12 +72,12 @@ pub struct SearchStatsEntry {
     pub static_eval: i32,
     pub ply: i32,
     pub searching_null_move: bool,
+    pub excluded_move: Move,
     pub tt_hit: bool,
     pub tt_move: Move,
     pub tt_val: i32,
     pub tt_depth: i32,
     pub tt_node_type: u8
-    // TODO tt hit, entry, etc.
 }
 
 impl SearchStatsEntry {
@@ -87,6 +87,7 @@ impl SearchStatsEntry {
             static_eval: 0,
             ply: 0,
             searching_null_move: false,
+            excluded_move: Move::null_move(),
             tt_hit: false,
             tt_move: Move::null_move(),
             tt_val: 0,

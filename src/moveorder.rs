@@ -20,7 +20,7 @@ const PAWN_CAPTURE_OFFSET: u64 = 1 << 56;
 
 // quiet moves
 pub const KILLER_OFFSET: u64 = 1 << 50;
-const QUIET_OFFSET: u64 = 1 << 10;
+pub const QUIET_OFFSET: u64 = 1 << 10;
 
 // losing captures
 const BAD_CAPTURE_OFFSET: u64 = 0;

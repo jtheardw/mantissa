@@ -51,6 +51,26 @@ impl TTEntry {
             valid: false
         }
     }
+
+    pub fn make_tt_score(score: i32, ply: i32) -> i32 {
+        if score > MATE_SCORE - 100000 {
+            score + ply
+        } else if score < (-MATE_SCORE + 100000) {
+            score - ply
+        } else {
+            score
+        }
+    }
+
+    pub fn read_tt_score(score: i32, ply: i32) -> i32 {
+        if score > MATE_SCORE - 100000 {
+            score - ply
+        } else if score < (-MATE_SCORE + 100000) {
+            score + ply
+        } else {
+            score
+        }
+    }
 }
 
 impl TT {
