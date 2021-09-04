@@ -109,6 +109,8 @@ pub fn evaluate_position(pos: &Bitboard) -> i32 {
     score += mobility_and_king_danger(pos);
     score += pawn_structure_value(pos);
     score += double_bishop_bonus(pos);
+    score += rook_on_seventh_value(pos);
+    score += rook_on_open_value(pos);
     score += if pos.side_to_move == Color::White {TEMPO_BONUS} else {-TEMPO_BONUS};
     return taper_score(score, pos.get_phase());
 }
@@ -242,6 +244,8 @@ fn double_bishop_bonus(pos: &Bitboard) -> Score {
 }
 
 pub fn print_value(pos: &Bitboard) {
+    println!("material: {}", taper_score(material_score(pos), pos.get_phase()));
+    println!("mobility and king_danger: {}", taper_score(mobility_and_king_danger(pos), pos.get_phase()));
     println!("passed_pawns: {}", taper_score(passed_pawns_value(pos), pos.get_phase()));
     println!("center_pawns: {}", taper_score(center_pawns_value(pos), pos.get_phase()));
     println!("isolated_pawns: {}", taper_score(isolated_pawns_value(pos), pos.get_phase()));
@@ -249,8 +253,8 @@ pub fn print_value(pos: &Bitboard) {
     println!("backwards_pawns: {}", taper_score(backwards_pawns_value(pos), pos.get_phase()));
     println!("connected_pawns: {}", taper_score(connected_pawns_value(pos), pos.get_phase()));
     println!("space: {}", taper_score(space_control_value(pos), pos.get_phase()));
-    println!("material: {}", taper_score(material_score(pos), pos.get_phase()));
-    println!("mobility and king_danger: {}", taper_score(mobility_and_king_danger(pos), pos.get_phase()));
+    println!("rook on 7th: {}", taper_score(rook_on_seventh_value(pos), pos.get_phase()));
+    println!("rook on open: {}", taper_score(rook_on_open_value(pos), pos.get_phase()));
     println!("double_bishop_bonus: {}", taper_score(double_bishop_bonus(pos), pos.get_phase()));
 }
 
@@ -460,38 +464,43 @@ fn space_control_value(pos: &Bitboard) -> Score {
     return SPACE_VALUE * (space_control[white] - space_control[black]) as i64;
 }
 
-// fn rook_on_seventh_value(pos: &Bitboard) -> Score {
-//     let white = Color::White as usize;
-//     let black = Color::Black as usize;
-//     let white_seventh_rooks = (self.rook[white] & RANK_MASKS[6]).count_ones() as i32;
-//     let black_seventh_rooks = (self.rook[black] & RANK_MASKS[1]).count_ones() as i32;
+fn rook_on_seventh_value(pos: &Bitboard) -> Score {
+    let white = Color::White as usize;
+    let black = Color::Black as usize;
+    let white_seventh_rooks = (pos.rook[white] & RANK_MASKS[6]).count_ones() as i32;
+    let black_seventh_rooks = (pos.rook[black] & RANK_MASKS[1]).count_ones() as i32;
 
-//     let white_condition = (self.king[black] & RANK_MASKS[7]) != 0 || (self.pawn[black] & RANK_MASKS[6]) != 0;
-//     let black_condition = (self.king[white] & RANK_MASKS[7]) != 0 || (self.pawn[white] & RANK_MASKS[6]) != 0;
+    let white_condition = (pos.king[black] & RANK_MASKS[7]) != 0 || (pos.pawn[black] & RANK_MASKS[6]) != 0;
+    let black_condition = (pos.king[white] & RANK_MASKS[7]) != 0 || (pos.pawn[white] & RANK_MASKS[6]) != 0;
 
-//     return ROOK_ON_SEVENTH
-//         * (if white_condition {white_seventh_rooks} else 0
-//          - if black_condition {black_seventh_rooks} else 0);
-// }
+    return ROOK_ON_SEVENTH
+        * (if white_condition {white_seventh_rooks} else {0}
+         - if black_condition {black_seventh_rooks} else {0}) as i64;
+}
 
-// fn rook_on_open_file_value(pos: &Bitboard) -> Score {
-//     let white = Color::White as usize;
-//     let black = Color::Black as usize;
-//     let mut open_file_rooks: [i32; 2] = [0, 0];
-//     let mut semi_open_file_rooks: [i32; 2] = [0, 0];
-//     for side in [white, black] {
-//         let enemy_side = if side == white {black} else {white};
-//         let rook_bb = self.rook[side];
-//         for f in 0..8 {
-//             let rooks = (FILE_MASKS[f] & rook_bb).count_ones();
-//             if rooks > 0 && ((FILE_MASKS[f] & self.pawn[side]) == 0) {
-//                 // at least semi-open
-//                 if (FILE_MASKS[f] & self.pawn[enemy_side]) == 0 {
-//                     open_file_rooks[side] += rooks as i32;
-//                 } else {
-//                     semi_open_file_rooks[side] += rooks as i32;
-//                 }
-//             }
-//         }
-//     }
-// }
+fn rook_on_open_value(pos: &Bitboard) -> Score {
+    let white = Color::White as usize;
+    let black = Color::Black as usize;
+    let mut openish_file_rooks: [i32; 2] = [0, 0];
+    for side in [white, black] {
+        let enemy_side = if side == white {black} else {white};
+        let mut rook_bb = pos.rook[side];
+        while rook_bb != 0 {
+            let idx = rook_bb.trailing_zeros() as i32;
+            rook_bb &= rook_bb - 1;
+
+            let f = (idx % 8) as usize;
+            let pawns = FILE_MASKS[f] & pos.pawn[side];
+            if pawns != 0 { continue; }
+
+            if (FILE_MASKS[f] & pos.pawn[enemy_side]) == 0 {
+                // open
+                openish_file_rooks[side] += 2;
+            } else {
+                openish_file_rooks[side] += 1;
+            }
+        }
+    }
+
+    return ROOK_ON_OPEN * (openish_file_rooks[white] - openish_file_rooks[black]) as i64;
+}
