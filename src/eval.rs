@@ -118,7 +118,7 @@ pub fn evaluate_position(pos: &Bitboard) -> i32 {
     return taper_score(score, pos.get_phase());
 }
 
-fn material_score(pos: &Bitboard) -> Score {
+pub fn material_score(pos: &Bitboard) -> Score {
     // TODO this will probably be handled incrementally
     let mut score: Score = make_score(0, 0);
     let white = Color::White as usize;

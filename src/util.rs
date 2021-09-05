@@ -9,6 +9,7 @@ pub const MATE_SCORE: i32 = 1000000;
 pub const DRAW_SCORE: i32 = 0;
 
 pub const MAX_DEPTH: usize = 64;
+pub const MAX_PLY: usize = 128;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Color {

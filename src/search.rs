@@ -11,6 +11,9 @@ use crate::tt::*;
 use crate::util::*;
 
 static mut ABORT: bool = false;
+static mut START_TIME: u128 = 0;
+static mut SEARCH_LIMITS: SearchLimits = SearchLimits::infinite();
+
 const LB: i32 = -10000000;
 const UB: i32 = 10000000;
 
@@ -55,8 +58,42 @@ fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, n
     );
 }
 
-pub fn best_move(node: &mut Bitboard, compute_time: u128) { // TODO threads
+pub fn abort_search() {
     unsafe {
+        ABORT = true;
+    }
+}
+
+pub fn search_aborted() -> bool {
+    unsafe {
+        ABORT
+    }
+}
+
+fn check_time(search_limits: &SearchLimits) {
+    if search_limits.infinite { return; }
+    if search_limits.movetime == 0 && !search_limits.use_variable_time {
+        return;
+    }
+
+    unsafe {
+        let elapsed_time = get_time_millis() - START_TIME;
+        if search_limits.movetime > 0 && elapsed_time > search_limits.movetime {
+            abort_search();
+            return;
+        } else if search_limits.maximum_time > 0 && elapsed_time > search_limits.maximum_time - 10 {
+            abort_search();
+            return;
+        }
+    }
+}
+
+pub fn best_move(node: &mut Bitboard, search_limits: SearchLimits) { // TODO threads
+    let start_time = get_time_millis();
+    unsafe {
+        ABORT = false;
+        START_TIME = start_time;
+        SEARCH_LIMITS = search_limits;
         TI = Vec::new();
         SS = Vec::new();
 
@@ -65,29 +102,74 @@ pub fn best_move(node: &mut Bitboard, compute_time: u128) { // TODO threads
     }
 
     let mut depth: i32 = 1;
-    let start_time: u128 = get_time_millis();
-    let mut current_time: u128 = start_time;
+    let mut current_time: u128;
 
-    let mut mv: Move = Move::null_move();
+    let mut best_move_changes = 0;
+    let mut last_best_move_change = 0;
+    let mut best_move: Move = Move::null_move();
     let mut val: i32;
     let mut pv: &Vec<Move>;
 
     // TODO aspiration windows
-    while (current_time - start_time) <= compute_time {
+    while depth <= search_limits.depth {
         let alpha = LB;
         let beta = UB;
 
         val = search(node, alpha, beta, depth, 0, true, false, 0);
+        if search_aborted() { depth -= 1; break; }
+
+        let elapsed_time;
         unsafe {
             pv = &SS[0][0].pv;       // TEMP this only works with single thread
-            mv = pv[0];
+            let mv = pv[0];
+            if mv != best_move {
+                last_best_move_change = 0;
+                best_move_changes += 1;
+            } else {
+                last_best_move_change += 1;
+            }
+            best_move = mv;
 
             current_time = cmp::max(get_time_millis(), start_time + 1);
+            elapsed_time = current_time - start_time;
             print_info(depth, TI[0].seldepth, &pv, val, current_time - start_time, TI[0].nodes_searched);
         }
+
+        // we've obviously run out of time
+        if search_limits.movetime > 0 && elapsed_time > search_limits.movetime {
+            abort_search();
+            break;
+        } else if search_limits.maximum_time > 0 && elapsed_time > search_limits.maximum_time - 10 {
+            abort_search();
+            break;
+        }
+
+        // it's less obvious that we have
+        if search_limits.use_variable_time {
+            if elapsed_time >= search_limits.optimum_time {
+                // general idea here, inspired by some combination of SF and Ethereal
+                // but then simplified by my laziness and then made sloppy
+                // is that the more often the PV changes and the more recently it changed
+                // the longer we allow ourselves to search
+
+                // the specific multiplies here though are completely arbitrary
+                // and subject to change
+                let opttime = search_limits.optimum_time as f64;
+                let last_change_factor = (15 - last_best_move_change) as f32 / 4.;
+                let mod_factor = (1.0 + (best_move_changes as f32 / 4.) + last_change_factor) as f64;
+                let target_time = if mod_factor < 1.0 {opttime} else {(opttime * mod_factor) as f64} as u128;
+
+                // println!("OPT {} LCF {} BMC {} TARGET {}", opttime, last_change_factor, best_move_changes, target_time);
+                if elapsed_time > target_time {
+                    abort_search();
+                    break;
+                }
+            }
+        }
+
         depth += 1;
     }
-    println!("bestmove {}", mv);
+    println!("bestmove {}", best_move);
 }
 
 fn search(node: &mut Bitboard,
@@ -98,6 +180,17 @@ fn search(node: &mut Bitboard,
           is_pv: bool,
           cut_node: bool,
           thread_num: usize) -> i32 {
+    if thread_num == 0 {
+        // main thread
+        unsafe {
+            check_time(&SEARCH_LIMITS);
+        }
+    }
+
+    if search_aborted() {
+        return 0;
+    }
+
     let mut ti: &mut ThreadInfo;
     let ss: &SearchStats;
     let mut sse: &mut SearchStatsEntry;
@@ -188,7 +281,7 @@ fn search(node: &mut Bitboard,
 
     let is_check = node.is_check(node.side_to_move);
     sse.static_eval = static_eval(node);
-    let mut eval = sse.static_eval;
+    let eval = sse.static_eval;
 
     // Reverse Futility Pruning
     if depth < RFP_DEPTH && !is_pv && !is_check && !init_node {
@@ -372,6 +465,7 @@ fn search(node: &mut Bitboard,
         }
 
         node.undo_move(&mv);
+        if search_aborted() { return 0; }
 
         moves_searched += 1;
         if val > best_val {
@@ -412,7 +506,7 @@ fn search(node: &mut Bitboard,
     }
 
     unsafe {
-        if sse.excluded_move.is_null {
+        if sse.excluded_move.is_null && !search_aborted() {
             TT.set(node.hash, best_move, TTEntry::make_tt_score(best_val, ply), if raised_alpha {PV_NODE} else {ALL_NODE}, depth, node.history.len() as i32);
         }
     }

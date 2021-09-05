@@ -1,4 +1,5 @@
 use crate::moveutil::*;
+use crate::time::*;
 use crate::tt::*;
 use crate::util::*;
 
@@ -28,16 +29,86 @@ pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
     return 1 + ((moves_searched - 4) / 4) + (depth / 8);
 }
 
+#[derive(Copy, Clone)]
+pub struct SearchLimits {
+    pub infinite: bool,
+    pub use_variable_time: bool,
+    pub movetime: u128,
+    pub optimum_time: u128,
+    pub maximum_time: u128,
+    pub depth: i32,
+}
+
+impl SearchLimits {
+    // constructors
+    pub fn movetime(movetime: u128) -> SearchLimits {
+        SearchLimits {
+            infinite: false,
+            use_variable_time: false,
+            movetime: movetime,
+            optimum_time: 0,
+            maximum_time: 0,
+            depth: MAX_DEPTH as i32
+        }
+    }
+
+    pub fn clock_with_inc(clock_time: i32, clock_inc: i32, overhead: i32, ply: i32, material: i32) -> SearchLimits {
+        let time_info = get_time_bounds_clock_inc(clock_time, clock_inc, overhead, ply, material);
+        println!("{} {}", time_info.0, time_info.1);
+        SearchLimits {
+            infinite: false,
+            use_variable_time: true,
+            movetime: 0,
+            optimum_time: time_info.0,
+            maximum_time: time_info.1,
+            depth: MAX_DEPTH as i32
+        }
+    }
+
+    pub fn moves_to_go(clock_time: i32, moves_to_go: i32, overhead: i32) -> SearchLimits {
+        let time_info = get_time_bounds_moves_to_go(clock_time, moves_to_go, overhead);
+        SearchLimits {
+            infinite: false,
+            use_variable_time: true,
+            movetime: 0,
+            optimum_time: time_info.0,
+            maximum_time: time_info.1,
+            depth: MAX_DEPTH as i32
+        }
+    }
+
+    pub fn depth(depth: i32) -> SearchLimits {
+        SearchLimits {
+            infinite: false,
+            use_variable_time: false,
+            movetime: 0,
+            optimum_time: 0,
+            maximum_time: 0,
+            depth: depth
+        }
+    }
+    pub const fn infinite() -> SearchLimits {
+        SearchLimits {
+            infinite: true,
+            use_variable_time: false,
+            movetime: 0,
+            optimum_time: 0,
+            maximum_time: 0,
+            depth: MAX_DEPTH as i32
+        }
+    }
+}
+
 pub struct ThreadInfo {
     pub nodes_searched: u64,
     pub seldepth: i32,
-    pub killers: [[Move; 2]; MAX_DEPTH],
+    pub killers: [[Move; 2]; MAX_PLY],
     pub move_history: [[u64; 64]; 12]
 }
 
 impl ThreadInfo {
     pub fn new() -> ThreadInfo {
-        let killers = [[Move::null_move(); 2]; MAX_DEPTH];
+        let killers = [[Move::null_move(); 2]; MAX_PLY];
         let move_history = [[0; 64]; 12];
         ThreadInfo {
             nodes_searched: 0,
@@ -48,7 +119,7 @@ impl ThreadInfo {
     }
 
     pub fn clear(&mut self) {
-        self.killers = [[Move::null_move(); 2]; MAX_DEPTH];
+        self.killers = [[Move::null_move(); 2]; MAX_PLY];
         self.seldepth = 0;
         self.nodes_searched = 0;
         self.move_history = [[0; 64]; 12];
@@ -110,7 +181,7 @@ pub type SearchStats = Vec<SearchStatsEntry>;
 
 pub fn new_searchstats() -> SearchStats {
     let mut ss: SearchStats = Vec::new();
-    for _ in 0..MAX_DEPTH {
+    for _ in 0..MAX_PLY {
         ss.push(SearchStatsEntry::new());
     }
     return ss;
