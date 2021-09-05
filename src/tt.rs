@@ -113,10 +113,16 @@ impl TT {
             valid: true
         };
 
+        // if e1.valid && e1.hash == hash {
+        //     // always replace with more recent search of the same position
+        //     to_insert = (entry, e2);
+        // } else if e2.valid && e2.hash == hash {
+        //     to_insert = (e1, entry);
+        // } else
         if !e1.valid || e1.depth <= depth || (ply - e1.ply) > age_threshold(e1.depth, depth) {
             // first bucket is depth-preferred (though ages out)
             to_insert = (entry, e2);
-        } else if hash != e1.hash {
+        } else {
             to_insert = (e1, entry);
         }
         self.tt[idx] = to_insert;

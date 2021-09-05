@@ -187,11 +187,11 @@ fn search(node: &mut Bitboard,
     }
 
     let is_check = node.is_check(node.side_to_move);
-    let eval = static_eval(node);
-    sse.static_eval = eval;
+    sse.static_eval = static_eval(node);
+    let mut eval = sse.static_eval;
 
     // Reverse Futility Pruning
-    if depth < RFP_DEPTH && !is_pv && !is_check && !init_node && (!ss[(ply - 1) as usize].searching_null_move) {
+    if depth < RFP_DEPTH && !is_pv && !is_check && !init_node {
         if (eval - rfp_margin(depth)) >= beta {
             return eval - rfp_margin(depth);
         }

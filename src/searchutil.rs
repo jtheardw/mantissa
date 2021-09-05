@@ -3,7 +3,7 @@ use crate::tt::*;
 use crate::util::*;
 
 pub const EFP_DEPTH: i32 = 3;         // extended futility pruning
-pub const RFP_DEPTH: i32 = 3;         // reverse futility pruning
+pub const RFP_DEPTH: i32 = 4;         // reverse futility pruning
 pub const NMP_DEPTH: i32 = 3;         // null-move pruning/reductions
 pub const LMR_DEPTH: i32 = 3;         // late move reductions
 
