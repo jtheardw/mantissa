@@ -36,9 +36,9 @@ fn main() {
     // let mut starting_board = Bitboard::from_position(format!("8/1p6/8/6k1/8/3r2p1/3p2Kp/3R4 w - - 2 65"));
     // let mut starting_board = Bitboard::from_position(format!("8/pppR1pkp/6p1/4b3/2B1q3/PP6/K1R2PPP/8 w - - 2 65"));
     // let mut starting_board = Bitboard::from_position(format!("8/pppR1pkp/6p1/8/2B5/PP6/K4PPb/8 b - - 1 34"));
-    // let mut starting_board = Bitboard::from_position(format!("8/1p6/8/6k1/8/3r2p1/3p2Kp/3R4 w - - 2 65"));
+    let mut starting_board = Bitboard::from_position(format!("8/1p6/8/6k1/8/3r2p1/3p2Kp/3R4 w - - 2 65"));
     // let mut starting_board = Bitboard::from_position(format!("1k6/4R3/1p6/p1p3p1/qn4Qp/1n3P2/1P6/1K6 w - - 0 24"));
-    let mut starting_board = Bitboard::from_position(format!("1k6/4R3/1p6/p1p3p1/qnBn2Qp/5P2/1P6/1K6 w - - 0 1"));
+    // let mut starting_board = Bitboard::from_position(format!("8/7P/8/5N2/5R1p/8/kr1p3p/3K4 w - - 0 1"));
     println!("{}", starting_board.get_phase());
     // let mut starting_board = Bitboard::default_board();
     println!("{}", bb_str(starting_board.composite[0] | starting_board.composite[1]));
@@ -55,5 +55,5 @@ fn main() {
     //     }
     // }
     print_value(&starting_board);
-    best_move(&mut starting_board, 10000);
+    best_move(&mut starting_board, 20000);
 }

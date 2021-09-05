@@ -219,8 +219,8 @@ fn search(node: &mut Bitboard,
     }
 
     let mut sing_extend = false;
-    if false && !init_node
-        && depth >= 10
+    if true && !init_node
+        && depth >= 7
         && sse.tt_hit
         && sse.excluded_move.is_null
         && sse.tt_val.abs() < MATE_SCORE - 100000 // TODO give this a name
@@ -231,12 +231,14 @@ fn search(node: &mut Bitboard,
         // move detection with multi-cut in the same search
         //
         // I can't afford to do the super-tight cutoffs stockfish does though
-        let margin = if sse.tt_node_type == PV_NODE {25 * (depth / 2)} else {20 * (depth / 2)}; // 200
+        let tt_val = sse.tt_val;
+        let tt_move = sse.tt_move;
+        let margin = if sse.tt_node_type == PV_NODE {40 * (depth / 2)} else {30 * (depth / 2)}; // 200
         let depth_to_search = if sse.tt_node_type == PV_NODE {(depth + 2) / 2} else {(depth - 1) / 2};
         let target = sse.tt_val - margin;
 
         sse.excluded_move = sse.tt_move;
-        let val = search(node, target - 1, target, depth_to_search, ply, false, false, thread_num);
+        let val = search(node, target - 1, target, depth_to_search, ply, false, cut_node, thread_num);
         sse.excluded_move = Move::null_move();
 
         if val < target {
@@ -244,11 +246,15 @@ fn search(node: &mut Bitboard,
             // singularly extend
             depth += 1;
             sing_extend = true;
-        } else if !is_pv && target >= beta {
-            // if we're not doing pv node we might want to prune here with
-            // multi-cut.  This indicates multiple moves failed high
+        } else if target >= beta {
+            // pseudo-multi-cut.  This indicates multiple moves failed high
             // so this is probably a cutnode
             return target;
+        } else if tt_val >= beta {
+            sse.excluded_move = tt_move;
+            let val = search(node, beta - 1, beta, (depth + 3) / 2, ply, false, cut_node, thread_num);
+            sse.excluded_move = Move::null_move();
+            if val >= beta { return beta; }
         }
     }
 
@@ -260,7 +266,6 @@ fn search(node: &mut Bitboard,
     // futility pruning
     let mut futile = false;
     if !is_pv && !is_check && depth <= EFP_DEPTH {
-        // TODO also don't do if near mate value
         if depth == EFP_DEPTH {
             if sse.static_eval < alpha - efp_margin(EFP_DEPTH) {
                 depth -= 1;
@@ -321,7 +326,7 @@ fn search(node: &mut Bitboard,
                     let mut r = lmr_reduction(depth, moves_searched);
                     if gives_check { r -= 1; }
 
-                    // if cut_node { r += 1; }
+                    if cut_node { r += 1; }
 
                     if score >= KILLER_OFFSET { r -= 1; }
 
@@ -391,13 +396,18 @@ fn search(node: &mut Bitboard,
         }
     }
 
-    if best_move.is_null && !found_legal_move {
-        // some sort of mate
-        sse.pv = Vec::new();
-        if is_check {
-            return -MATE_SCORE + ply;
+    if best_move.is_null {
+        if !found_legal_move {
+            // some sort of mate
+            sse.pv = Vec::new();
+            if is_check {
+                return -MATE_SCORE + ply;
+            } else {
+                return DRAW_SCORE;
+            }
         } else {
-            return DRAW_SCORE;
+            // futility pruning weirdness?
+            return sse.static_eval;
         }
     }
 
