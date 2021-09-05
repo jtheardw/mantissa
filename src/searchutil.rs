@@ -9,8 +9,9 @@ pub const LMR_DEPTH: i32 = 3;         // late move reductions
 
 pub fn efp_margin(depth: i32) -> i32 {
     if depth <= 0 { return 0; }
-    let base = 2000;
-    return base + 1000 * (depth - 1);
+    if depth > 3 { return 4000 * depth}
+    return [0, 2200, 3200, 5300][depth as usize];
+    // return base + 1000 * (depth - 1);
 }
 
 pub fn rfp_margin(depth: i32) -> i32 {

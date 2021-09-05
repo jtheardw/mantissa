@@ -1,6 +1,7 @@
 use crate::bitboard::*;
 use crate::movegen::*;
 use crate::pht::*;
+use crate::psqt::*;
 use crate::util::*;
 
 pub type Score = i64;
@@ -8,21 +9,21 @@ pub type Score = i64;
 // This is an idea I'm stealing from Stockfish's source
 // and an older version of Ethereal
 // essentially you store 2 scores
-const fn make_score(mg_value: i32, eg_value: i32) -> Score {
+pub const fn make_score(mg_value: i32, eg_value: i32) -> Score {
     ((mg_value as i64) << 32) + (eg_value as i64)
 }
 
-fn mg_score(score: Score) -> i32 {
+pub fn mg_score(score: Score) -> i32 {
     // this is a quirk required to handle the way the
     // eg value was added in (particularly if it was a negative number)
     ((score + 0x80000000) >> 32) as i32
 }
 
-fn eg_score(score: Score) -> i32 {
+pub fn eg_score(score: Score) -> i32 {
     ((score << 32) >> 32) as i32
 }
 
-fn taper_score(s: Score, phase: i32) -> i32 {
+pub fn taper_score(s: Score, phase: i32) -> i32 {
     ((256 - phase) * mg_score(s) + phase * eg_score(s)) >> 8
 }
 
@@ -38,11 +39,11 @@ macro_rules! S {
 
 // TODO might have to make these mutable
 // if tuning needs to mess with them.
-const QUEEN_VALUE: Score = S!(9200, 9200);
-const ROOK_VALUE: Score = S!(5000, 5000);
-const BISHOP_VALUE: Score = S!(3200, 3200);
-const KNIGHT_VALUE: Score = S!(3000, 3000);
-const PAWN_VALUE: Score = S!(1000, 1000);
+pub const QUEEN_VALUE: Score = S!(9200, 9200);
+pub const ROOK_VALUE: Score = S!(5000, 5000);
+pub const BISHOP_VALUE: Score = S!(3200, 3200);
+pub const KNIGHT_VALUE: Score = S!(3000, 3000);
+pub const PAWN_VALUE: Score = S!(1000, 1000);
 
 const KNIGHT_MOBILITY: [Score; 9] = [
     S!(  0,   0), S!( 25,  27), S!( 50,  54), S!( 75,  81), S!(100, 108),
@@ -90,7 +91,7 @@ const ADVANCED_PAWN_VALUE: [Score; 8] = [
 const SUPPORTED_PAWN_BONUS: Score = S!(26, 88);
 const SPACE_VALUE: Score = S!(43, 19);
 
-const BISHOP_COLOR_PENALTY: Score = S!(-50, -30);
+const BISHOP_COLOR: Score = S!(-50, -30);
 
 const TEMPO_BONUS: Score = S!(130, 130);
 
@@ -109,8 +110,10 @@ pub fn evaluate_position(pos: &Bitboard) -> i32 {
     score += mobility_and_king_danger(pos);
     score += pawn_structure_value(pos);
     score += double_bishop_bonus(pos);
+    score += bishop_color_value(pos);
     score += rook_on_seventh_value(pos);
     score += rook_on_open_value(pos);
+    score += nonpawn_psqt_value(pos);
     score += if pos.side_to_move == Color::White {TEMPO_BONUS} else {-TEMPO_BONUS};
     return taper_score(score, pos.get_phase());
 }
@@ -256,6 +259,8 @@ pub fn print_value(pos: &Bitboard) {
     println!("rook on 7th: {}", taper_score(rook_on_seventh_value(pos), pos.get_phase()));
     println!("rook on open: {}", taper_score(rook_on_open_value(pos), pos.get_phase()));
     println!("double_bishop_bonus: {}", taper_score(double_bishop_bonus(pos), pos.get_phase()));
+    println!("bishop_color: {}", taper_score(bishop_color_value(pos), pos.get_phase()));
+    println!("psqt: {}", taper_score(nonpawn_psqt_value(pos) + pawn_psqt_value(pos), pos.get_phase()));
 }
 
 fn pawn_structure_value(pos: &Bitboard) -> Score {
@@ -275,6 +280,7 @@ fn pawn_structure_value(pos: &Bitboard) -> Score {
         val += backwards_pawns_value(pos);
         val += connected_pawns_value(pos);
         val += space_control_value(pos);
+        val += pawn_psqt_value(pos);
         pht.set(pos.pawn_hash, val);
     }
     return val;
@@ -503,4 +509,26 @@ fn rook_on_open_value(pos: &Bitboard) -> Score {
     }
 
     return ROOK_ON_OPEN * (openish_file_rooks[white] - openish_file_rooks[black]) as i64;
+}
+
+pub fn bishop_color_value(pos: &Bitboard) -> Score {
+    let mut bishop_color: [i32; 2] = [0, 0];
+    let white = Color::White as usize;
+    let black = Color::Black as usize;
+
+    let dark_tiles_mask =
+        0b10101010_01010101_10101010_01010101_10101010_01010101_10101010_01010101;
+    let light_tiles_mask = !dark_tiles_mask;
+
+    for side in [white, black] {
+        let bishops_on_dark = (pos.bishop[side] & dark_tiles_mask).count_ones() as i32;
+        let bishops_on_light = (pos.bishop[side] & light_tiles_mask).count_ones() as i32;
+
+        let pawns_on_dark = (pos.pawn[side] & dark_tiles_mask).count_ones() as i32;
+        let pawns_on_light = (pos.pawn[side] & light_tiles_mask).count_ones() as i32;
+
+        bishop_color[side] = bishops_on_dark * pawns_on_dark + bishops_on_light * pawns_on_light;
+    }
+
+    return BISHOP_COLOR * (bishop_color[white] - bishop_color[black]) as i64;
 }

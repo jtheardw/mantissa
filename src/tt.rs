@@ -19,7 +19,7 @@ pub fn allocate_tt(size_mb: usize) {
 
 fn age_threshold(old_depth: i32, new_depth: i32) -> i32 {
     // how old can an entry be and still not be replaced by an entry with lower depth
-    return (old_depth - new_depth) << 2;
+    return ((old_depth - new_depth) << 3) - 2;
 }
 
 #[derive(Copy, Clone)]
@@ -54,21 +54,21 @@ impl TTEntry {
 
     pub fn make_tt_score(score: i32, ply: i32) -> i32 {
         if score > MATE_SCORE - 100000 {
-            score + ply
+            return score + ply;
         } else if score < (-MATE_SCORE + 100000) {
-            score - ply
+            return score - ply;
         } else {
-            score
+            return score;
         }
     }
 
     pub fn read_tt_score(score: i32, ply: i32) -> i32 {
         if score > MATE_SCORE - 100000 {
-            score - ply
+            return score - ply;
         } else if score < (-MATE_SCORE + 100000) {
-            score + ply
+            return score + ply;
         } else {
-            score
+            return score
         }
     }
 }
