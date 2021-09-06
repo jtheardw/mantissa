@@ -16,6 +16,7 @@ mod searchutil; use crate::searchutil::*;
 mod see; use crate::see::*;
 mod time; use crate::time::*;
 mod tt; use crate::tt::*;
+mod uci; use crate::uci::*;
 mod util; use crate::util::*;
 mod zobrist; use crate::zobrist::*;
 
@@ -23,11 +24,12 @@ fn init() {
     initialize_masks();
     initialize_magic_tables();
     initialize_pht();
-    allocate_tt(1024);
+    allocate_tt(64);
 }
 
 fn main() {
     init();
+    uci_loop();
     // let mut starting_board = Bitboard::default_board();
     // let mut starting_board = Bitboard::from_position(format!("1k6/4R3/1p6/p1p3p1/qn4Qp/1n3P2/1P6/1K6 w - - 0 24")); // queen move
     // let mut starting_board = Bitboard::from_position(format!("1k6/4R3/1p6/p1p3p1/qnBn2Qp/5P2/1P6/1K6 w - - 0 1"));
@@ -39,13 +41,13 @@ fn main() {
     // let mut starting_board = Bitboard::from_position(format!("8/1p6/8/6k1/8/3r2p1/3p2Kp/3R4 w - - 2 65"));
     // let mut starting_board = Bitboard::from_position(format!("8/6pp/2k1p3/2B1p3/4P1K1/5PPP/8/8 b - - 0 1"));
     // let mut starting_board = Bitboard::from_position(format!("1k6/4R3/1p6/p1p3p1/qn4Qp/1n3P2/1P6/1K6 w - - 0 24"));
-    let mut starting_board = Bitboard::from_position(format!("8/7P/8/5N2/5R1p/8/kr1p3p/3K4 w - - 0 1"));
+    // let mut starting_board = Bitboard::from_position(format!("8/7P/8/5N2/5R1p/8/kr1p3p/3K4 w - - 0 1"));
     // let mut starting_board = Bitboard::from_position(format!("1k6/4R3/1p6/p1p3p1/qnBn2Qp/5P2/1P6/1K6 w - - 0 1"));
     // let mut starting_board = Bitboard::from_position(format!("4r3/2k2p2/1ppp1Pp1/2p1r1Pn/P1P1P1K1/2N4p/1R5P/1R6 b - - 0 1"));
 
-    println!("{}", starting_board.get_phase());
+    // println!("{}", starting_board.get_phase());
     // let mut starting_board = Bitboard::default_board();
-    println!("{}", bb_str(starting_board.composite[0] | starting_board.composite[1]));
+    // println!("{}", bb_str(starting_board.composite[0] | starting_board.composite[1]));
 
     // println!("SCORE {}", evaluate_position(&starting_board, 0));
     // println!("SCORE {}", evaluate_position(&starting_board, 128));
@@ -58,9 +60,10 @@ fn main() {
     //         i += 1;
     //     }
     // }
-    print_value(&starting_board);
-    // let limits = SearchLimits::movetime(10000);
+    // print_value(&starting_board);
+    // let limits = SearchLimits::movetime(20000);
     // let limits = SearchLimits::depth(10);
-    let limits = SearchLimits::clock_with_inc(120000, 1000, 0, 15, mg_score(material_score(&starting_board)));
-    best_move(&mut starting_board, 1, limits);
+    // let limits = SearchLimits::clock_with_inc(120000, 1000, 0, 15, mg_score(material_score(&starting_board)));
+    // best_move(&mut starting_board, 2, limits);
+
 }

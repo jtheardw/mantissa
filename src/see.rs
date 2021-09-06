@@ -36,6 +36,7 @@ fn get_piece_value(piece: u8) -> i32 {
         b'b' => mg_score(BISHOP_VALUE),
         b'n' => mg_score(KNIGHT_VALUE),
         b'p' => mg_score(PAWN_VALUE),
+        b'k' => 200000,
         _ => 0
     };
 }

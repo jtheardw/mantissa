@@ -20,7 +20,7 @@ pub fn allocate_tt(size_mb: usize) {
 
 fn age_threshold(old_depth: i32, new_depth: i32) -> i32 {
     // how old can an entry be and still not be replaced by an entry with lower depth
-    return ((old_depth - new_depth) << 3) - 2;
+    return (old_depth - new_depth) << 4;
 }
 
 #[derive(Copy, Clone)]
@@ -124,13 +124,12 @@ impl TT {
             valid: true
         };
 
-        // if e1.valid && e1.hash == hash {
-        //     // always replace with more recent search of the same position
-        //     to_insert = (entry, e2);
-        // } else if e2.valid && e2.hash == hash {
-        //     to_insert = (e1, entry);
-        // } else
-        if !e1.valid || e1.depth <= depth || (ply - e1.ply) > age_threshold(e1.depth, depth) {
+        if e1.valid && e1.hash == hash {
+            // always replace with more recent search of the same position
+            to_insert = (entry, e2);
+        } else if e2.valid && e2.hash == hash {
+            to_insert = (e1, entry);
+        } else if !e1.valid || e1.depth <= depth || (ply - e1.ply) > age_threshold(e1.depth, depth) {
             // first bucket is depth-preferred (though ages out)
             to_insert = (entry, e2);
         } else {

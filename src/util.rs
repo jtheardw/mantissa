@@ -67,6 +67,10 @@ pub fn str_to_idx(s: String) -> i32 {
     return coord_to_idx(((s[0] - b'a') as i32, (s[1] - b'1') as i32));
 }
 
+pub fn bytes_to_idx(file_byte: u8, rank_byte: u8) -> i32 {
+    return coord_to_idx(((file_byte - b'a') as i32, (rank_byte - b'1') as i32));
+}
+
 pub fn bb_str(bb: u64) -> String {
     let mut s = String::new();
     let mut b = bb;
@@ -122,7 +126,6 @@ pub const RANK_MASKS: [u64; 8] =
     ];
 
 pub const CENTER_MASK: u64 = 0x0000001818000000;
-pub const NEAR_CENTER_MASK: u64 = 0x00003C24243C0000;
 pub const AHEAD_RANKS: [[u64; 8]; 2] =
     [
         [
