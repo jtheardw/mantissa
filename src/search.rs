@@ -1,5 +1,6 @@
 use std::cmp;
 use std::time::SystemTime;
+use std::thread;
 
 use crate::bitboard::*;
 use crate::eval::*;
@@ -10,7 +11,9 @@ use crate::see::*;
 use crate::tt::*;
 use crate::util::*;
 
+static mut SEARCH_IN_PROGRESS: bool = false;
 static mut ABORT: bool = false;
+static mut STOP_THREAD: bool = false;
 static mut START_TIME: u128 = 0;
 static mut SEARCH_LIMITS: SearchLimits = SearchLimits::infinite();
 
@@ -24,6 +27,12 @@ pub fn get_time_millis() -> u128 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_millis(),
         Err(_) => panic!("SystemTime failed!"),
+    }
+}
+
+pub fn ongoing_search() -> bool {
+    unsafe {
+        SEARCH_IN_PROGRESS
     }
 }
 
@@ -64,9 +73,27 @@ pub fn abort_search() {
     }
 }
 
+pub fn stop_threads() {
+    unsafe {
+        STOP_THREAD = true;
+    }
+}
+
+pub fn allow_threads() {
+    unsafe {
+        STOP_THREAD = false;
+    }
+}
+
 pub fn search_aborted() -> bool {
     unsafe {
         ABORT
+    }
+}
+
+pub fn thread_killed() -> bool {
+    unsafe {
+        ABORT | STOP_THREAD
     }
 }
 
@@ -88,7 +115,16 @@ fn check_time(search_limits: &SearchLimits) {
     }
 }
 
-pub fn best_move(node: &mut Bitboard, search_limits: SearchLimits) { // TODO threads
+fn thread_handler(mut node: Bitboard, thread_depth: i32, thread_num: usize) {
+    let mut depth = thread_depth;
+    loop {
+        let score = search(&mut node, LB, UB, depth, 0, true, false, thread_num);
+        if thread_killed() { return; }
+        depth += 1;
+    }
+}
+
+pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLimits) { // TODO threads
     let start_time = get_time_millis();
     unsafe {
         ABORT = false;
@@ -97,8 +133,10 @@ pub fn best_move(node: &mut Bitboard, search_limits: SearchLimits) { // TODO thr
         TI = Vec::new();
         SS = Vec::new();
 
-        TI.push(ThreadInfo::new());
-        SS.push(new_searchstats());
+        for _ in 0..num_threads {
+            TI.push(ThreadInfo::new());
+            SS.push(new_searchstats());
+        }
     }
 
     let mut depth: i32 = 1;
@@ -115,12 +153,29 @@ pub fn best_move(node: &mut Bitboard, search_limits: SearchLimits) { // TODO thr
         let alpha = LB;
         let beta = UB;
 
+        allow_threads();
+        let mut threads = Vec::new();
+        for thread_num in 1..num_threads {
+            // kick off threads
+            let thread_depth = depth + thread_num.trailing_zeros() as i32;
+            let mut thread_node = node.thread_copy();
+
+            // search(&mut thread_node, alpha, beta, thread_depth, 0, true, false, thread_num as usize);
+            threads.push(thread::spawn(move || {
+                thread_handler(thread_node, thread_depth, thread_num as usize);
+            }));
+        }
+
         val = search(node, alpha, beta, depth, 0, true, false, 0);
-        if search_aborted() { depth -= 1; break; }
+        stop_threads();
+        for t in threads {
+            t.join();
+        }
+        if search_aborted() { break; }
 
         let elapsed_time;
         unsafe {
-            pv = &SS[0][0].pv;       // TEMP this only works with single thread
+            pv = &SS[0][0].pv;
             let mv = pv[0];
             if mv != best_move {
                 last_best_move_change = 0;
@@ -132,7 +187,13 @@ pub fn best_move(node: &mut Bitboard, search_limits: SearchLimits) { // TODO thr
 
             current_time = cmp::max(get_time_millis(), start_time + 1);
             elapsed_time = current_time - start_time;
-            print_info(depth, TI[0].seldepth, &pv, val, current_time - start_time, TI[0].nodes_searched);
+
+            let mut nodes_searched = 0;
+            for t_num in 0..num_threads {
+                nodes_searched += TI[t_num as usize].nodes_searched;
+            }
+
+            print_info(depth, TI[0].seldepth, &pv, val, current_time - start_time, nodes_searched);
         }
 
         // we've obviously run out of time
@@ -187,7 +248,7 @@ fn search(node: &mut Bitboard,
         }
     }
 
-    if search_aborted() {
+    if thread_killed() {
         return 0;
     }
 
@@ -311,7 +372,6 @@ fn search(node: &mut Bitboard,
         }
     }
 
-    let mut sing_extend = false;
     if true && !init_node
         && depth >= 7
         && sse.tt_hit
@@ -338,7 +398,6 @@ fn search(node: &mut Bitboard,
             // println!("val {} tt_val {} target {}", val, sse.tt_val, target);
             // singularly extend
             depth += 1;
-            sing_extend = true;
         } else if target >= beta {
             // pseudo-multi-cut.  This indicates multiple moves failed high
             // so this is probably a cutnode
@@ -465,7 +524,7 @@ fn search(node: &mut Bitboard,
         }
 
         node.undo_move(&mv);
-        if search_aborted() { return 0; }
+        if thread_killed() { return 0; }
 
         moves_searched += 1;
         if val > best_val {
@@ -506,7 +565,7 @@ fn search(node: &mut Bitboard,
     }
 
     unsafe {
-        if sse.excluded_move.is_null && !search_aborted() {
+        if sse.excluded_move.is_null && !thread_killed() {
             TT.set(node.hash, best_move, TTEntry::make_tt_score(best_val, ply), if raised_alpha {PV_NODE} else {ALL_NODE}, depth, node.history.len() as i32);
         }
     }

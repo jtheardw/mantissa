@@ -1,9 +1,10 @@
 use std::mem;
+use std::sync::Mutex;
 
 use crate::moveutil::*;
 use crate::util::*;
 
-pub static mut TT: TT = TT {tt: Vec::new(), bits: 0, mask: 0};
+pub static mut TT: TT = TT {tt: Vec::new(), bits: 0, mask: 0, locks: Vec::new()};
 
 pub fn allocate_tt(size_mb: usize) {
     let entry_size = mem::size_of::<TTEntry>() * 2;
@@ -36,7 +37,8 @@ pub struct TTEntry {
 pub struct TT {
     pub tt: Vec<(TTEntry, TTEntry)>,
     pub bits: usize,
-    pub mask: u64
+    pub mask: u64,
+    locks: Vec<Mutex<u64>>
 }
 
 impl TTEntry {
@@ -79,16 +81,24 @@ impl TT {
         for _ in 0..(1 << bits) {
             v.push((TTEntry::invalid_entry(), TTEntry::invalid_entry()));
         }
+
+        let mut locks: Vec<Mutex<u64>> = Vec::new();
+        for _ in 0..64 {
+            locks.push(Mutex::new(0));
+        }
         TT {
             tt: v,
             bits: bits,
             mask: (1 << bits) - 1,
+            locks: locks
         }
     }
 
     pub fn get(&self, hash: u64) -> TTEntry {
+        let mut l = self.locks[(hash % 64) as usize].lock().unwrap();
         let idx: usize = (hash & self.mask) as usize;
         let (e1, e2) = self.tt[idx];
+        *l = hash | e1.hash | e2.hash;
         if e1.valid && e1.hash == hash {
             return e1;
         }
@@ -100,8 +110,9 @@ impl TT {
 
     pub fn set(&mut self, hash: u64, mv: Move, value: i32, node_type: u8, depth: i32, ply: i32) {
         let idx: usize = (hash & self.mask) as usize;
+        let mut l = self.locks[(hash % 64) as usize].lock().unwrap();
         let (e1, e2) = self.tt[idx];
-        let mut to_insert = (e1, e2);
+        let to_insert;
 
         let entry = TTEntry {
             hash: hash,
@@ -126,5 +137,6 @@ impl TT {
             to_insert = (e1, entry);
         }
         self.tt[idx] = to_insert;
+        *l = hash | to_insert.0.hash | to_insert.1.hash;
     }
 }
