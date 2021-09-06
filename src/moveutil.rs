@@ -113,7 +113,7 @@ impl fmt::Display for Move {
 
 pub fn is_quiet_move(mv: &Move, pos: &Bitboard) -> bool {
     if mv.promote_to != 0 || mv.is_ep { return false; }
-    if pos.piece_at_square(mv.end, pos.side_to_move) != 0 { return false; }
+    if pos.piece_at_square(mv.end, !pos.side_to_move) != 0 { return false; }
     return true;
 }
 
@@ -135,6 +135,6 @@ pub fn is_tactical_move(mv: &Move, pos: &Bitboard) -> bool {
             }
         }
     }
-    if pos.piece_at_square(mv.end, pos.side_to_move) != 0 { return true; }
+    if pos.piece_at_square(mv.end, !pos.side_to_move) != 0 { return true; }
     return false;
 }

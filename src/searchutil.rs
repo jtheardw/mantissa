@@ -54,7 +54,6 @@ impl SearchLimits {
 
     pub fn clock_with_inc(clock_time: i32, clock_inc: i32, overhead: i32, ply: i32, material: i32) -> SearchLimits {
         let time_info = get_time_bounds_clock_inc(clock_time, clock_inc, overhead, ply, material);
-        println!("{} {}", time_info.0, time_info.1);
         SearchLimits {
             infinite: false,
             use_variable_time: true,

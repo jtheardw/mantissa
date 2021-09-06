@@ -218,7 +218,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
                 // the specific multiplies here though are completely arbitrary
                 // and subject to change
                 let opttime = search_limits.optimum_time as f64;
-                let last_change_factor = (15 - last_best_move_change) as f32 / 4.;
+                let last_change_factor = (18 - last_best_move_change) as f32 / 3.;
                 let mod_factor = (1.0 + (best_move_changes as f32 / 4.) + last_change_factor) as f64;
                 let target_time = if mod_factor < 1.0 {opttime} else {(opttime * mod_factor) as f64} as u128;
 
@@ -359,11 +359,13 @@ fn search(node: &mut Bitboard,
     if !is_pv && depth >= NMP_DEPTH && !is_check && !init_node && (!ss[(ply - 1) as usize].searching_null_move) && sse.excluded_move.is_null {
         if sse.static_eval >= beta {
             let r = null_move_r(sse.static_eval, beta, depth);
+
             sse.searching_null_move = true;
             node.do_null_move();
             let val = -search(node, -beta, -beta + 1, depth - 1 - r, ply + 1, false, !cut_node, thread_num);
             node.undo_null_move();
             sse.searching_null_move = false;
+
             if val >= beta {
                 // using the extended null move reductions
                 // idea from Eli David and Nathan S. Netanyahu
@@ -377,7 +379,7 @@ fn search(node: &mut Bitboard,
     }
 
     if true && !init_node
-        && depth >= 7
+        && depth >= 8
         && sse.tt_hit
         && sse.excluded_move.is_null
         && sse.tt_val.abs() < MATE_SCORE - 100000 // TODO give this a name
@@ -390,7 +392,7 @@ fn search(node: &mut Bitboard,
         // I can't afford to do the super-tight cutoffs stockfish does though
         let tt_val = sse.tt_val;
         let tt_move = sse.tt_move;
-        let margin = if sse.tt_node_type == PV_NODE {40 * (depth / 2)} else {30 * (depth / 2)}; // 200
+        let margin = if sse.tt_node_type == PV_NODE {25 * (depth / 2)} else {20 * (depth / 2)};
         let depth_to_search = if sse.tt_node_type == PV_NODE {(depth + 2) / 2} else {(depth - 1) / 2};
         let target = sse.tt_val - margin;
 
@@ -407,10 +409,10 @@ fn search(node: &mut Bitboard,
             // so this is probably a cutnode
             return target;
         } else if tt_val >= beta {
-            sse.excluded_move = tt_move;
-            let val = search(node, beta - 1, beta, (depth + 3) / 2, ply, false, cut_node, thread_num);
-            sse.excluded_move = Move::null_move();
-            if val >= beta { return beta; }
+            // sse.excluded_move = tt_move;
+            // let val = search(node, beta - 1, beta, (depth + 3) / 2, ply, false, cut_node, thread_num);
+            // sse.excluded_move = Move::null_move();
+            // if val >= beta { return beta; }
         }
     }
 
@@ -440,7 +442,7 @@ fn search(node: &mut Bitboard,
             break;
         }
 
-        if !init_node && mv == sse.excluded_move {
+        if mv == sse.excluded_move {
             continue;
         }
 
@@ -473,9 +475,9 @@ fn search(node: &mut Bitboard,
             let mut do_full_zw_search = true;
             if depth > LMR_DEPTH
                 && !init_node
-                && moves_searched > 2
+                && moves_searched > 3
                 && !is_check
-                // && score < KILLER_OFFSET
+                && score < KILLER_OFFSET
                 // && (is_quiet || cut_node) {
                 && (is_quiet || score < QUIET_OFFSET) {
                     do_full_zw_search = false;
