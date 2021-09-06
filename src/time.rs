@@ -49,7 +49,7 @@ pub fn get_time_bounds_clock_inc(clock: i32, inc: i32, overhead: i32, ply: i32, 
     let est_time_per_move = (((clock - inc) as f64 / moves_remaining) + inc as f64) - overhead as f64;
 
     let optimum_time = cmp::min((est_time_per_move * 0.2).ceil() as u128, cmp::max(0, clock - overhead) as u128);
-    let maximum_time = cmp::min((est_time_per_move * 2.0).ceil() as u128, cmp::max(0, clock - overhead) as u128);
+    let maximum_time = cmp::min((est_time_per_move * 1.5).ceil() as u128, cmp::max(0, clock - overhead) as u128);
 
     return (optimum_time, maximum_time);
 }
@@ -59,7 +59,7 @@ pub fn get_time_bounds_moves_to_go(clock: i32, moves_to_go: i32, overhead: i32) 
     let est_time_per_move = (clock as f64 / moves_remaining) - overhead as f64;
 
     let optimum_time = cmp::min((est_time_per_move * 0.2).ceil() as u128, cmp::max(0, clock - overhead) as u128);
-    let maximum_time = cmp::min((est_time_per_move * 2.0).ceil() as u128, cmp::max(0, clock - overhead) as u128);
+    let maximum_time = cmp::min((est_time_per_move * 1.5).ceil() as u128, cmp::max(0, clock - overhead) as u128);
 
     return (optimum_time, maximum_time);
 }

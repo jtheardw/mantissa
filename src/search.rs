@@ -409,10 +409,10 @@ fn search(node: &mut Bitboard,
             // so this is probably a cutnode
             return target;
         } else if tt_val >= beta {
-            // sse.excluded_move = tt_move;
-            // let val = search(node, beta - 1, beta, (depth + 3) / 2, ply, false, cut_node, thread_num);
-            // sse.excluded_move = Move::null_move();
-            // if val >= beta { return beta; }
+            sse.excluded_move = tt_move;
+            let val = search(node, beta - 1, beta, (depth + 3) / 2, ply, false, cut_node, thread_num);
+            sse.excluded_move = Move::null_move();
+            if val >= beta { return beta; }
         }
     }
 
@@ -478,8 +478,8 @@ fn search(node: &mut Bitboard,
                 && moves_searched >= 4
                 && !is_check
                 && score < KILLER_OFFSET
-                // && (is_quiet || cut_node) {
-                && (is_quiet || score < QUIET_OFFSET) {
+                && (is_quiet || cut_node || score < QUIET_OFFSET) {
+                // && (is_quiet || score < QUIET_OFFSET) {
                     do_full_zw_search = false;
                     let mut r = lmr_reduction(depth, moves_searched);
                     if gives_check { r -= 1; }
@@ -496,7 +496,7 @@ fn search(node: &mut Bitboard,
                             if see_score < 0 {
                                 r += 1;
                             } else {
-                                r -= 1;
+                                r -= 2;
                             }
                             node.do_move(&mv);
                         }
