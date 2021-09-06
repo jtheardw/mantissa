@@ -475,7 +475,7 @@ fn search(node: &mut Bitboard,
             let mut do_full_zw_search = true;
             if depth > LMR_DEPTH
                 && !init_node
-                && moves_searched > 3
+                && moves_searched >= 4
                 && !is_check
                 && score < KILLER_OFFSET
                 // && (is_quiet || cut_node) {
