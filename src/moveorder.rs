@@ -12,15 +12,16 @@ const REMAINING_MOVES: u8 = 1;
 const TT_MOVE_SCORE: u64 = 0xFFFFFFFFFFFFFFFF;
 // offsets for scores
 // winning and equal captures
-const QUEEN_CAPTURE_OFFSET: u64 = 1 << 60;
-const ROOK_CAPTURE_OFFSET: u64 = 1 << 59;
-const BISHOP_CAPTURE_OFFSET: u64 = 1 << 58;
-const KNIGHT_CAPTURE_OFFSET: u64 = 1 << 57;
-const PAWN_CAPTURE_OFFSET: u64 = 1 << 56;
+// const QUEEN_CAPTURE_OFFSET: u64 = 1 << 60;
+// const ROOK_CAPTURE_OFFSET: u64 = 1 << 59;
+// const BISHOP_CAPTURE_OFFSET: u64 = 1 << 58;
+// const KNIGHT_CAPTURE_OFFSET: u64 = 1 << 57;
+// const PAWN_CAPTURE_OFFSET: u64 = 1 << 56;
+const OK_CAPTURE_OFFSET: u64 = 1 << 60;
 
 // quiet moves
 pub const KILLER_OFFSET: u64 = 1 << 50;
-pub const QUIET_OFFSET: u64 = 1 << 10;
+pub const QUIET_OFFSET: u64 = 1 << 12;
 
 // losing captures
 const BAD_CAPTURE_OFFSET: u64 = 0;
@@ -64,6 +65,7 @@ impl MovePicker {
 
     fn score_moves(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u64)> {
         let mut scored_moves: Vec<(Move, u64)> = Vec::new();
+        let defended_pieces = all_attacks_board(pos, !pos.side_to_move) & pos.composite[!pos.side_to_move as usize];
 
         for mv in movelist {
             let mv_score: u64;
@@ -83,35 +85,32 @@ impl MovePicker {
             } else {
                 let my_val = match mv.piece {
                     b'p' => 1,
-                    b'n' => 2,
+                    b'n' => 3,
                     b'b' => 3,
-                    b'r' => 4,
-                    b'q' => 5,
-                    b'k' => 6,
+                    b'r' => 5,
+                    b'q' => 9,
+                    b'k' => 200,
                     _ => 0
                 };
 
                 let their_val = match captured {
                     b'p' => 1,
-                    b'n' => 2,
+                    b'n' => 3,
                     b'b' => 3,
-                    b'r' => 4,
-                    b'q' => 5,
+                    b'r' => 5,
+                    b'q' => 9,
+                    b'k' => panic!("Captured king?"),
                     _ => 0
                 };
 
-                if my_val > their_val && mv.piece != b'k' {
-                    mv_score = BAD_CAPTURE_OFFSET + (10 - (my_val - their_val));
+                if idx_to_bb(mv.end) & defended_pieces == 0 {
+                    // free capture
+                    mv_score = their_val;
+                } else if my_val > their_val {
+                    mv_score = BAD_CAPTURE_OFFSET + (1000 - (my_val - their_val));
                 } else {
-                    let offset = 10 - my_val;
-                    mv_score = offset + match captured {
-                        b'q' => QUEEN_CAPTURE_OFFSET,
-                        b'r' => ROOK_CAPTURE_OFFSET,
-                        b'b' => BISHOP_CAPTURE_OFFSET,
-                        b'n' => KNIGHT_CAPTURE_OFFSET,
-                        b'p' => PAWN_CAPTURE_OFFSET,
-                        _ => 0
-                    };
+                    let offset = their_val - my_val;
+                    mv_score = OK_CAPTURE_OFFSET + offset;
                 }
             }
 

@@ -476,3 +476,53 @@ pub fn qmoves(pos: &Bitboard) -> Vec<Move> {
 
     return moves;
 }
+
+pub fn all_attacks_board(pos: &Bitboard, side: Color) -> u64 {
+    let me = side as usize;
+    let pawns = pos.pawn[me];
+    let mut knights = pos.knight[me];
+    let mut bishops = pos.bishop[me];
+    let mut rooks = pos.rook[me];
+    let mut queens = pos.queen[me];
+    let mut kings = pos.king[me];
+    let occ = pos.composite[0] | pos.composite[1];
+
+    let mut attacks: u64 = 0;
+    attacks |= if side == Color::White {
+        ((pawns & !FILE_MASKS[0]) << 7) | ((pawns & !FILE_MASKS[7]) << 9)
+    } else {
+        ((pawns & !FILE_MASKS[0]) >> 9) | ((pawns & !FILE_MASKS[7]) >> 7)
+    };
+
+    while knights != 0 {
+        let idx = knights.trailing_zeros() as i32;
+        attacks |= knight_moves_board(idx);
+        knights &= knights - 1;
+    }
+
+    while bishops != 0 {
+        let idx = bishops.trailing_zeros() as i32;
+        attacks |= bishop_moves_board(idx, occ);
+        bishops &= bishops - 1;
+    }
+
+    while rooks != 0 {
+        let idx = rooks.trailing_zeros() as i32;
+        attacks |= rook_moves_board(idx, occ);
+        rooks &= rooks - 1;
+    }
+
+    while queens != 0 {
+        let idx = queens.trailing_zeros() as i32;
+        attacks |= queen_moves_board(idx, occ);
+        queens &= queens - 1;
+    }
+
+    while kings != 0 {
+        let idx = kings.trailing_zeros() as i32;
+        attacks |= king_normal_moves_board(idx);
+        kings &= kings - 1;
+    }
+
+    return attacks;
+}
