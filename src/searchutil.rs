@@ -4,7 +4,7 @@ use crate::tt::*;
 use crate::util::*;
 
 pub const EFP_DEPTH: i32 = 3;         // extended futility pruning
-pub const RFP_DEPTH: i32 = 3;         // reverse futility pruning
+pub const RFP_DEPTH: i32 = 6;         // reverse futility pruning
 pub const NMP_DEPTH: i32 = 3;         // null-move pruning/reductions
 pub const LMR_DEPTH: i32 = 3;         // late move reductions
 
@@ -20,8 +20,9 @@ pub fn rfp_margin(depth: i32) -> i32 {
 }
 
 pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
-    let mut r = if depth > 6 {3} else {2};
-    r += ((static_eval - beta) / 1000) as i32;
+    // let mut r = if depth > 6 {3} else {2};
+    let mut r = 3 + (depth / 6);
+    r += ((static_eval - beta) / 2000) as i32;
     return r;
 }
 

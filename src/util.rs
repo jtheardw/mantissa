@@ -6,6 +6,7 @@ pub const CUT_NODE: u8 = 2;
 pub const PV_NODE: u8 = 3;
 
 pub const MATE_SCORE: i32 = 1000000;
+pub const MIN_MATE_SCORE: i32 = MATE_SCORE - 100000;
 pub const DRAW_SCORE: i32 = 0;
 
 pub const MAX_DEPTH: usize = 64;

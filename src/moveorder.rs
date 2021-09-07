@@ -105,7 +105,7 @@ impl MovePicker {
 
                 if idx_to_bb(mv.end) & defended_pieces == 0 {
                     // free capture
-                    mv_score = their_val;
+                    mv_score = OK_CAPTURE_OFFSET + their_val;
                 } else if my_val > their_val {
                     mv_score = BAD_CAPTURE_OFFSET + (1000 - (my_val - their_val));
                 } else {
