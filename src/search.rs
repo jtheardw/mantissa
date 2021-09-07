@@ -196,6 +196,9 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             }
 
             print_info(depth, TI[0].seldepth, &pv, val, current_time - start_time, nodes_searched);
+            for i in 0..MAX_PLY {
+                SS[0][i].pv = Vec::new();
+            }
         }
 
         // we've obviously run out of time
@@ -392,7 +395,7 @@ fn search(node: &mut Bitboard,
         // I can't afford to do the super-tight cutoffs stockfish does though
         let tt_val = sse.tt_val;
         let tt_move = sse.tt_move;
-        let margin = if sse.tt_node_type == PV_NODE {25 * (depth / 2)} else {20 * (depth / 2)};
+        let margin = if sse.tt_node_type == PV_NODE {40 * (depth / 2)} else {30 * (depth / 2)};
         let depth_to_search = if sse.tt_node_type == PV_NODE {(depth + 2) / 2} else {(depth - 1) / 2};
         let target = sse.tt_val - margin;
 
@@ -435,6 +438,7 @@ fn search(node: &mut Bitboard,
     }
 
     let mut found_legal_move = false;
+    sse.pv = Vec::new();
     loop {
         let (mv, score) = movepicker.next(node);
         if mv.is_null {
@@ -549,8 +553,10 @@ fn search(node: &mut Bitboard,
                     ti.update_killers(mv, ply);
                     ti.update_move_history(mv, node.side_to_move, depth);
                 }
-                unsafe {
-                    TT.set(node.hash, best_move, TTEntry::make_tt_score(val, ply), CUT_NODE, depth, node.history.len() as i32);
+                if sse.excluded_move.is_null {
+                    unsafe {
+                        TT.set(node.hash, best_move, TTEntry::make_tt_score(val, ply), CUT_NODE, depth, node.history.len() as i32);
+                    }
                 }
             }
             return val;
@@ -558,6 +564,13 @@ fn search(node: &mut Bitboard,
     }
 
     if best_move.is_null {
+        // if !found_legal_move && !sse.excluded_move.is_null {
+        //     node.do_move(&sse.excluded_move);
+        //     if !node.is_check(!node.side_to_move) {
+        //         found_legal_move = true;
+        //     }
+        //     node.undo_move(&sse.excluded_move);
+        // }
         if !found_legal_move {
             // some sort of mate
             sse.pv = Vec::new();
