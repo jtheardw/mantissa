@@ -265,6 +265,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
         depth += 1;
     }
+
     println!("bestmove {}", best_move);
     unsafe {
         SEARCH_IN_PROGRESS = false;
@@ -593,9 +594,6 @@ fn search(node: &mut Bitboard,
         if alpha >= beta {
             // fail-high
             if !thread_killed() {
-                // if depth > 8 {
-                //     println!("fail high on move {} score {} quiet {}", moves_searched, score, is_quiet);
-                // }
                 if is_quiet {
                     // update heuristics
                     ti.update_killers(mv, ply);
@@ -612,13 +610,6 @@ fn search(node: &mut Bitboard,
     }
 
     if best_move.is_null {
-        // if !found_legal_move && !sse.excluded_move.is_null {
-        //     node.do_move(&sse.excluded_move);
-        //     if !node.is_check(!node.side_to_move) {
-        //         found_legal_move = true;
-        //     }
-        //     node.undo_move(&sse.excluded_move);
-        // }
         if !found_legal_move {
             // some sort of mate
             sse.pv = Vec::new();
@@ -638,6 +629,7 @@ fn search(node: &mut Bitboard,
             TT.set(node.hash, best_move, TTEntry::make_tt_score(best_val, ply), if raised_alpha {PV_NODE} else {ALL_NODE}, depth, node.history.len() as i32);
         }
     }
+
     return best_val;
 }
 
