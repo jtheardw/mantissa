@@ -32,7 +32,6 @@ pub fn afp_margin(depth: i32) -> i32 {
 }
 
 pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
-    // let mut r = if depth > 6 {3} else {2};
     let mut r = 3 + (depth / 6);
     r += cmp::min(3, ((static_eval - beta) / 2300)) as i32;
     return r;
@@ -43,6 +42,9 @@ pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
 }
 
 pub fn lmp_count(improving: bool, depth: i32) -> i32 {
+    // TENTATIVE.  Currently letting a version of mantissa play
+    // with this enabled using values very similar to Ethereal's but slightly
+    // more conservative.  Subject to change or removal altogether soon.
     if improving {
         4 + 4 * depth * depth / 4
     } else {
