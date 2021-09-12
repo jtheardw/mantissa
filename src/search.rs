@@ -57,7 +57,6 @@ fn get_val_str(val: i32) -> String {
     return format!("mate {}", mate_score);
 }
 
-// todo move this to uci
 fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, nodes: u64) {
     let pv_str = get_pv_str(pv);
     let val_str = get_val_str(val);
@@ -283,11 +282,9 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     }
 }
 
-
 fn see_score(pos: &mut Bitboard, mv: Move) -> i32 {
     return see(pos, mv.end, pos.piece_at_square(mv.end, !pos.side_to_move), mv.start, mv.piece);
 }
-
 
 fn search(node: &mut Bitboard,
           alpha: i32,
