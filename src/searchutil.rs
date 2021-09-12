@@ -1,10 +1,14 @@
+use std::cmp;
+
 use crate::moveutil::*;
 use crate::time::*;
 use crate::tt::*;
 use crate::util::*;
 
 pub const EFP_DEPTH: i32 = 3;         // extended futility pruning
+pub const FP_DEPTH: i32 = 5;
 pub const RFP_DEPTH: i32 = 6;         // reverse futility pruning
+pub const AFP_DEPTH: i32 = 8;         // reverse futility pruning
 pub const NMP_DEPTH: i32 = 3;         // null-move pruning/reductions
 pub const LMR_DEPTH: i32 = 3;         // late move reductions
 
@@ -15,19 +19,35 @@ pub fn efp_margin(depth: i32) -> i32 {
     // return base + 1000 * (depth - 1);
 }
 
+pub fn fp_margin(depth: i32) -> i32 {
+    return 1000 + depth * 1000;
+}
+
 pub fn rfp_margin(depth: i32) -> i32 {
     return 1300 * depth;
+}
+
+pub fn afp_margin(depth: i32) -> i32 {
+    return 20000;
 }
 
 pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
     // let mut r = if depth > 6 {3} else {2};
     let mut r = 3 + (depth / 6);
-    r += ((static_eval - beta) / 2000) as i32;
+    r += cmp::min(3, ((static_eval - beta) / 2300)) as i32;
     return r;
 }
 
 pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
-    return 1 + ((moves_searched - 4) / 4) + (depth / 8);
+    return (0.75 + (depth as f64).log2() * (moves_searched as f64).log2() / 2.25).floor() as i32;
+}
+
+pub fn lmp_count(improving: bool, depth: i32) -> i32 {
+    if improving {
+        4 + 4 * depth * depth / 4
+    } else {
+        2 + 2 * depth * depth / 4
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -103,18 +123,24 @@ pub struct ThreadInfo {
     pub nodes_searched: u64,
     pub seldepth: i32,
     pub killers: [[Move; 2]; MAX_PLY],
-    pub move_history: [[u64; 64]; 12]
+    pub move_history: [[i32; 64]; 12],
+    pub countermove_table: [[Move; 64]; 12],
+    pub followup_history: Vec<[[[i32; 64]; 12]; 64]>
 }
 
 impl ThreadInfo {
     pub fn new() -> ThreadInfo {
         let killers = [[Move::null_move(); 2]; MAX_PLY];
         let move_history = [[0; 64]; 12];
+        let countermove_table = [[Move::null_move(); 64]; 12];
+        let followup_history = vec![[[[0; 64]; 12]; 64]; 12];
         ThreadInfo {
             nodes_searched: 0,
             seldepth: 0,
             killers: killers,
-            move_history: move_history
+            move_history: move_history,
+            countermove_table: countermove_table,
+            followup_history: followup_history
         }
     }
 
@@ -123,11 +149,18 @@ impl ThreadInfo {
         self.seldepth = 0;
         self.nodes_searched = 0;
         self.move_history = [[0; 64]; 12];
+        self.countermove_table = [[Move::null_move(); 64]; 12];
+        self.followup_history = vec![[[[0; 64]; 12]; 64]; 12];
     }
 
-    pub fn update_move_history(&mut self, mv: Move, side: Color, depth: i32) {
+    pub fn update_move_history(&mut self, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
+        for s_mv in searched_moves {
+            if *s_mv == mv {continue;}
+            let piece_num = get_piece_num(s_mv.piece, side);
+            self.move_history[piece_num][s_mv.end as usize] -= depth * depth;
+        }
         let piece_num = get_piece_num(mv.piece, side);
-        self.move_history[piece_num][mv.end as usize] += 1 << depth;
+        self.move_history[piece_num][mv.end as usize] += depth * depth;
     }
 
     pub fn update_killers(&mut self, mv: Move, ply: i32) {
@@ -137,6 +170,32 @@ impl ThreadInfo {
             self.killers[ply][0] = mv;
         }
     }
+
+    pub fn update_countermove(&mut self, prev_mv: Move, mv: Move, side: Color) {
+        if prev_mv.is_null || mv.is_null { return; }
+        let piece_num = get_piece_num(prev_mv.piece, side);
+        self.countermove_table[piece_num][prev_mv.end as usize] = mv;
+    }
+
+    pub fn update_followup(&mut self, prev_mv: Move, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
+        if prev_mv.is_null || mv.is_null { return; }
+        let prev_piece_num = get_piece_num(prev_mv.piece, side);
+        let prev_end = prev_mv.end as usize;
+        for s_mv in searched_moves {
+            if *s_mv == mv {
+                continue;
+            }
+            let piece_num = get_piece_num(s_mv.piece, side);
+            let end = s_mv.end as usize;
+
+            self.followup_history[prev_piece_num][prev_end][piece_num][end] -= depth * depth;
+        }
+
+        let piece_num = get_piece_num(mv.piece, side);
+        let end = mv.end as usize;
+
+        self.followup_history[prev_piece_num][prev_end][piece_num][end] += depth * depth;
+    }
 }
 
 pub struct SearchStatsEntry {
@@ -145,6 +204,7 @@ pub struct SearchStatsEntry {
     pub ply: i32,
     pub searching_null_move: bool,
     pub excluded_move: Move,
+    pub current_move: Move,
     pub tt_hit: bool,
     pub tt_move: Move,
     pub tt_val: i32,
@@ -160,6 +220,7 @@ impl SearchStatsEntry {
             ply: 0,
             searching_null_move: false,
             excluded_move: Move::null_move(),
+            current_move: Move::null_move(),
             tt_hit: false,
             tt_move: Move::null_move(),
             tt_val: 0,
@@ -173,6 +234,8 @@ impl SearchStatsEntry {
         self.static_eval = 0;
         self.ply = 0;
         self.searching_null_move = false;
+        self.excluded_move = Move::null_move();
+        self.current_move = Move::null_move();
         self.tt_hit = false;
     }
 }

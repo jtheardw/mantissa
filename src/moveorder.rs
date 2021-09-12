@@ -17,28 +17,31 @@ const TT_MOVE_SCORE: u64 = 0xFFFFFFFFFFFFFFFF;
 // const BISHOP_CAPTURE_OFFSET: u64 = 1 << 58;
 // const KNIGHT_CAPTURE_OFFSET: u64 = 1 << 57;
 // const PAWN_CAPTURE_OFFSET: u64 = 1 << 56;
-const OK_CAPTURE_OFFSET: u64 = 1 << 60;
+pub const OK_CAPTURE_OFFSET: u64 = 1 << 60;
 
 // quiet moves
 pub const KILLER_OFFSET: u64 = 1 << 50;
-pub const QUIET_OFFSET: u64 = 1 << 12;
+pub const COUNTER_OFFSET: u64 = 1 << 49;
+pub const QUIET_OFFSET: u64 = 1 << 20;
 
 // losing captures
-const BAD_CAPTURE_OFFSET: u64 = 0;
+pub const BAD_CAPTURE_OFFSET: u64 = 0;
 
 pub struct MovePicker {
     q_moves_only: bool,
     move_stage: u8,
     tt_move: Move,
     killers: [Move; 2],
-    history: [[u64; 64]; 12],
+    history: [[i32; 64]; 12],
+    countermove: Move,
+    followup: [[i32; 64]; 12],
     scored_moves: Vec<(Move, u64)>,
     cur_i: usize,
 }
 
 impl MovePicker {
 
-    pub fn new(tt_move: Move, killers: [Move; 2], history: [[u64; 64]; 12], q_moves_only: bool) -> MovePicker {
+    pub fn new(tt_move: Move, killers: [Move; 2], history: [[i32; 64]; 12], countermove: Move, followup_history: [[i32; 64]; 12], q_moves_only: bool) -> MovePicker {
         let stage = if tt_move.is_null {REMAINING_MOVES} else {TT_MOVE};
         MovePicker {
             q_moves_only: q_moves_only,
@@ -46,6 +49,8 @@ impl MovePicker {
             tt_move: tt_move,
             killers: killers,
             history: history,
+            followup: followup_history,
+            countermove: countermove,
             scored_moves: Vec::new(),
             cur_i: 0,
         }
@@ -58,6 +63,8 @@ impl MovePicker {
             tt_move: Move::null_move(),
             killers: [Move::null_move(); 2],
             history: [[0; 64]; 12],
+            followup: [[0; 64]; 12],
+            countermove: Move::null_move(),
             scored_moves: Vec::new(),
             cur_i: 0
         }
@@ -78,9 +85,11 @@ impl MovePicker {
                 // not a capture
                 if mv == self.killers[0] || mv == self.killers[1] {
                     mv_score = KILLER_OFFSET;
+                } else if mv == self.countermove {
+                    mv_score = COUNTER_OFFSET;
                 } else {
                     let piece_num = get_piece_num(mv.piece, pos.side_to_move);
-                    mv_score = QUIET_OFFSET + self.history[piece_num][mv.end as usize];
+                    mv_score = QUIET_OFFSET + (self.history[piece_num][mv.end as usize] + self.followup[piece_num][mv.end as usize]) as u64;
                 }
             } else {
                 let my_val = match mv.piece {

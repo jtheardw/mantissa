@@ -68,30 +68,38 @@ fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, n
 }
 
 pub fn abort_search() {
+    // kill a search altogether
     unsafe {
         ABORT = true;
     }
 }
 
 pub fn stop_threads() {
+    // stop the currently running threads
+    // but don't necessarily abandon
+    // the whole search.  Used
+    // to kill child threads in the ID loop
     unsafe {
         STOP_THREAD = true;
     }
 }
 
 pub fn allow_threads() {
+    // re-enable threads to be spawned
     unsafe {
         STOP_THREAD = false;
     }
 }
 
 pub fn search_aborted() -> bool {
+    // check if search is aborted
     unsafe {
         ABORT
     }
 }
 
 pub fn thread_killed() -> bool {
+    // check if a thread should die
     unsafe {
         ABORT || STOP_THREAD
     }
@@ -128,7 +136,7 @@ fn thread_handler(mut node: Bitboard, thread_depth: i32, thread_num: usize) {
                 beta = val + aspiration_delta;
             }
 
-            val = search(&mut node, alpha, beta, depth, 0, true, false, thread_num);
+            val = search(&mut node, alpha, beta, depth, 0, true, thread_num);
             if thread_killed() { return; }
 
             if val > alpha && val < beta {
@@ -141,8 +149,11 @@ fn thread_handler(mut node: Bitboard, thread_depth: i32, thread_num: usize) {
     }
 }
 
-pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLimits) { // TODO threads
+pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLimits) {
     let start_time = get_time_millis();
+    let mut search_limits = search_limits;
+    let max_time = search_limits.maximum_time;
+    search_limits.maximum_time = 10000;
     unsafe {
         SEARCH_IN_PROGRESS = true;
         ABORT = false;
@@ -158,7 +169,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         }
     }
 
-    let mut depth: i32 = 1;
+    let mut depth: i32 = 2;
     let mut current_time: u128;
 
     let mut best_move_changes = 0;
@@ -167,7 +178,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     let mut val: i32 = LB;
     let mut pv: &Vec<Move>;
 
-    // TODO aspiration windows
     while depth <= search_limits.depth {
         allow_threads();
         let mut threads = Vec::new();
@@ -176,7 +186,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             let thread_depth = depth + thread_num.trailing_zeros() as i32;
             let thread_node = node.thread_copy();
 
-            // search(&mut thread_node, alpha, beta, thread_depth, 0, true, false, thread_num as usize);
             threads.push(thread::spawn(move || {
                 thread_handler(thread_node, thread_depth, thread_num as usize);
             }));
@@ -191,7 +200,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
                 beta = val + aspiration_delta;
             }
 
-            val = search(node, alpha, beta, depth, 0, true, false, 0);
+            val = search(node, alpha, beta, depth, 0, true, 0);
             if search_aborted() {break;}
 
             if val > alpha && val < beta {
@@ -208,6 +217,8 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
         let elapsed_time;
         unsafe {
+            SEARCH_LIMITS.maximum_time = max_time;
+            search_limits.maximum_time = max_time;
             pv = &SS[0][0].pv;
             let mv = pv[0];
             if mv != best_move {
@@ -272,13 +283,18 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     }
 }
 
+
+fn see_score(pos: &mut Bitboard, mv: Move) -> i32 {
+    return see(pos, mv.end, pos.piece_at_square(mv.end, !pos.side_to_move), mv.start, mv.piece);
+}
+
+
 fn search(node: &mut Bitboard,
           alpha: i32,
           beta: i32,
           depth: i32,
           ply: i32,
           is_pv: bool,
-          cut_node: bool,
           thread_num: usize) -> i32 {
     if thread_num == 0 {
         // main thread
@@ -301,15 +317,26 @@ fn search(node: &mut Bitboard,
     }
     let init_node = ply == 0;
     sse.pv = Vec::new();
+    sse.current_move = Move::null_move();
 
+    if ply > ti.seldepth {
+        ti.seldepth = ply;
+    }
+    ti.nodes_searched += 1;
+
+    let mut alpha = alpha;
+    let mut beta = beta;
     if !init_node {
         if node.is_repetition() {
             return DRAW_SCORE;
         }
-    }
 
-    if ply > ti.seldepth {
-        ti.seldepth = ply;
+        // mate distance pruning
+        alpha = cmp::max(alpha, -MATE_SCORE + ply);
+        beta = cmp::min(beta, MATE_SCORE - (ply + 1));
+        if alpha >= beta {
+            return alpha;
+        }
     }
 
     let mut depth = depth;
@@ -322,18 +349,6 @@ fn search(node: &mut Bitboard,
         depth = 1;
     }
 
-    ti.nodes_searched += 1;
-
-    let mut alpha = alpha;
-    let mut beta = beta;
-    if !init_node {
-        // mate distance pruning
-        alpha = cmp::max(alpha, -MATE_SCORE + ply);
-        beta = cmp::min(beta, MATE_SCORE - (ply + 1));
-        if alpha >= beta {
-            return alpha;
-        }
-    }
     unsafe {
         let tt_entry = TT.get(node.hash);
         if tt_entry.valid {
@@ -357,8 +372,23 @@ fn search(node: &mut Bitboard,
             if (node_type & CUT_NODE) != 0 && tt_val >= beta {
                 let mv = sse.tt_move;
                 if is_quiet_move(&mv, node) {
+                    // we still want to update our heuristic counters
+                    // here.
+                    let my_prev_mv = if ply >= 2 {
+                        ss[(ply - 2) as usize].current_move
+                    } else {
+                        Move::null_move()
+                    };
+                    let prev_mv = if !init_node {
+                        ss[(ply - 1) as usize].current_move
+                    } else {
+                        Move::null_move()
+                    };
+
                     ti.update_killers(mv, ply);
-                    ti.update_move_history(mv, node.side_to_move, depth);
+                    ti.update_move_history(mv, node.side_to_move, depth, &Vec::new());
+                    ti.update_countermove(prev_mv, mv, !node.side_to_move);
+                    ti.update_followup(my_prev_mv, mv, node.side_to_move, depth, &Vec::new());
                 }
                 return tt_val;
             } else if (node_type & ALL_NODE) != 0 && tt_val <= alpha {
@@ -370,13 +400,11 @@ fn search(node: &mut Bitboard,
         // if we fail to get a tt hit on a PV node, which should be fairly rare
         // at high depths, we'll do a reduced search to get a good guess for first move
         sse.pv = Vec::new();
-        let val = search(node, alpha, beta, depth - 2, ply, true, false, thread_num);
+        let val = search(node, alpha, beta, depth - 2, ply, true, thread_num);
         if sse.pv.len() > 0 {
             sse.tt_move = sse.pv[0];
             sse.pv = Vec::new();
             sse.tt_val = val;
-        } else {
-            // panic!("why wasn't there a pv here?");
         }
     }
 
@@ -384,16 +412,48 @@ fn search(node: &mut Bitboard,
     sse.static_eval = static_eval(node);
     let eval = sse.static_eval;
 
+    // is our position getting better than it was a move ago?
+    // if so we might want to be more conservative about reductions and pruning
+    // moreso because we want to slightly more aggressively prune moves that *aren't*
+    // making things better.
+    let improving = ply >= 2 && !is_check && eval > ss[(ply - 2) as usize].static_eval;
+
+    // clear out the killers for our children.
+    // this is an experiment in move ordering that I've seen in Ethereal
+    // there are plenty of strong engines that don't do this
+    // so it's just being played around with.
     ti.killers[(ply + 1) as usize] = [Move::null_move(), Move::null_move()];
 
     // Reverse Futility Pruning
-    if depth < RFP_DEPTH && !is_pv && !is_check && !init_node {
-        if (eval - rfp_margin(depth)) >= beta {
+    // AKA if our position is really really good
+    // like better than it ought to be
+    // chances are it will remain too good to be true
+    // in the remaining ply of the search
+    if depth < RFP_DEPTH && !is_pv && !is_check {
+        if (eval - rfp_margin(depth)) > beta {
             return eval - rfp_margin(depth);
         }
     }
 
-    // Null Move Reductions
+    // If we are way, way below alpha (generally an amount that is considered unsalvageable)
+    // just stop here.  You're not going to make back up being 25 pawns below alpha in the
+    // remaining 8 or 9 ply of the search.
+    if depth < AFP_DEPTH && !is_pv & !is_check {
+        if (eval + afp_margin(depth)) <= alpha {
+            return eval;
+        }
+    }
+
+    // Null Move Pruning
+    // Similar idea to RFP above, but more nuanced.
+    // If we have a position that seems to be above beta, we check if the position is in fact so good
+    // that we can still be ahead even if we stay still and give our opponent a second move in a row.
+
+    // There are some restrictions, mostly that we want to avoid messing up in zugzwang positions
+    // by checking for nonpawn material (most zugzwang occurs in king and pawn endgames)
+
+    // we also don't want to do things like 2 null moves in a row
+    // and we don't want to pollute our singular move search
     if !is_pv
         && depth >= NMP_DEPTH
         && !is_check
@@ -406,28 +466,31 @@ fn search(node: &mut Bitboard,
         && (!sse.tt_hit || sse.tt_node_type & CUT_NODE == 0 || sse.tt_val >= beta)
     {
         let r = null_move_r(sse.static_eval, beta, depth);
-        // if r > 2 && depth > 10 {
-        //     println!("{} {} {} {}", depth, r, sse.static_eval, beta);
-        // }
+
         sse.searching_null_move = true;
         node.do_null_move();
-        let val = -search(node, -beta, -beta + 1, depth - 1 - r, ply + 1, false, !cut_node, thread_num);
+        let val = -search(node, -beta, -beta + 1, depth - 1 - r, ply + 1, false, thread_num);
         node.undo_null_move();
         sse.searching_null_move = false;
 
         if val >= beta {
-            // using the extended null move reductions
-            // idea from Eli David and Nathan S. Netanyahu
-            // in the paper of the same name
             return beta;
-            // depth -= 4;
-            // if depth <= 0 {
-            //     return search(node, alpha, beta, 0, ply, false, false, thread_num);
-            // }
         }
     }
 
-    if true && !init_node
+    // Singular Extensions + Multi-cut:
+    // If we have a decent guess for best move from the TT, we want
+    // to test this move for 'singularity'. That is, is this move the only
+    // sane move in this position by a fair margin.  If so, we're in
+    // a sort of extended set of tactics or walking a fine line, and we
+    // definitely don't want to stop searching before we see this situation to a
+    // conclusion.
+
+    // On the other hand, if we have a move that already gives a outcome that's
+    // better than beta, and even when excluding that move we can still beat beta
+    // (at least, in a reduced search), then this node is probably a cut-node.
+    let mut sing_extend = false;
+    if !init_node
         && depth >= 8
         && sse.tt_hit
         && sse.excluded_move.is_null
@@ -442,27 +505,25 @@ fn search(node: &mut Bitboard,
         let tt_val = sse.tt_val;
         let tt_move = sse.tt_move;
         let former_pv = sse.tt_node_type == PV_NODE && !is_pv;
-        let margin = if former_pv {25 * (depth / 2)} else {20 * (depth / 2)};
+        let margin = if former_pv {30 * (depth / 2)} else {25 * (depth / 2)};
         let depth_to_search = if former_pv {(depth + 2) / 2} else {(depth - 1) / 2};
         let target = sse.tt_val - margin;
 
         sse.excluded_move = sse.tt_move;
-        let val = search(node, target - 1, target, depth_to_search, ply, false, cut_node, thread_num);
+        let val = search(node, target - 1, target, depth_to_search, ply, false, thread_num);
         sse.excluded_move = Move::null_move();
 
         if val < target {
-            // println!("val {} tt_val {} target {}", val, sse.tt_val, target);
-            // singularly extend
-            depth += 1;
+            sing_extend = true;
         } else if target >= beta {
             // pseudo-multi-cut.  This indicates multiple moves failed high
             // so this is probably a cutnode
             return target;
         } else if tt_val >= beta {
-            sse.excluded_move = tt_move;
-            let val = search(node, beta - 1, beta, (depth + 3) / 2, ply, false, cut_node, thread_num);
-            sse.excluded_move = Move::null_move();
-            if val >= beta { return beta; }
+            // sse.excluded_move = tt_move;
+            // let val = search(node, beta - 1, beta, (depth + 3) / 2, ply, false, cut_node, thread_num);
+            // sse.excluded_move = Move::null_move();
+            // if val >= beta { return beta; }
         }
     }
 
@@ -470,23 +531,45 @@ fn search(node: &mut Bitboard,
     let mut best_move = Move::null_move();
     let mut best_val = LB;
     let mut moves_searched: i32 = 0;
-    let mut movepicker = MovePicker::new(sse.tt_move, ti.killers[ply as usize], ti.move_history, false);
-    // futility pruning
+    let prev_mv = if !init_node {ss[(ply - 1) as usize].current_move} else {Move::null_move()};
+    let my_prev_mv = if ply >= 2 {ss[(ply - 2) as usize].current_move} else {Move::null_move()};
+
+    // Countermove Heuristic
+    // The idea here is that many moves have a natural response
+    // i.e. a counter. When a quiet move causes a fail high
+    // we may consider that move a potential "counter" to the move
+    // that preceded it, so we give it a bonus in move ordering
+    let countermove = if prev_mv.is_null {
+        Move::null_move()
+    } else {
+        let piece_num = get_piece_num(prev_mv.piece, !node.side_to_move);
+        ti.countermove_table[piece_num][prev_mv.end as usize]
+    };
+
+    // Followup History
+    // Similarly to the CM heuristic above, moves by you may
+    // have a natural follow-up in executing a plan.  Here instead
+    // of a specific move, we hold on to a full history table for each move
+    let followup_table = if my_prev_mv.is_null {
+        [[0; 64]; 12]
+    } else {
+        let piece_num = get_piece_num(my_prev_mv.piece, node.side_to_move);
+        ti.followup_history[piece_num][my_prev_mv.end as usize]
+    };
+
+    let mut movepicker = MovePicker::new(sse.tt_move, ti.killers[ply as usize], ti.move_history, countermove, followup_table, false);
+
+    // Futility Pruning.  The 'futile' flag signals
+    // to skip quiet moves.  Different conditions in the search
+    // loop can activate this flag to prune all subsequent quiet moves
+    // from then on.
     let mut futile = false;
-    if !is_pv && !is_check && depth <= EFP_DEPTH {
-        if depth == EFP_DEPTH {
-            if sse.static_eval < alpha - efp_margin(EFP_DEPTH) {
-                depth -= 1;
-            }
-        }
-        if sse.static_eval <= (alpha - efp_margin(depth)) {
-            futile = true;
-        }
-    }
 
     let mut found_legal_move = false;
+    let mut searched_moves: Vec<Move> = Vec::new();
     loop {
         let (mv, score) = movepicker.next(node);
+        sse.current_move = mv;
         if mv.is_null {
             // we've exhausted all the moves
             break;
@@ -504,8 +587,29 @@ fn search(node: &mut Bitboard,
             continue;
         }
         let gives_check = node.is_check(node.side_to_move);
+
+        // VERY EXPERIMENTAL.  Curious to see if doing a basic form of late move pruning
+        // hurts search results in the current mantissa.
+        if best_val > -MIN_MATE_SCORE && depth <= 8 && moves_searched >= lmp_count(improving, depth) {
+            futile = true;
+        }
+
+        if is_quiet && !futile && score < COUNTER_OFFSET && best_val > - MIN_MATE_SCORE {
+            // Futility pruning
+            // modified from the older version to be able to come into play at higher
+            // depths but conditioned on reaching a move with bad history
+            let fp_margin = fp_margin(depth);
+            let hist = if score >= QUIET_OFFSET {(score - QUIET_OFFSET) as i32} else {-((QUIET_OFFSET - score) as i32)};
+            if !is_check
+                && eval + fp_margin <= alpha
+                && depth < FP_DEPTH
+                && hist < if improving {5000} else {9000} {
+                    futile = true;
+                }
+        }
+
         if futile {
-            found_legal_move = true;//&& found_legal_move {
+            found_legal_move = true;
             if !is_tactical && !gives_check {
                 node.undo_move(&mv);
                 continue
@@ -513,9 +617,12 @@ fn search(node: &mut Bitboard,
         }
 
         found_legal_move = true;
+        if is_quiet {
+            searched_moves.push(mv);
+        }
         let mut val = LB;
         if moves_searched == 0 {
-            val = -search(node, -beta, -alpha, depth - 1, ply + 1, is_pv, false, thread_num);
+            val = -search(node, -beta, -alpha, if sing_extend {depth} else {depth - 1}, ply + 1, is_pv, thread_num);
             unsafe {
                 let child_ss = &mut SS[thread_num][(ply + 1) as usize];
                 sse.pv = vec![mv];
@@ -525,20 +632,45 @@ fn search(node: &mut Bitboard,
             let mut do_full_zw_search = true;
             if depth > LMR_DEPTH
                 && !init_node
-                && moves_searched >= 4
+                && moves_searched > 2
                 && !is_check
-                && score < KILLER_OFFSET
-                && (is_quiet || cut_node || score < QUIET_OFFSET) {
-                // && (is_quiet || score < QUIET_OFFSET) {
+                && (is_quiet || score < QUIET_OFFSET) {
+                    // Late Move Reductions.
+                    // the ideas here are a mish-mash of various ideas that are
+                    // constantly being added, removed, and played around with
+                    // some are ideas I've come up with on my own
+                    // some are taken from SF, Ethereal, and others and modified slightly
+                    // to see if they are compatible with Mantissa's search.
                     do_full_zw_search = false;
+
+                    // get base reduction
                     let mut r = lmr_reduction(depth, moves_searched);
-                    if gives_check { r -= 1; }
 
-                    if cut_node { r += 1; }
+                    // this is a common idea I've seen in several engines
+                    // if we're not improving our position, we'll pay
+                    // less attention.
+                    if !improving { r += 1; }
 
-                    if score >= KILLER_OFFSET { r -= 1; }
+                    // This one comes from Ethereal.  If avoiding check with
+                    // a king move, reduce further.
+                    if is_quiet && is_check && mv.piece == b'k' { r += 1; }
 
-                    if !is_quiet {
+                    // This one is pretty clear.  Killer/Counter moves are
+                    // likely to be good.
+                    if score >= COUNTER_OFFSET { r -= 1; }
+
+                    // adjust r based on history of other quiet moves
+                    if is_quiet && score < COUNTER_OFFSET {
+                        let quiet_score = (score as i32) - QUIET_OFFSET as i32;
+                        r -= cmp::max(-2, cmp::min(2, quiet_score / 3000))
+                    }
+
+                    // test captures which initially seem bad
+                    // some of them may (rarely) be fruitful.
+                    // if they are, we reduce them less and possibly
+                    // do a pseudo check-extension on them.
+                    // otherwise, reduce them more
+                    if !is_quiet && score < OK_CAPTURE_OFFSET {
                         let cap_piece = node.get_last_capture();
                         if cap_piece != 0 {
                             node.undo_move(&mv);
@@ -547,30 +679,40 @@ fn search(node: &mut Bitboard,
                                 r += 1;
                             } else {
                                 r -= 1;
+                                if gives_check { r -= 1; }
                             }
                             node.do_move(&mv);
                         }
                     }
 
+
+                    // the tt node type here gives us some impression on if we
+                    // expect this to be a PV node.  Reduce more or less according to
+                    // that expectation.
                     if sse.tt_hit && sse.tt_node_type == PV_NODE { r -= 1; }
                     if sse.tt_hit && sse.tt_node_type != PV_NODE { r += 1; }
 
+                    // in potential PV nodes, we'll be more careful
                     if is_pv && r > 0 {
                         r = (r * 2) / 3;
                     }
 
-                    let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);
+                    // not (yet) allowing extensions from LMR.
+                    // we also don't want to dump directly into qsearch.
+                    let lmr_depth = cmp::min(cmp::max(1, depth - r), depth - 1);
 
-                    val = -search(node, -alpha - 1, -alpha, lmr_depth, ply + 1, false, true, thread_num);
+                    val = -search(node, -alpha - 1, -alpha, lmr_depth, ply + 1, false, thread_num);
                     if val > alpha && lmr_depth < depth - 1 {
+                        // if we raise alpha in the reduced search,
+                        // we have to see if we can raise it in the full-depth
                         do_full_zw_search = true;
                     }
                 }
             if do_full_zw_search {
-                val = -search(node, -alpha - 1, -alpha, depth - 1, ply + 1, false, !cut_node, thread_num);
+                val = -search(node, -alpha - 1, -alpha, depth - 1, ply + 1, false, thread_num);
             }
             if is_pv && val > alpha && val < beta {
-                val = -search(node, -beta, -alpha, depth - 1, ply + 1, true, false, thread_num);
+                val = -search(node, -beta, -alpha, depth - 1, ply + 1, true, thread_num);
                 unsafe {
                     let child_ss = &mut SS[thread_num][(ply + 1) as usize];
                     sse.pv = vec![mv];
@@ -597,7 +739,9 @@ fn search(node: &mut Bitboard,
                 if is_quiet {
                     // update heuristics
                     ti.update_killers(mv, ply);
-                    ti.update_move_history(mv, node.side_to_move, depth);
+                    ti.update_move_history(mv, node.side_to_move, depth, &searched_moves);
+                    ti.update_countermove(prev_mv, mv, !node.side_to_move);
+                    ti.update_followup(my_prev_mv, mv, node.side_to_move, depth, &searched_moves);
                 }
                 if sse.excluded_move.is_null {
                     unsafe {
@@ -662,7 +806,6 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
     let mut best_val = stand_pat;
 
     let mut movepicker = MovePicker::q_new();
-
     loop {
         let (mv, score) = movepicker.next(node);
         if mv.is_null {
@@ -692,14 +835,13 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
             }
         }
 
-        // todo SEE based pruning
-        if score < QUIET_OFFSET {
+        if score <= OK_CAPTURE_OFFSET {
             // see if this is a viable capture
             let cap_piece = node.get_last_capture();
             if cap_piece != 0 {
                 node.undo_move(&mv);
                 let see_score = see(node, mv.end, cap_piece, mv.start, mv.piece);
-                if see_score < 0 {
+                if see_score <= cmp::max(0, alpha - stand_pat) {
                     continue;
                 } else {
                     node.do_move(&mv);
@@ -709,13 +851,13 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
         let val = -qsearch(node, -beta, -alpha, thread_num);
         node.undo_move(&mv);
         if val > best_val {
-            best_val = val
+            best_val = val;
         }
         if val > alpha {
             alpha = val;
         }
         if val >= beta {
-            return val;
+            break;
         }
     }
 

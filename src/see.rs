@@ -31,11 +31,11 @@ fn lva(pos: &Bitboard, atk_bb: u64, side: Color) -> (u64, u8) {
 
 fn get_piece_value(piece: u8) -> i32 {
     return match piece {
-        b'q' => mg_score(QUEEN_VALUE),
-        b'r' => mg_score(ROOK_VALUE),
-        b'b' => mg_score(BISHOP_VALUE),
-        b'n' => mg_score(KNIGHT_VALUE),
-        b'p' => mg_score(PAWN_VALUE),
+        b'q' => 9000,
+        b'r' => 5000,
+        b'b' => 3000,
+        b'n' => 3000,
+        b'p' => 1000,
         b'k' => 200000,
         _ => 0
     };
@@ -96,9 +96,9 @@ pub fn see(pos: &Bitboard, to_idx: i32, target_piece: u8, from_idx: i32, atk_pie
     while from_sq != 0 {
         gain[depth] = get_piece_value(target_piece) - if depth > 0 {gain[depth - 1]} else {0};
 
-        if depth > 0 {
-            if gain[depth - 1] > 0 && gain[depth] < 0 {break;}
-        }
+        // if depth > 0 {
+        //     if gain[depth - 1] > 0 && gain[depth] < 0 {break;}
+        // }
 
         // remove the attacker from occupancy and attacks
         occ ^= from_sq;
