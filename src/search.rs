@@ -449,10 +449,10 @@ fn search(node: &mut Bitboard,
     // Similar idea to RFP above, but more nuanced.
     // If we have a position that seems to be above beta, we check if the position is in fact so good
     // that we can still be ahead even if we stay still and give our opponent a second move in a row.
-
+    //
     // There are some restrictions, mostly that we want to avoid messing up in zugzwang positions
     // by checking for nonpawn material (most zugzwang occurs in king and pawn endgames)
-
+    //
     // we also don't want to do things like 2 null moves in a row
     // and we don't want to pollute our singular move search
     if !is_pv
