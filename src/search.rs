@@ -583,6 +583,7 @@ fn search(node: &mut Bitboard,
         let is_quiet = is_quiet_move(&mv, node);
         node.do_move(&mv);
         if node.is_check(!node.side_to_move) {
+            // Illegal move
             node.undo_move(&mv);
             continue;
         }
@@ -651,10 +652,6 @@ fn search(node: &mut Bitboard,
                     // to get better, so we reduce further.
                     if !improving { r += 1; }
 
-                    // This one comes from Ethereal.  If avoiding check with
-                    // a king move, reduce further.
-                    if is_quiet && is_check && mv.piece == b'k' { r += 1; }
-
                     // This one is pretty clear.  Killer/Counter moves are
                     // likely to be good.
                     if score >= COUNTER_OFFSET { r -= 1; }
@@ -662,7 +659,7 @@ fn search(node: &mut Bitboard,
                     // adjust r based on history of other quiet moves
                     if is_quiet && score < COUNTER_OFFSET {
                         let quiet_score = (score as i32) - QUIET_OFFSET as i32;
-                        r -= cmp::max(-2, cmp::min(2, quiet_score / 3000))
+                        r -= cmp::max(-3, cmp::min(2, quiet_score / 3000))
                     }
 
                     // test captures which initially seem bad
