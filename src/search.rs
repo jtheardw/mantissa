@@ -685,7 +685,6 @@ fn search(node: &mut Bitboard,
                         }
                     }
 
-
                     // the tt node type here gives us some impression on if we
                     // expect this to be a PV node.  Reduce more or less according to
                     // that expectation.
