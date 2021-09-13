@@ -27,13 +27,13 @@ pub fn rfp_margin(depth: i32) -> i32 {
     return 1300 * depth;
 }
 
-pub fn afp_margin(depth: i32) -> i32 {
+pub fn afp_margin(_depth: i32) -> i32 {
     return 20000;
 }
 
 pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
     let mut r = 3 + (depth / 6);
-    r += cmp::min(3, ((static_eval - beta) / 2300)) as i32;
+    r += cmp::min(3, (static_eval - beta) / 2300) as i32;
     return r;
 }
 

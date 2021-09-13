@@ -210,7 +210,11 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         }
         stop_threads();
         for t in threads {
-            t.join();
+            let res = t.join();
+            match res {
+                Err(_) => panic!("Error encountered in thread!"),
+                _ => {}
+            }
         }
         if search_aborted() { break; }
 
@@ -500,7 +504,6 @@ fn search(node: &mut Bitboard,
         //
         // I can't afford to do the super-tight cutoffs stockfish does though
         let tt_val = sse.tt_val;
-        let tt_move = sse.tt_move;
         let former_pv = sse.tt_node_type == PV_NODE && !is_pv;
         let margin = if former_pv {30 * (depth / 2)} else {25 * (depth / 2)};
         let depth_to_search = if former_pv {(depth + 2) / 2} else {(depth - 1) / 2};
@@ -643,9 +646,9 @@ fn search(node: &mut Bitboard,
                     // get base reduction
                     let mut r = lmr_reduction(depth, moves_searched);
 
-                    // this is a common idea I've seen in several engines
-                    // if we're not improving our position, we'll pay
-                    // less attention.
+                    // this is a common idea in several strong engines
+                    // if we're not improving our position, we're often not going
+                    // to get better, so we reduce further.
                     if !improving { r += 1; }
 
                     // This one comes from Ethereal.  If avoiding check with
