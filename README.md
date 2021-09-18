@@ -44,7 +44,7 @@ In terms of search, Mantissa uses some form of the following ideas:
 - Tapered Evaluation
 
 ### Search Basics
-- Negamax search with Alpha-beta pruning
+- Negamax search with alpha-beta pruning
 - Principal Variation (PV) and Zero-window search
 - Quiescence search in the leaves
 - Aspiration Windows
