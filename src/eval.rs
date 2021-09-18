@@ -87,7 +87,8 @@ pub const DOUBLED_PAWN_VALUE: Score = S!(-64, -284);
 pub const BACKWARDS_PAWN_VALUE: Score = S!(-61, -19);
 pub const ADVANCED_PAWN_VALUE: [Score; 8] = [
     S!( 0,   0), S!( 32,  16), S!( 63,  54), S!(68, 82),
-    S!(97, 201), S!(360, 244), S!(289, 500), S!( 0,  0)];
+    S!(97, 201), S!(360, 244), S!(289, 500), S!( 0,  0)
+];
 pub const SUPPORTED_PAWN_BONUS: Score = S!(158, 65);
 pub const SPACE_VALUE: Score = S!(16, 5);
 

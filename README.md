@@ -12,13 +12,13 @@ Mantissa is named after the "significand" (or mantissa) in the floating point sp
 
 Mantissa is hosted on lichess here: https://lichess.org/@/AKS-Mantissa
 
-It accepts challenges from humans and bots in any time format except ultrabullet (bots aren't allowed to play ultra-bullet on lichess) or correspondence/unlimited (a few bad apples have clogged up Mantissa's match queue before by leaving once they were in a bad spot).  It accepts both casual and rated challenges.
+She accepts challenges from humans and bots in any time format except ultrabullet (bots aren't allowed to play ultra-bullet on lichess) or correspondence/unlimited (a few bad apples have clogged up Mantissa's match queue before by leaving once they were in a bad spot).  Mantissa accepts both casual and rated challenges.
 
-As of this writing it's currently between 2000 and 2100 lichess ELO in most formats and is slowly getting stronger.
+As of this writing, Mantissa is currently between 2000 and 2100 lichess ELO in most formats and is slowly getting stronger.
 
 ## Features
 
-Mantissa is UCI-compatible and can be used with most UCI GUIs (e.g. cutechess, arena).  It supports both clock+inc time and x moves in y time formats.  It supports multiple threads as well.
+Mantissa is UCI-compatible and can be used with most UCI GUIs (e.g. cutechess, arena).  She supports both clock+inc time and x moves in y time formats.
 
 In terms of search, Mantissa uses some form of the following ideas:
 
@@ -72,3 +72,8 @@ In terms of search, Mantissa uses some form of the following ideas:
 ## Build
 
 You can build Mantissa so long as you have rust installed using the `build` script located in the main directory.  It will build both the debug and release-optimized versions.  You can find them in the `target/debug` and `target/release` directories respectively.
+
+## Credit
+
+- The chess programming community for many of the ideas used in Mantissa.
+- Kade Phillips for the logo, optimization code in the tuner, and the "plies remaining" estimation code for Mantissa's time control.
