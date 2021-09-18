@@ -328,7 +328,7 @@ fn search(node: &mut Bitboard,
     let mut alpha = alpha;
     let mut beta = beta;
     if !init_node {
-        if node.is_repetition() {
+        if node.is_repetition() || node.is_fifty_move() {
             return DRAW_SCORE;
         }
 

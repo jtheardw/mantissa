@@ -28,6 +28,9 @@ pub struct Bitboard {
     ep_stack: Vec<i32>,
     cap_stack: Vec<u8>,
     castling_rights_stack: Vec<u8>,
+    halfmove_stack: Vec<u8>,
+
+    halfmove: u8,
 
     pub hash: u64,
     pub pawn_hash: u64,
@@ -69,7 +72,9 @@ impl Bitboard {
             ep_stack: Vec::new(),
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),
+            halfmove_stack: Vec::new(),
 
+            halfmove: 0,
             hash: 0,
             pawn_hash: 0
         };
@@ -181,6 +186,14 @@ impl Bitboard {
             ep_file = file as i32;
         }
 
+        let halfmove: u8 = match fen_split.next() {
+            Some(p) => match p.trim().parse::<u8>() {
+                Ok(num) => num,
+                Err(_) => panic!("Bad FEN string.  Failed to parse halfmove clock.")
+            },
+            None => panic!("Bad FEN string.  Missing halfmove clock")
+        };
+
         let white_composite = white_king | white_queen | white_rook | white_bishop | white_knight | white_pawn;
         let black_composite = black_king | black_queen | black_rook | black_bishop | black_knight | black_pawn;
 
@@ -202,7 +215,9 @@ impl Bitboard {
             ep_stack: Vec::new(),
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),
+            halfmove_stack: Vec::new(),
 
+            halfmove: halfmove,
             hash: 0,            // for the moment, we fill it in late
             pawn_hash: 0
         };
@@ -243,7 +258,9 @@ impl Bitboard {
             ep_stack: Vec::new(),
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),
+            halfmove_stack: Vec::new(),
 
+            halfmove: self.halfmove,
             hash: self.hash,
             pawn_hash: self.pawn_hash,
         }
@@ -520,6 +537,13 @@ impl Bitboard {
         self.composite[them] = self.pawn[them] | self.knight[them] | self.bishop[them] |
             self.rook[them] | self.queen[them] | self.king[them];
 
+        if captured_piece != 0 || mv.piece == b'p' {
+            self.halfmove_stack.push(self.halfmove);
+            self.halfmove = 0;
+        } else {
+            self.halfmove += 1;
+        }
+
         self.side_to_move = !self.side_to_move;
     }
 
@@ -613,6 +637,15 @@ impl Bitboard {
             Some(p) => p,
             None => panic!("Pawn History stack empty!")
         };
+
+        if mv.piece == b'p' || captured_piece != 0 {
+            self.halfmove = match self.halfmove_stack.pop() {
+                Some(p) => p,
+                None => panic!("Could not revert halfmove clock!")
+            }
+        } else {
+            self.halfmove -= 1;
+        }
     }
 
     pub fn is_repetition(&self) -> bool {
@@ -706,5 +739,9 @@ impl Bitboard {
             return 0;
         }
         return phase;
+    }
+
+    pub fn is_fifty_move(&self) -> bool {
+        return self.halfmove >= 100;
     }
 }
