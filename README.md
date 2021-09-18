@@ -77,3 +77,4 @@ You can build Mantissa so long as you have rust installed using the `build` scri
 
 - The chess programming community for many of the ideas used in Mantissa.
 - Kade Phillips for the logo, optimization code in the tuner, and the "plies remaining" estimation code for Mantissa's time control.
+- Andy Grant (Ethereal creator) for some of the positions used in tuning Mantissa's evaluator, as well as a lot of ideas found pouring through Ethereal's source.

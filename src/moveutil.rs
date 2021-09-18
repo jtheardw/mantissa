@@ -110,7 +110,6 @@ impl fmt::Display for Move {
     }
 }
 
-
 pub fn is_quiet_move(mv: &Move, pos: &Bitboard) -> bool {
     if mv.is_ep { return false; }
     if (idx_to_bb(mv.end) & pos.composite[!pos.side_to_move as usize]) != 0 { return false; }
