@@ -744,4 +744,37 @@ impl Bitboard {
     pub fn is_fifty_move(&self) -> bool {
         return self.halfmove >= 100;
     }
+
+    pub fn insufficient_material(&self) -> bool {
+        // just kings
+        // KN v K
+        // KB v K
+        // KNN v K
+        if self.king[0] != self.composite[0] && self.king[1] != self.composite[1] {
+            // at least one non-king thing is on the board
+            return false;
+        }
+
+        let mut side_to_confirm: usize = 0;
+        if self.king[0] == self.composite[0] {
+            // side 0 has only king
+            side_to_confirm = 1;
+        }
+
+        if self.king[side_to_confirm] | self.knight[side_to_confirm] == self.composite[side_to_confirm] {
+            // K, KN, KNN
+            if self.knight[side_to_confirm].count_ones() <= 2 {
+                return true;
+            }
+        }
+
+        if self.king[side_to_confirm] | self.bishop[side_to_confirm] == self.composite[side_to_confirm] {
+            // KB
+            if self.bishop[side_to_confirm].count_ones() == 1 {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
