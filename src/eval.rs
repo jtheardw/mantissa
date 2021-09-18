@@ -37,66 +37,66 @@ macro_rules! S {
     }
 }
 
-// TODO might have to make these mutable
-// if tuning needs to mess with them.
-pub const QUEEN_VALUE: Score = S!(9200, 9200);
-pub const ROOK_VALUE: Score = S!(5000, 5000);
-pub const BISHOP_VALUE: Score = S!(3200, 3200);
-pub const KNIGHT_VALUE: Score = S!(3000, 3000);
-pub const PAWN_VALUE: Score = S!(1000, 1000);
+pub const QUEEN_VALUE: Score = S!(10947, 16706);
+pub const ROOK_VALUE: Score = S!(4865, 8652);
+pub const BISHOP_VALUE: Score = S!(3523, 5211);
+pub const KNIGHT_VALUE: Score = S!(3466, 4880);
+pub const PAWN_VALUE: Score = S!(800, 1414);
 
-const KNIGHT_MOBILITY: [Score; 9] = [
-    S!(  0,   0), S!( 25,  27), S!( 50,  54), S!( 75,  81), S!(100, 108),
-    S!(125, 135), S!(150, 162), S!(175, 189), S!(200, 216)
+pub const KNIGHT_MOBILITY: [Score; 9] = [
+    S!(-275, 21), S!(-36,  10), S!(145, 148), S!(132, 528),
+    S!(191, 535), S!(183, 563), S!(223, 551), S!(295, 453),
+    S!(297, 333)
 ];
-const BISHOP_MOBILITY: [Score; 14] = [
-    S!(  0,   0), S!( 68,  10), S!(136,  20), S!(204,  30), S!(272,  40),
-    S!(340,  50), S!(408,  60), S!(476,  70), S!(544,  80), S!(612,  90),
-    S!(680, 100), S!(748, 110), S!(816, 120), S!(884, 130)
+pub const BISHOP_MOBILITY: [Score; 14] = [
+    S!(-139,  115), S!( 227, -209), S!(288, -843), S!(259, -339),
+    S!( 374, -108), S!( 364,   96), S!(472,  310), S!(559,  389),
+    S!( 572,  558), S!( 580,  634), S!(552,  682), S!(579,  621),
+    S!( 440,  651), S!(1141,  511)
 ];
-const ROOK_MOBILITY: [Score; 15] = [
-    S!(  0,   0), S!( 10,  58), S!( 20, 116), S!( 30, 174), S!( 40, 232),
-    S!( 50, 290), S!( 60, 348), S!( 70, 406), S!( 80, 464), S!( 90, 522),
-    S!(100, 580), S!(110, 638), S!(120, 696), S!(130, 754), S!(140, 812)
+pub const ROOK_MOBILITY: [Score; 15] = [
+    S!( 66,  -86), S!( 55,  97), S!(-221, -254), S!(-78,  -74),
+    S!(-20,  301), S!( 13, 468), S!(  15,  756), S!( -4,  833),
+    S!( -8,  901), S!( 66, 935), S!( 139,  967), S!(190, 1001),
+    S!(277, 1005), S!(335, 969), S!( 569,  767)
 ];
-const QUEEN_MOBILITY: [Score; 28] = [
-    S!(  0,   0), S!( 16,  36), S!( 32,  72), S!( 48, 108), S!( 64, 144),
-    S!( 80, 180), S!( 96, 216), S!(112, 252), S!(128, 288), S!(144, 324),
-    S!(160, 360), S!(176, 396), S!(192, 432), S!(208, 468), S!(224, 504),
-    S!(240, 540), S!(256, 576), S!(272, 612), S!(288, 648), S!(304, 684),
-    S!(320, 720), S!(336, 756), S!(352, 792), S!(368, 828), S!(384, 864),
-    S!(400, 900), S!(416, 936), S!(432, 972)
+pub const QUEEN_MOBILITY: [Score; 28] = [
+    S!( 42,  -24), S!( 41, 121), S!(-241,   81), S!(-42,  76),
+    S!( -3,  134), S!(302, -76), S!( -45,  -89), S!( 92,  47),
+    S!(123, -119), S!(151,  64), S!( 227,  178), S!(184, 423),
+    S!(244,  500), S!(249, 627), S!( 269,  800), S!(224, 883),
+    S!(250,  910), S!(282, 801), S!( 234,  970), S!(334, 811),
+    S!(191,  961), S!(200, 912), S!( 192,  935), S!( 71, 822),
+    S!(235,  994), S!(443, 631), S!( 278, 1125), S!(448, 955)
 ];
 
-const QUEEN_KING_DANGER: i32 = 8;
-const ROOK_KING_DANGER: i32 = 4;
-const BISHOP_KING_DANGER: i32 = 2;
-const KNIGHT_KING_DANGER: i32 = 2;
-const KING_DANGER_SCALE: [i32; 8] = [0, 0, 50, 75, 85, 90, 95, 100];
+pub const QUEEN_KING_DANGER: [i32; 8] = [66, 216, 464, 824, 983, 647, 753, 910];
+pub const ROOK_KING_DANGER: [i32; 8] = [19, 35, 98, 177, 362, 502, 400, 293];
+pub const BISHOP_KING_DANGER: [i32; 8] = [0, 60, 41, 87, 55, 181, 124, 176];
+pub const KNIGHT_KING_DANGER: [i32; 8] = [25, 0, 48, 103, 517, 115, 427, 154];
 
-const DOUBLE_BISHOP_BONUS: Score = S!(500, 500);
+pub const DOUBLE_BISHOP_BONUS: Score = S!(109, 972);
 
-const PASSED_PAWN_VALUE: [Score; 8] = [
-    S!(   0,    0), S!( 116,  199), S!( 232,  398), S!( 348,  597), S!( 464,  796),
-    S!( 580,  995), S!( 696, 1194), S!(   0,    0)
+pub const PASSED_PAWN_VALUE: [Score; 8] = [
+    S!(  0,   0), S!( 45,  179), S!(   0,  239), S!(0, 511),
+    S!(234, 794), S!(388, 1465), S!(1316, 1732), S!(0,   0)
 ];
-const CENTER_PAWN_VALUE: Score = S!(256, 282);
-const ISOLATED_PAWN_VALUE: Score = S!(-181, -181);
-const DOUBLED_PAWN_VALUE: Score = S!(-162, -344);
-const BACKWARDS_PAWN_VALUE: Score = S!(-215, -233);
-const ADVANCED_PAWN_VALUE: [Score; 8] = [
-    S!(  0,   0), S!( 15,  21), S!( 30,  42), S!( 45,  63), S!( 60,  84),
-    S!( 75, 105), S!( 90, 126), S!(  0,   0)
-];
-const SUPPORTED_PAWN_BONUS: Score = S!(26, 88);
-const SPACE_VALUE: Score = S!(43, 19);
+pub const CENTER_PAWN_VALUE: Score = S!(84, 0);
+pub const ISOLATED_PAWN_VALUE: Score = S!(-53, -67);
+pub const DOUBLED_PAWN_VALUE: Score = S!(-64, -284);
+pub const BACKWARDS_PAWN_VALUE: Score = S!(-61, -19);
+pub const ADVANCED_PAWN_VALUE: [Score; 8] = [
+    S!( 0,   0), S!( 32,  16), S!( 63,  54), S!(68, 82),
+    S!(97, 201), S!(360, 244), S!(289, 500), S!( 0,  0)];
+pub const SUPPORTED_PAWN_BONUS: Score = S!(158, 65);
+pub const SPACE_VALUE: Score = S!(16, 5);
 
-const BISHOP_COLOR: Score = S!(-50, -30);
+pub const BISHOP_COLOR: Score = S!(-50, -30);
 
-const TEMPO_BONUS: Score = S!(130, 130);
+pub const TEMPO_BONUS: Score = S!(130, 130);
 
-const ROOK_ON_SEVENTH: Score = S!(93, 128);
-const ROOK_ON_OPEN: Score = S!(114, 101);
+pub const ROOK_ON_SEVENTH: Score = S!(0, 24);
+pub const ROOK_ON_OPEN: Score = S!(124, 95);
 
 pub fn static_eval(pos: &Bitboard) -> i32 {
     let score = evaluate_position(pos);
@@ -167,6 +167,11 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
         let king_idx = king_bb.trailing_zeros() as i32;
         let king_zone = king_bb | unsafe{ KING_MASK[king_idx as usize] };
 
+        let mut queen_attacks = 0;
+        let mut rook_attacks = 0;
+        let mut bishop_attacks = 0;
+        let mut knight_attacks = 0;
+
         let mut board = pos.queen[side];
         while board != 0 {
             let start_idx = board.trailing_zeros() as i32;
@@ -175,7 +180,8 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
-                attack_value += QUEEN_KING_DANGER * attacks.count_ones() as i32;
+                queen_attacks += attacks.count_ones();
+                // attack_value += QUEEN_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * QUEEN_MOBILITY[moves];
             board &= board - 1;
@@ -189,7 +195,8 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
-                attack_value += ROOK_KING_DANGER * attacks.count_ones() as i32;
+                rook_attacks += attacks.count_ones();
+                // attack_value += ROOK_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * ROOK_MOBILITY[moves];
             board &= board - 1;
@@ -203,7 +210,8 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
-                attack_value += BISHOP_KING_DANGER * attacks.count_ones() as i32;
+                bishop_attacks += attacks.count_ones();
+                // attack_value += BISHOP_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * BISHOP_MOBILITY[moves];
             board &= board - 1;
@@ -218,14 +226,19 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
-                attack_value += KNIGHT_KING_DANGER * attacks.count_ones() as i32;
+                knight_attacks += attacks.count_ones();
+                // attack_value += KNIGHT_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * KNIGHT_MOBILITY[moves];
             board &= board - 1;
         }
 
         if attackers > 7 { attackers = 7; }
-        king_danger[side] = KING_DANGER_SCALE[attackers] * attack_value;
+        attack_value += QUEEN_KING_DANGER[attackers] * queen_attacks as i32;
+        attack_value += ROOK_KING_DANGER[attackers] * rook_attacks as i32;
+        attack_value += BISHOP_KING_DANGER[attackers] * bishop_attacks as i32;
+        attack_value += KNIGHT_KING_DANGER[attackers] * knight_attacks as i32;
+        king_danger[side] = attack_value;
     }
 
     let score = mobility + (make_score(1, 1) * (king_danger[white] - king_danger[black]) as i64);

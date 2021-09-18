@@ -157,8 +157,8 @@ pub fn print_params_vector(v: &Vec<i32>) {
     print_score_vector("bishop psqt 8", &v_copy(v, 356, 360), &v_copy(v, 388, 392));
 
     print_score_vector("rook psqt 1", &v_copy(v, 392, 396), &v_copy(v, 424, 428));
-    print_score_vector("rook psqt 4", &v_copy(v, 396, 400), &v_copy(v, 428, 432));
-    print_score_vector("rook psqt 4", &v_copy(v, 400, 404), &v_copy(v, 432, 436));
+    print_score_vector("rook psqt 2", &v_copy(v, 396, 400), &v_copy(v, 428, 432));
+    print_score_vector("rook psqt 3", &v_copy(v, 400, 404), &v_copy(v, 432, 436));
     print_score_vector("rook psqt 4", &v_copy(v, 404, 408), &v_copy(v, 436, 440));
     print_score_vector("rook psqt 5", &v_copy(v, 408, 412), &v_copy(v, 440, 444));
     print_score_vector("rook psqt 6", &v_copy(v, 412, 416), &v_copy(v, 444, 448));
@@ -166,7 +166,7 @@ pub fn print_params_vector(v: &Vec<i32>) {
     print_score_vector("rook psqt 8", &v_copy(v, 420, 424), &v_copy(v, 452, 456));
 
     print_score_vector("queen psqt 1", &v_copy(v, 456, 460), &v_copy(v, 488, 492));
-    print_score_vector("queen psqt 4", &v_copy(v, 460, 464), &v_copy(v, 492, 496));
+    print_score_vector("queen psqt 2", &v_copy(v, 460, 464), &v_copy(v, 492, 496));
     print_score_vector("queen psqt 3", &v_copy(v, 464, 468), &v_copy(v, 496, 500));
     print_score_vector("queen psqt 4", &v_copy(v, 468, 472), &v_copy(v, 500, 504));
     print_score_vector("queen psqt 5", &v_copy(v, 472, 476), &v_copy(v, 504, 508));
@@ -175,7 +175,7 @@ pub fn print_params_vector(v: &Vec<i32>) {
     print_score_vector("queen psqt 8", &v_copy(v, 484, 488), &v_copy(v, 516, 520));
 
     print_score_vector("king psqt 1", &v_copy(v, 520, 524), &v_copy(v, 552, 556));
-    print_score_vector("king psqt 4", &v_copy(v, 524, 528), &v_copy(v, 556, 560));
+    print_score_vector("king psqt 2", &v_copy(v, 524, 528), &v_copy(v, 556, 560));
     print_score_vector("king psqt 3", &v_copy(v, 528, 532), &v_copy(v, 560, 564));
     print_score_vector("king psqt 4", &v_copy(v, 532, 536), &v_copy(v, 564, 568));
     print_score_vector("king psqt 5", &v_copy(v, 536, 540), &v_copy(v, 568, 572));
@@ -551,7 +551,7 @@ pub fn find_optimal_k(v: &mut Vec<(Bitboard, f64)>) -> f64 {
     return best_k;
 }
 
-const K: f64 = 0.000388;
+const K: f64 = 0.00053;
 
 pub fn score_positions(v: &mut Vec<(Bitboard, f64)>) -> i32 {
     let mut s = LB;
@@ -568,36 +568,36 @@ pub fn neighbor(param_vec: &Vec<i32>, reach: f64) -> Vec<i32> {
     let mut dimens: Vec<(f64, f64, f64, f64)> = Vec::new();
     for i in 0..584 {
         let d = match i {
-            0..2   => {(8000.0, 18000.0,  100.0, 2000.0)},
-            2..4   => {(4000.0, 12000.0,   50.0, 1000.0)},
-            4..6   => {(2500.0,  8000.0,   30.0, 1000.0)},
-            6..8   => {(2500.0,  8000.0,   30.0, 1000.0)},
-            8..10  => {( 800.0,  3000.0,   10.0,  200.0)},
+            0..2   => {(8000.0, 18000.0,  300.0, 2000.0)},
+            2..4   => {(4000.0, 12000.0,  200.0, 1000.0)},
+            4..6   => {(2500.0,  8000.0,  200.0, 1000.0)},
+            6..8   => {(2500.0,  8000.0,  200.0, 1000.0)},
+            8..10  => {( 800.0,  3000.0,  200.0,  200.0)},
 
-            10..28  => {(-1000.0, 1500.0,   15.0,  200.0)},
-            28..56  => {(-1000.0, 1500.0,   15.0,  200.0)},
-            56..86  => {(-1000.0, 1500.0,   15.0,  200.0)},
-            86..142 => {(-1000.0, 1500.0,   15.0,  200.0)},
+            10..28  => {(-1000.0, 1500.0,  100.0,  500.0)},
+            28..56  => {(-1000.0, 1500.0,  100.0,  500.0)},
+            56..86  => {(-1000.0, 1500.0,  100.0,  500.0)},
+            86..142 => {(-1000.0, 1500.0,  100.0,  500.0)},
 
-            142..150 => {(   0.0, 1400.0,   15.0,  500.0)},
-            150..158 => {(   0.0, 1400.0,   15.0,  500.0)},
-            158..166 => {(   0.0, 1400.0,   15.0,  500.0)},
-            166..174 => {(   0.0, 1400.0,   15.0,  500.0)},
+            142..150 => {(   0.0, 1400.0,  100.0,  500.0)},
+            150..158 => {(   0.0, 1400.0,  100.0,  500.0)},
+            158..166 => {(   0.0, 1400.0,  100.0,  500.0)},
+            166..174 => {(   0.0, 1400.0,  100.0,  500.0)},
 
-            174..176 => {(   0.0, 1500.0,   30.0,  300.0)},
+            174..176 => {(   0.0, 1500.0,  100.0,  300.0)},
 
-            176..188 => {(   0.0, 2000.0,   20.0,  200.0)},
+            176..188 => {(   0.0, 2000.0,  100.0,  200.0)},
 
-            188..190 => {(    0.0, 1000.0,   20.0,  150.0)},
-            190..196 => {(-1000.0,    0.0,   20.0,  150.0)},
+            188..190 => {(    0.0, 1000.0,  100.0,  150.0)},
+            190..196 => {(-1000.0,    0.0,  100.0,  150.0)},
 
-            196..208 => {(    0.0,  500.0,   20.0,   100.0)},
-            208..210 => {(    0.0,  300.0,   20.0,    70.0)},
-            210..212 => {(    0.0,  300.0,   10.0,   100.0)},
+            196..208 => {(    0.0,  500.0,  100.0,   100.0)},
+            208..210 => {(    0.0,  300.0,  100.0,    70.0)},
+            210..212 => {(    0.0,  300.0,  100.0,   100.0)},
 
-            212..216 => {(    0.0,  500.0,   20.0,   100.0)},
+            212..216 => {(    0.0,  500.0,  100.0,   100.0)},
 
-            216..584 => {(-1000.0, 1000.0,   15.0,   200.0)},
+            216..584 => {(-1000.0, 1000.0,  100.0,   200.0)},
             _ => {(0.0, 0.0, 0.0, 0.0)}
         };
         dimens.push(d);
@@ -667,7 +667,7 @@ pub fn tune(v: &mut Vec<(Bitboard, f64)>) -> Vec<i32> {
 pub fn get_position_vector(fname: &str) -> Vec<(Bitboard, f64)> {
     let f = match File::open(fname) {
         Ok(f) => f,
-        Err(e) => panic!("unable to open file {}", fname)
+        Err(e) => panic!("unable to open file {}. err: {}", fname, e)
     };
 
     let mut r = BufReader::new(f);
@@ -677,12 +677,12 @@ pub fn get_position_vector(fname: &str) -> Vec<(Bitboard, f64)> {
     let mut idx = 0;
     loop {
         let num_bytes = match r.read_line(&mut buf) {
-            Ok(n) => n, Err(e) => panic!("unable to read line")
+            Ok(n) => n, Err(e) => panic!("unable to read line. err: {}", e)
         };
         if num_bytes == 0 { break; }
         if buf.len() > 0 {
             // fen winner
-            if idx % 10 != 0 {
+            if idx % 20 != 0 {
                 idx += 1;
                 buf.clear();
                 continue;

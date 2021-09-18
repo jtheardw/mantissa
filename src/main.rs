@@ -34,9 +34,5 @@ fn init() {
 
 fn main() {
     init();
-    let mut v = get_position_vector("gm_positions3.fen");
-    // let k = find_optimal_k(&mut v);
-    // print_params_vector(&get_params_vector());
-    // uci_loop();
-    tune(&mut v);
+    uci_loop();
 }
