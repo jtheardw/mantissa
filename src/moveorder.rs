@@ -4,6 +4,15 @@ use crate::moveutil::*;
 use crate::util::*;
 
 const TT_MOVE: u8 = 0;
+const GEN_NOISY: u8 = 1;
+const OK_NOISY: u8 = 2;
+const KILLER_MOVE_1: u8 = 3;
+const KILLER_MOVE_2: u8 = 4;
+const COUNTER_MOVE: u8 = 5;
+const GEN_QUIET: u8 = 6;
+const QUIET_MOVES: u8 = 7;
+const BAD_NOISY: u8 = 8;
+
 const REMAINING_MOVES: u8 = 1;
 // TODO more stages to come later.  For now
 // let's stay basic
@@ -28,15 +37,17 @@ pub const QUIET_OFFSET: u64 = 1 << 20;
 pub const BAD_CAPTURE_OFFSET: u64 = 0;
 
 pub struct MovePicker {
-    q_moves_only: bool,
-    move_stage: u8,
+    noisy_moves_only: bool,
+    pub move_stage: u8,
     tt_move: Move,
     killers: [Move; 2],
     history: [[i32; 64]; 12],
     countermove: Move,
     followup: [[i32; 64]; 12],
-    scored_moves: Vec<(Move, u64)>,
-    cur_i: usize,
+    scored_noisy_moves: Vec<(Move, u64)>,
+    scored_quiet_moves: Vec<(Move, u64)>,
+    noisy_i: usize,
+    quiet_i: usize
 }
 
 impl MovePicker {
@@ -44,30 +55,49 @@ impl MovePicker {
     pub fn new(tt_move: Move, killers: [Move; 2], history: [[i32; 64]; 12], countermove: Move, followup_history: [[i32; 64]; 12], q_moves_only: bool) -> MovePicker {
         let stage = if tt_move.is_null {REMAINING_MOVES} else {TT_MOVE};
         MovePicker {
-            q_moves_only: q_moves_only,
+            noisy_moves_only: q_moves_only,
             move_stage: stage,
             tt_move: tt_move,
             killers: killers,
             history: history,
             followup: followup_history,
             countermove: countermove,
-            scored_moves: Vec::new(),
-            cur_i: 0,
+            scored_noisy_moves: Vec::new(),
+            scored_quiet_moves: Vec::new(),
+            noisy_i: 0,
+            quiet_i: 0
         }
     }
 
     pub fn q_new() -> MovePicker {
         MovePicker {
-            q_moves_only: true,
+            noisy_moves_only: true,
             move_stage: REMAINING_MOVES,
             tt_move: Move::null_move(),
             killers: [Move::null_move(); 2],
             history: [[0; 64]; 12],
             followup: [[0; 64]; 12],
             countermove: Move::null_move(),
-            scored_moves: Vec::new(),
-            cur_i: 0
+            scored_noisy_moves: Vec::new(),
+            scored_quiet_moves: Vec::new(),
+            noisy_i: 0,
+            quiet_i: 0
         }
+    }
+
+    fn sort_next_move(mvs: &mut Vec<(Move, u64)>, cur_i: usize) {
+        let mut highest_i = cur_i;
+
+        for i in (cur_i + 1)..mvs.len() {
+            if mvs[i].1 > mvs[highest_i].1 {
+                highest_i = i;
+            }
+        }
+
+        // swap
+        let (mv, score) = mvs[highest_i];
+        mvs[highest_i] = mvs[cur_i];
+        mvs[cur_i] = (mv, score);
     }
 
     fn score_moves(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u64)> {
@@ -84,9 +114,13 @@ impl MovePicker {
             if captured == 0 {
                 // not a capture
                 if mv == self.killers[0] || mv == self.killers[1] {
-                    mv_score = KILLER_OFFSET;
+                    // mv_score = KILLER_OFFSET;
+                    // this move will be handled in a different stage
+                    continue;
                 } else if mv == self.countermove {
-                    mv_score = COUNTER_OFFSET;
+                    // mv_score = COUNTER_OFFSET;
+                    // same here
+                    continue;
                 } else {
                     let piece_num = get_piece_num(mv.piece, pos.side_to_move);
                     mv_score = QUIET_OFFSET + (self.history[piece_num][mv.end as usize] + self.followup[piece_num][mv.end as usize]) as u64;
@@ -130,37 +164,85 @@ impl MovePicker {
 
     pub fn next(&mut self, pos: &Bitboard) -> (Move, u64) {
         if self.move_stage == TT_MOVE {
-            self.move_stage = REMAINING_MOVES;
-            return (self.tt_move, TT_MOVE_SCORE);
-        } else {
-            if self.cur_i == 0 {
-                let movelist: Vec<Move>;
-                // generate the moves
-                if self.q_moves_only {
-                    movelist = qmoves(pos);
-                } else {
-                    movelist = moves(pos);
-                }
-                self.scored_moves = self.score_moves(pos, movelist);
+            self.move_stage = GEN_NOISY;
+            if pos.is_pseudolegal(&self.tt_move) {
+                return (self.tt_move, TT_MOVE_SCORE);
             }
-            if self.cur_i == self.scored_moves.len() {
+        }
+        if self.move_stage == GEN_NOISY {
+            self.move_stage = OK_NOISY;
+            self.scored_noisy_moves = self.score_moves(pos, noisy_moves(pos));
+        }
+        if self.move_stage == OK_NOISY {
+            if self.noisy_i == self.scored_noisy_moves.len() {
+                if self.noisy_moves_only {
+                    self.move_stage = BAD_NOISY;
+                } else {
+                    self.move_stage = KILLER_MOVE_1;
+                }
+            } else {
+                // still noisy moves
+                MovePicker::sort_next_move(&mut self.scored_noisy_moves, self.noisy_i);
+                let (mv, score) = self.scored_noisy_moves[self.noisy_i];
+                if score < QUIET_OFFSET {
+                    // consider the rest "bad"
+                    if self.noisy_moves_only {
+                        self.move_stage = BAD_NOISY;
+                    } else {
+                        self.move_stage = KILLER_MOVE_1;
+                    }
+                } else {
+                    self.noisy_i += 1;
+                    return (mv, score);
+                }
+            }
+        }
+        if self.move_stage == KILLER_MOVE_1 {
+            self.move_stage = KILLER_MOVE_2;
+            if pos.is_pseudolegal(&self.killers[0]) {
+                return (self.killers[0], KILLER_OFFSET);
+            }
+        }
+        if self.move_stage == KILLER_MOVE_2 {
+            self.move_stage = COUNTER_MOVE;
+            if pos.is_pseudolegal(&self.killers[1]) {
+                return (self.killers[1], KILLER_OFFSET);
+            }
+        }
+        if self.move_stage == COUNTER_MOVE {
+            self.move_stage = GEN_QUIET;
+            if pos.is_pseudolegal(&self.countermove) {
+                return (self.countermove, COUNTER_OFFSET);
+            }
+        }
+        if self.move_stage == GEN_QUIET {
+            self.move_stage = QUIET_MOVES;
+            self.scored_quiet_moves = self.score_moves(pos, quiet_moves(pos));
+        }
+        if self.move_stage == QUIET_MOVES {
+            if self.quiet_i == self.scored_quiet_moves.len() {
+                self.move_stage = BAD_NOISY;
+            } else {
+                // still quiet moves
+                MovePicker::sort_next_move(&mut self.scored_quiet_moves, self.quiet_i);
+                let (mv, score) = self.scored_quiet_moves[self.quiet_i];
+                self.quiet_i += 1;
+                return (mv, score);
+            }
+        }
+        if self.move_stage == BAD_NOISY {
+            if self.noisy_i == self.scored_noisy_moves.len() {
                 return (Move::null_move(), 0);
             }
-
-            let mut highest_i = self.cur_i;
-
-            for i in (self.cur_i + 1)..self.scored_moves.len() {
-                if self.scored_moves[i].1 > self.scored_moves[highest_i].1 {
-                    highest_i = i;
-                }
+            // here we reverse the cadence because the next move was already sorted in the good noisy
+            // moves.
+            let (mv, score) = self.scored_noisy_moves[self.noisy_i];
+            self.noisy_i += 1;
+            if self.noisy_i < self.scored_noisy_moves.len() {
+                MovePicker::sort_next_move(&mut self.scored_noisy_moves, self.noisy_i);
             }
-
-            let (mv, score) = self.scored_moves[highest_i];
-            self.scored_moves[highest_i] = self.scored_moves[self.cur_i];
-            self.scored_moves[self.cur_i] = (mv, score);
-            self.cur_i += 1;
-
-            return (mv, score)
+            return (mv, score);
         }
+        return (Move::null_move(), 0);
     }
 }

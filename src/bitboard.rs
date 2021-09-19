@@ -777,4 +777,55 @@ impl Bitboard {
 
         return false;
     }
+
+    pub fn is_pseudolegal(&self, mv: &Move) -> bool {
+        if mv.is_null || mv.piece != self.piece_at_square(mv.start, self.side_to_move) {
+            return false;
+        }
+
+        if mv.is_ep {
+            return mv.end % 8 == self.ep_file;
+        }
+
+        if mv.piece == b'k' && (mv.end - mv.start).abs() == 2 {
+            // castling
+            // start will be greater than end if queenside castling
+            return self.can_castle(self.side_to_move, mv.start > mv.end);
+        }
+
+        let end_bb = idx_to_bb(mv.end);
+        let self_occ = self.composite[self.side_to_move as usize];
+        let enemy_occ = self.composite[!self.side_to_move as usize];
+        let occ = self.composite[0] | self.composite[1];
+        if end_bb & self_occ != 0 {
+            // capturing own piece?
+            return false;
+        }
+
+        // all that's left should be more "normal" moves
+        let moves_board = match mv.piece {
+            b'k' => {
+                king_normal_moves_board(mv.start)
+            },
+            b'q' => {
+                queen_moves_board(mv.start, occ)
+            },
+            b'r' => {
+                rook_moves_board(mv.start, occ)
+            },
+            b'b' => {
+                bishop_moves_board(mv.start, occ)
+            },
+            b'n' => {
+                knight_moves_board(mv.start)
+            },
+            b'p' => {
+                pawn_walk_board(occ, mv.start, self.side_to_move)
+                    | (pawn_attack_board(mv.start, self.side_to_move) & enemy_occ)
+            },
+            _ => {return false;}
+        };
+
+        return moves_board & end_bb != 0;
+    }
 }
