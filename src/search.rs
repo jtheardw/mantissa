@@ -190,18 +190,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     }
 
     while depth <= search_limits.depth {
-        // allow_threads();
-        // let mut threads = Vec::new();
-        // for thread_num in 1..num_threads {
-        //     // kick off threads
-        //     let thread_depth = depth + thread_num.trailing_zeros() as i32;
-        //     let thread_node = node.thread_copy();
-
-        //     threads.push(thread::spawn(move || {
-        //         thread_handler(thread_node, thread_depth, thread_num as usize);
-        //     }));
-        // }
-
         let mut aspiration_delta = 250;
         loop {
             let mut alpha = LB;
@@ -220,14 +208,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
                 aspiration_delta *= 2;
             }
         }
-        // stop_threads();
-        // for t in threads {
-        //     let res = t.join();
-        //     match res {
-        //         Err(_) => panic!("Error encountered in thread!"),
-        //         _ => {}
-        //     }
-        // }
         if search_aborted() { break; }
 
         let elapsed_time;
