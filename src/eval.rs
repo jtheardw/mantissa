@@ -99,17 +99,17 @@ pub const TEMPO_BONUS: Score = S!(130, 130);
 pub const ROOK_ON_SEVENTH: Score = S!(0, 24);
 pub const ROOK_ON_OPEN: Score = S!(124, 95);
 
-pub fn static_eval(pos: &Bitboard) -> i32 {
-    let score = evaluate_position(pos);
+pub fn static_eval(pos: &Bitboard, pht: &mut PHT) -> i32 {
+    let score = evaluate_position(pos, pht);
     return if pos.side_to_move == Color::White {score} else {-score};
 }
 
-pub fn evaluate_position(pos: &Bitboard) -> i32 {
+pub fn evaluate_position(pos: &Bitboard, pht: &mut PHT) -> i32 {
     // positive is white-favored, negative black-favored
     let mut score: Score = make_score(0, 0);
     score += material_score(pos);
     score += mobility_and_king_danger(pos);
-    score += pawn_structure_value(pos);
+    score += pawn_structure_value(pos, pht);
     score += double_bishop_bonus(pos);
     score += bishop_color_value(pos);
     score += rook_on_seventh_value(pos);
@@ -277,11 +277,11 @@ pub fn print_value(pos: &Bitboard) {
     println!("psqt: {}", taper_score(nonpawn_psqt_value(pos) + pawn_psqt_value(pos), pos.get_phase()));
 }
 
-fn pawn_structure_value(pos: &Bitboard) -> Score {
-    let pht;
-    unsafe {
-        pht = &mut PHT;
-    }
+fn pawn_structure_value(pos: &Bitboard, pht: &mut PHT) -> Score {
+    // let pht;
+    // unsafe {
+    //     pht = &mut PHT;
+    // }
     let mut val: Score = 0;
     let pht_entry = pht.get(pos.pawn_hash);
     if pht_entry.valid {

@@ -1,6 +1,7 @@
 use std::cmp;
 
 use crate::moveutil::*;
+use crate::pht::*;
 use crate::time::*;
 use crate::tt::*;
 use crate::util::*;
@@ -127,7 +128,8 @@ pub struct ThreadInfo {
     pub killers: [[Move; 2]; MAX_PLY],
     pub move_history: [[i32; 64]; 12],
     pub countermove_table: [[Move; 64]; 12],
-    pub followup_history: Vec<[[[i32; 64]; 12]; 64]>
+    pub followup_history: Vec<[[[i32; 64]; 12]; 64]>,
+    pub pht: PHT,
 }
 
 impl ThreadInfo {
@@ -136,13 +138,15 @@ impl ThreadInfo {
         let move_history = [[0; 64]; 12];
         let countermove_table = [[Move::null_move(); 64]; 12];
         let followup_history = vec![[[[0; 64]; 12]; 64]; 12];
+        let pht = PHT::get_pht(14);
         ThreadInfo {
             nodes_searched: 0,
             seldepth: 0,
             killers: killers,
             move_history: move_history,
             countermove_table: countermove_table,
-            followup_history: followup_history
+            followup_history: followup_history,
+            pht: pht
         }
     }
 

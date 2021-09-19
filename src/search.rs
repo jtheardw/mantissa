@@ -177,18 +177,30 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     let mut val: i32 = LB;
     let mut pv: &Vec<Move>;
 
-    while depth <= search_limits.depth {
-        allow_threads();
-        let mut threads = Vec::new();
-        for thread_num in 1..num_threads {
-            // kick off threads
-            let thread_depth = depth + thread_num.trailing_zeros() as i32;
-            let thread_node = node.thread_copy();
+    allow_threads();
+    let mut threads = Vec::new();
+    for thread_num in 1..num_threads {
+        // kick off threads
+        let thread_depth = depth + thread_num.trailing_zeros() as i32;
+        let thread_node = node.thread_copy();
 
-            threads.push(thread::spawn(move || {
-                thread_handler(thread_node, thread_depth, thread_num as usize);
-            }));
-        }
+        threads.push(thread::spawn(move || {
+            thread_handler(thread_node, thread_depth, thread_num as usize);
+        }));
+    }
+
+    while depth <= search_limits.depth {
+        // allow_threads();
+        // let mut threads = Vec::new();
+        // for thread_num in 1..num_threads {
+        //     // kick off threads
+        //     let thread_depth = depth + thread_num.trailing_zeros() as i32;
+        //     let thread_node = node.thread_copy();
+
+        //     threads.push(thread::spawn(move || {
+        //         thread_handler(thread_node, thread_depth, thread_num as usize);
+        //     }));
+        // }
 
         let mut aspiration_delta = 250;
         loop {
@@ -208,14 +220,14 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
                 aspiration_delta *= 2;
             }
         }
-        stop_threads();
-        for t in threads {
-            let res = t.join();
-            match res {
-                Err(_) => panic!("Error encountered in thread!"),
-                _ => {}
-            }
-        }
+        // stop_threads();
+        // for t in threads {
+        //     let res = t.join();
+        //     match res {
+        //         Err(_) => panic!("Error encountered in thread!"),
+        //         _ => {}
+        //     }
+        // }
         if search_aborted() { break; }
 
         let elapsed_time;
@@ -278,6 +290,14 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         }
 
         depth += 1;
+    }
+    abort_search();
+    for t in threads {
+        let res = t.join();
+        match res {
+            Err(_) => panic!("Error encountered in thread!"),
+            _ => {}
+        }
     }
 
     println!("bestmove {}", best_move);
@@ -396,7 +416,7 @@ fn search(node: &mut Bitboard,
                 return tt_val;
             }
         }
-    } else if depth >= 6 && is_pv {
+    } else if depth >= 6 && is_pv { // && !init_node {
         // internal iterative deepening
         // if we fail to get a tt hit on a PV node, which should be fairly rare
         // at high depths, we'll do a reduced search to get a good guess for first move
@@ -410,7 +430,7 @@ fn search(node: &mut Bitboard,
     }
 
     let is_check = node.is_check(node.side_to_move);
-    sse.static_eval = static_eval(node);
+    sse.static_eval = static_eval(node, &mut ti.pht);
     let eval = sse.static_eval;
 
     // is our position getting better than it was a move ago?
@@ -780,11 +800,11 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
     }
     ti.nodes_searched += 1;
 
-    if node.is_quiet() { return static_eval(node); }
+    if node.is_quiet() { return static_eval(node, &mut ti.pht); }
 
     let mut alpha = alpha;
 
-    let stand_pat = static_eval(node);
+    let stand_pat = static_eval(node, &mut ti.pht);
 
     let is_check = node.is_check(node.side_to_move);
     // standing pat check so we *do* stop eventually
