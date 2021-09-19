@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unreachable_code)]
-#![feature(exclusive_range_pattern)]
 
 mod bitboard;
 mod eval;
@@ -16,9 +15,6 @@ mod rand;
 mod search;
 mod searchutil;
 mod see;
-mod tuning_eval;
-mod tuning_psqt;
-mod tuning;
 mod time;
 mod tt;
 mod uci;
