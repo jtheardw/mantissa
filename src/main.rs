@@ -11,7 +11,6 @@ mod moveutil;
 mod perft;
 mod pht;
 mod psqt;
-mod rand;
 mod search;
 mod searchutil;
 mod see;
