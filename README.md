@@ -73,7 +73,7 @@ In terms of search, Mantissa uses some form of the following ideas:
 
 You can build Mantissa so long as you have rust installed using the `build` script located in the main directory.  It will build both the debug and release-optimized versions.  You can find them in the `target/debug` and `target/release` directories respectively.
 
-NOTE: For the moment you'll need the nightly toolchain.  You can switch to it using [these instructions.](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml)
+NOTE: If you're having trouble installing the Windows build because you don't have the `popcnt` instruction or any other reason, use the `build_portable` script instead.
 
 ## Credit
 
