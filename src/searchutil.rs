@@ -13,6 +13,8 @@ pub const AFP_DEPTH: i32 = 8;         // reverse futility pruning
 pub const NMP_DEPTH: i32 = 3;         // null-move pruning/reductions
 pub const LMR_DEPTH: i32 = 3;         // late move reductions
 
+static mut LMR_TABLE: [[i32; 64]; 64] = [[0; 64]; 64];
+
 pub fn efp_margin(depth: i32) -> i32 {
     if depth <= 0 { return 0; }
     if depth > 3 { return 4000 * depth}
@@ -38,14 +40,26 @@ pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
     return r;
 }
 
+pub fn lmr_table_gen() {
+    // TODO: experiment on these parameters.  So far the same as Ethereal
+    // has been the best for Mantissa but I've only tried a few.
+    for d in 0..64 {
+        for m in 0..64 {
+            let r = (0.75 + (d as f64).log2() * (m as f64).log2() / 2.25).floor() as i32;
+            unsafe {LMR_TABLE[d as usize][m as usize] = r;}
+        }
+    }
+}
+
 pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
-    return (0.75 + (depth as f64).log2() * (moves_searched as f64).log2() / 2.25).floor() as i32;
+    let d = cmp::min(depth, 64) as usize;
+    let m = cmp::min(moves_searched, 64) as usize;
+    unsafe {
+        return LMR_TABLE[d][m];
+    }
 }
 
 pub fn lmp_count(improving: bool, depth: i32) -> i32 {
-    // TENTATIVE.  Currently letting a version of mantissa play
-    // with this enabled using values very similar to Ethereal's but slightly
-    // more conservative.  Subject to change or removal altogether soon.
     if improving {
         4 + 4 * depth * depth / 4
     } else {

@@ -87,11 +87,17 @@ impl MovePicker {
 
     fn sort_next_move(mvs: &mut Vec<(Move, u64)>, cur_i: usize) {
         let mut highest_i = cur_i;
+        let mut highest = mvs[highest_i].1;
+        let mut i = cur_i + 1;
+        let len = mvs.len();
 
-        for i in (cur_i + 1)..mvs.len() {
-            if mvs[i].1 > mvs[highest_i].1 {
+        while i < len {
+            let score = mvs[i].1;
+            if score > highest {
                 highest_i = i;
+                highest = score;
             }
+            i += 1;
         }
 
         // swap

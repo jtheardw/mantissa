@@ -23,6 +23,7 @@ mod zobrist;
 use crate::magic::*;
 use crate::movegen::*;
 use crate::pht::*;
+use crate::searchutil::*;
 use crate::tt::*;
 use crate::uci::*;
 use crate::util::*;
@@ -31,6 +32,7 @@ fn init() {
     initialize_masks();
     initialize_magic_tables();
     initialize_pht();
+    lmr_table_gen();
     allocate_tt(64);
 }
 
