@@ -52,8 +52,8 @@ pub fn lmr_table_gen() {
 }
 
 pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
-    let d = cmp::min(depth, 64) as usize;
-    let m = cmp::min(moves_searched, 64) as usize;
+    let d = cmp::min(depth, 63) as usize;
+    let m = cmp::min(moves_searched, 63) as usize;
     unsafe {
         return LMR_TABLE[d][m];
     }
