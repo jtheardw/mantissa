@@ -1,6 +1,6 @@
 # Mantissa
 
-<img src="mantissa_logo.png">
+<img src="mantissa_logo_seal.png" style="width: 300px">
 
 ## About
 
