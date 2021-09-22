@@ -61,8 +61,8 @@ fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, n
     let pv_str = get_pv_str(pv);
     let val_str = get_val_str(val);
     let nps = (nodes * 1000) as u128 / time;
-    println!("info depth {} seldepth {} pv {} score {} time {} nodes {} nps {}",
-             depth, seldepth, pv_str, val_str, time, nodes, nps
+    println!("info depth {} seldepth {} score {} time {} nodes {} nps {} pv {}",
+             depth, seldepth, val_str, time, nodes, nps, pv_str
     );
 }
 

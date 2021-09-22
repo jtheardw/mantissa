@@ -33,7 +33,7 @@ fn init() {
     initialize_magic_tables();
     initialize_pht();
     lmr_table_gen();
-    allocate_tt(64);
+    allocate_tt(16);
 }
 
 fn main() {
