@@ -79,6 +79,21 @@ NOTE: If you're having trouble installing the Windows build using the `build_win
 
 ## Credit
 
-- The chess programming community for many of the ideas used in Mantissa.
-- Kade Phillips for the logo, optimization code in the tuner, and the "plies remaining" estimation code for Mantissa's time control.
-- Andy Grant (Ethereal creator) for some of the positions used in tuning Mantissa's evaluator, as well as a lot of ideas found pouring through Ethereal's source.
+### Engine Design
+
+I am not very good at chess and am still relatively new to chess programming, so many of the ideas implemented in Mantissa have been very much informed by or taken from those who have come before.  I have to give a big thanks to the Chess Programming Wiki in general, which is an excellent jumping-off point for new chess programmers.  While I have looked at a lot of engines recently, there are a few I will directly credit for having been particularly influential of my understanding of chess programming:
+
+- [Stockfish](https://github.com/official-stockfish/Stockfish)
+- [Ethereal](https://github.com/AndyGrant/Ethereal)
+- [CPW-Engine](https://www.chessprogramming.org/CPW-Engine)
+- [Cheng-4](https://github.com/kmar/cheng4)
+- [Zahak](https://github.com/amanjpro/zahak)
+
+### Data
+
+- Andrew Grant for some of the positions used in the tuning process for Mantissa's evaluator.
+- Kade Phillips and Thomas Ahle for their two analyses of data to model moves remaining in a game.
+
+### Other
+
+- Kade Phillips for his work on both of Mantissa's current logos.

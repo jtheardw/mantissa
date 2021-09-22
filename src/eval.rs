@@ -182,7 +182,6 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             if attacks != 0 {
                 attackers += 1;
                 queen_attacks += attacks.count_ones();
-                // attack_value += QUEEN_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * QUEEN_MOBILITY[moves];
             board &= board - 1;
@@ -197,7 +196,6 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             if attacks != 0 {
                 attackers += 1;
                 rook_attacks += attacks.count_ones();
-                // attack_value += ROOK_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * ROOK_MOBILITY[moves];
             board &= board - 1;
@@ -212,7 +210,6 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             if attacks != 0 {
                 attackers += 1;
                 bishop_attacks += attacks.count_ones();
-                // attack_value += BISHOP_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * BISHOP_MOBILITY[moves];
             board &= board - 1;
@@ -228,7 +225,6 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             if attacks != 0 {
                 attackers += 1;
                 knight_attacks += attacks.count_ones();
-                // attack_value += KNIGHT_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * KNIGHT_MOBILITY[moves];
             board &= board - 1;

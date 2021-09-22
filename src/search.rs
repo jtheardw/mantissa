@@ -501,8 +501,6 @@ fn search(node: &mut Bitboard,
     {
         // I've stolen stockfish's idea here to combine singular
         // move detection with multi-cut in the same search
-        //
-        // I can't afford to do the super-tight cutoffs stockfish does though
         let tt_val = sse.tt_val;
         let former_pv = sse.tt_node_type == PV_NODE && !is_pv;
         let margin = if former_pv {30 * (depth / 2)} else {25 * (depth / 2)};
@@ -519,11 +517,6 @@ fn search(node: &mut Bitboard,
             // pseudo-multi-cut.  This indicates multiple moves failed high
             // so this is probably a cutnode
             return target;
-        } else if tt_val >= beta {
-            // sse.excluded_move = tt_move;
-            // let val = search(node, beta - 1, beta, (depth + 3) / 2, ply, false, cut_node, thread_num);
-            // sse.excluded_move = Move::null_move();
-            // if val >= beta { return beta; }
         }
     }
 
@@ -589,14 +582,13 @@ fn search(node: &mut Bitboard,
         }
         let gives_check = node.is_check(node.side_to_move);
 
-        // VERY EXPERIMENTAL.  Curious to see if doing a basic form of late move pruning
-        // hurts search results in the current mantissa.
+        // Basic form of late move pruning
         if best_val > -MIN_MATE_SCORE && depth <= 8 && moves_searched >= lmp_count(improving, depth) {
             futile = true;
         }
 
         if is_quiet && !futile && score < COUNTER_OFFSET && best_val > - MIN_MATE_SCORE {
-            // Futility pruning
+            // Futility/History leaf pruning
             // modified from the older version to be able to come into play at higher
             // depths but conditioned on reaching a move with bad history
             let fp_margin = fp_margin(depth);
