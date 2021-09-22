@@ -14,7 +14,14 @@ Mantissa is hosted on lichess here: https://lichess.org/@/AKS-Mantissa
 
 She accepts challenges from humans and bots in any time format except ultrabullet (bots aren't allowed to play ultra-bullet on lichess) or correspondence/unlimited (a few bad apples have clogged up Mantissa's match queue before by leaving once they were in a bad spot).  Mantissa accepts both casual and rated challenges.
 
-As of this writing, Mantissa is currently between 2000 and 2100 lichess ELO in most formats and is slowly getting stronger.
+## Strength
+
+### Lichess
+As of this writing, Mantissa is currently between 2050 and 2200 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however.
+
+### CCRL
+
+Mantissa is currently receiving some testing from the CCRL testers.  As numbers get reported, I'll update this section to present the numbers.
 
 ## Features
 
