@@ -106,4 +106,4 @@ I am not very good at chess and am still relatively new to chess programming, so
 
 ### Other
 
-- Kade Phillips for his work on both of Mantissa's current logos.
+- Kade Phillips for his work on Mantissa's logos.
