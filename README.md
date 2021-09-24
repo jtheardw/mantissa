@@ -2,7 +2,7 @@
 
 
 <p align="center">
-<img src="logos/mantissa_logo_seal_transparent.png" style="width: 45%">
+<img src="logos/mantissa_logo_seal_simple.png" style="width: 45%">
 </p>
 
 ## About
