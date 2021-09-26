@@ -41,8 +41,6 @@ pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
 }
 
 pub fn lmr_table_gen() {
-    // TODO: experiment on these parameters.  So far the same as Ethereal
-    // has been the best for Mantissa but I've only tried a few.
     for d in 0..64 {
         for m in 0..64 {
             let r = (0.75 + (d as f64).log2() * (m as f64).log2() / 2.25).floor() as i32;
@@ -59,7 +57,7 @@ pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
     }
 }
 
-pub fn lmp_count(improving: bool, depth: i32) -> i32 {
+pub fn lmp_count(improving: bool, depth: i32, _is_pv: bool) -> i32 {
     if improving {
         4 + 4 * depth * depth / 4
     } else {

@@ -122,10 +122,10 @@ fn check_time(search_limits: &SearchLimits) {
     }
 }
 
-fn thread_handler(mut node: Bitboard, thread_depth: i32, thread_num: usize) {
+fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_num: usize) {
     let mut depth = thread_depth;
     let mut val = LB;
-    loop {
+    while depth <= max_depth {
         let mut aspiration_delta = 250;
         loop {
             let mut alpha = LB;
@@ -185,7 +185,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         let thread_node = node.thread_copy();
 
         threads.push(thread::spawn(move || {
-            thread_handler(thread_node, thread_depth, thread_num as usize);
+            thread_handler(thread_node, thread_depth, search_limits.depth, thread_num as usize);
         }));
     }
 
@@ -396,18 +396,26 @@ fn search(node: &mut Bitboard,
                 return tt_val;
             }
         }
-    } else if depth >= 6 && is_pv { // && !init_node {
+    } else if depth >= 6 && !init_node { // && is_pv {
         // internal iterative deepening
         // if we fail to get a tt hit on a PV node, which should be fairly rare
         // at high depths, we'll do a reduced search to get a good guess for first move
-        sse.pv = Vec::new();
-        let val = search(node, alpha, beta, depth - 2, ply, true, thread_num);
-        if sse.pv.len() > 0 {
-            sse.tt_move = sse.pv[0];
-            sse.pv = Vec::new();
-            sse.tt_val = val;
-        }
-    }
+        // sse.pv = Vec::new();
+        // let val = search(node, alpha, beta, depth - 2, ply, true, thread_num);
+        // if sse.pv.len() > 0 {
+        //     sse.tt_move = sse.pv[0];
+        //     sse.pv = Vec::new();
+        //     sse.tt_val = val;
+        // }
+        depth -= 1;
+    } // else if depth >= 6 && thread_num != 0 {
+    //     // conditional internal iterative reductions
+    //     // IIR comes from a thread by Rebel creator
+    //     // but here I apply it only in the non-main
+    //     // threads, as their purpose is just to fill out the
+    //     // TT quickly
+    //     return search(node, alpha, beta, depth - 1, ply, is_pv, thread_num)
+    // }
 
     let is_check = node.is_check(node.side_to_move);
     sse.static_eval = static_eval(node, &mut ti.pht);
@@ -501,7 +509,6 @@ fn search(node: &mut Bitboard,
     {
         // I've stolen stockfish's idea here to combine singular
         // move detection with multi-cut in the same search
-        let tt_val = sse.tt_val;
         let former_pv = sse.tt_node_type == PV_NODE && !is_pv;
         let margin = if former_pv {30 * (depth / 2)} else {25 * (depth / 2)};
         let depth_to_search = if former_pv {(depth + 2) / 2} else {(depth - 1) / 2};
@@ -583,7 +590,7 @@ fn search(node: &mut Bitboard,
         let gives_check = node.is_check(node.side_to_move);
 
         // Basic form of late move pruning
-        if best_val > -MIN_MATE_SCORE && depth <= 8 && moves_searched >= lmp_count(improving, depth) {
+        if best_val > -MIN_MATE_SCORE && depth <= 8 && moves_searched >= lmp_count(improving, depth, is_pv) {
             futile = true;
         }
 
@@ -651,7 +658,7 @@ fn search(node: &mut Bitboard,
                     // adjust r based on history of other quiet moves
                     if is_quiet && score < COUNTER_OFFSET {
                         let quiet_score = (score as i32) - QUIET_OFFSET as i32;
-                        r -= cmp::max(-3, cmp::min(2, quiet_score / 3000))
+                        r -= cmp::max(-3, cmp::min(2, quiet_score / 4000))
                     }
 
                     // test captures which initially seem bad
