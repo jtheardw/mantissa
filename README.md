@@ -24,7 +24,7 @@ As of this writing, Mantissa is currently between 2050 and 2200 lichess ELO in m
 
 ### CCRL
 
-Mantissa is currently receiving some testing from the CCRL testers.  As numbers get reported, I'll update this section to present the numbers.
+Mantissa currently holds a blitz ELO rating of 2667 on CCRL.  This score may fluctuate in the future, as this is its first entry on the list.
 
 ## Features
 
