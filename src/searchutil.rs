@@ -11,7 +11,7 @@ pub const FP_DEPTH: i32 = 5;
 pub const RFP_DEPTH: i32 = 6;         // reverse futility pruning
 pub const AFP_DEPTH: i32 = 8;         // reverse futility pruning
 pub const NMP_DEPTH: i32 = 3;         // null-move pruning/reductions
-pub const LMR_DEPTH: i32 = 3;         // late move reductions
+pub const LMR_DEPTH: i32 = 2;         // late move reductions
 
 static mut LMR_TABLE: [[i32; 64]; 64] = [[0; 64]; 64];
 

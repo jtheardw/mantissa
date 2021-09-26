@@ -632,7 +632,7 @@ fn search(node: &mut Bitboard,
             let mut do_full_zw_search = true;
             if depth > LMR_DEPTH
                 && !init_node
-                && moves_searched > 2
+                && moves_searched >= 2
                 && !is_check
                 && (is_quiet || score < QUIET_OFFSET) {
                     // Late Move Reductions.
@@ -671,9 +671,9 @@ fn search(node: &mut Bitboard,
                         if cap_piece != 0 {
                             node.undo_move(&mv);
                             let see_score = see(node, mv.end, cap_piece, mv.start, mv.piece);
-                            if see_score < 0 {
+                            if see_score < 0 && !is_pv {
                                 r += 1;
-                            } else {
+                            } else if see_score > 0 {
                                 r -= 1;
                                 if gives_check { r -= 1; }
                             }
