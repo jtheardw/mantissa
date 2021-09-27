@@ -1,6 +1,9 @@
 # Mantissa
 
-<img src="mantissa_logo_seal_fancy.png" style="width: 300px">
+
+<p align="center">
+<img src="logos/mantissa_logo_seal_simple.png" style="width: 45%">
+</p>
 
 ## About
 
@@ -21,7 +24,7 @@ As of this writing, Mantissa is currently between 2050 and 2200 lichess ELO in m
 
 ### CCRL
 
-Mantissa is currently receiving some testing from the CCRL testers.  As numbers get reported, I'll update this section to present the numbers.
+Mantissa currently holds a blitz ELO rating of 2667 on CCRL.  This score may fluctuate in the future, as this is its first entry on the list.
 
 ## Features
 
@@ -103,4 +106,4 @@ I am not very good at chess and am still relatively new to chess programming, so
 
 ### Other
 
-- Kade Phillips for his work on both of Mantissa's current logos.
+- Kade Phillips for his work on Mantissa's logos.
