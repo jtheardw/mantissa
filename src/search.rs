@@ -396,26 +396,14 @@ fn search(node: &mut Bitboard,
                 return tt_val;
             }
         }
-    } else if depth >= 6 && !init_node { // && is_pv {
-        // internal iterative deepening
-        // if we fail to get a tt hit on a PV node, which should be fairly rare
-        // at high depths, we'll do a reduced search to get a good guess for first move
-        // sse.pv = Vec::new();
-        // let val = search(node, alpha, beta, depth - 2, ply, true, thread_num);
-        // if sse.pv.len() > 0 {
-        //     sse.tt_move = sse.pv[0];
-        //     sse.pv = Vec::new();
-        //     sse.tt_val = val;
-        // }
+    } else if depth >= 6 && !init_node {
+        // internal iterative reductions
+        // First place I can find IIR comes from a thread by Rebel and ProDeo author
+        // wherein they found success simply reducing the depth at unsorted subtrees
+        // After hundreds of games of self-play, the idea does bear fruit in Mantissa
+        // to the tune of about 20 self-ply Elo
         depth -= 1;
-    } // else if depth >= 6 && thread_num != 0 {
-    //     // conditional internal iterative reductions
-    //     // IIR comes from a thread by Rebel creator
-    //     // but here I apply it only in the non-main
-    //     // threads, as their purpose is just to fill out the
-    //     // TT quickly
-    //     return search(node, alpha, beta, depth - 1, ply, is_pv, thread_num)
-    // }
+    }
 
     let is_check = node.is_check(node.side_to_move);
     sse.static_eval = static_eval(node, &mut ti.pht);
@@ -689,7 +677,7 @@ fn search(node: &mut Bitboard,
 
                     // in potential PV nodes, we'll be more careful
                     if is_pv && r > 0 {
-                        r = (r * 2) / 3;
+                        r = (r * 3) / 4;
                     }
 
                     // not (yet) allowing extensions from LMR.
