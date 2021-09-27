@@ -1,6 +1,9 @@
+use std::cmp;
+
 use crate::bitboard::*;
 use crate::movegen::*;
 use crate::moveutil::*;
+use crate::see::*;
 use crate::util::*;
 
 const TT_MOVE: u8 = 0;
@@ -106,7 +109,11 @@ impl MovePicker {
         mvs[cur_i] = (mv, score);
     }
 
-    fn score_moves(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u64)> {
+    fn see_score(pos: &mut Bitboard, mv: Move) -> i32 {
+        return see(pos, mv.end, pos.piece_at_square(mv.end, !pos.side_to_move), mv.start, mv.piece);
+    }
+
+    fn score_moves_old(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u64)> {
         let mut scored_moves: Vec<(Move, u64)> = Vec::new();
         let defended_pieces = all_attacks_board(pos, !pos.side_to_move) & pos.composite[!pos.side_to_move as usize];
 
@@ -163,6 +170,41 @@ impl MovePicker {
                 }
             }
 
+            scored_moves.push((mv, mv_score));
+        }
+        return scored_moves;
+    }
+
+    fn score_moves(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u64)> {
+        let mut scored_moves: Vec<(Move, u64)> = Vec::new();
+        for mv in movelist {
+            let mv_score: u64;
+            let captured = pos.piece_at_square(mv.end, !pos.side_to_move);
+            if mv == self.tt_move {
+                continue;
+            }
+            if captured == 0 {
+                // not a capture
+                if mv == self.killers[0] || mv == self.killers[1] {
+                    // mv_score = KILLER_OFFSET;
+                    // this move will be handled in a different stage
+                    continue;
+                } else if mv == self.countermove {
+                    // mv_score = COUNTER_OFFSET;
+                    // same here
+                    continue;
+                } else {
+                    let piece_num = get_piece_num(mv.piece, pos.side_to_move);
+                    mv_score = QUIET_OFFSET + (self.history[piece_num][mv.end as usize] + self.followup[piece_num][mv.end as usize]) as u64;
+                }
+            } else {
+                let score = see(pos, mv.end, captured, mv.start, mv.piece);
+                if score >= 0 {
+                    mv_score = OK_CAPTURE_OFFSET + (score as u64);
+                } else {
+                    mv_score = QUIET_OFFSET - cmp::min(score.abs() as u64, QUIET_OFFSET);
+                }
+            }
             scored_moves.push((mv, mv_score));
         }
         return scored_moves;

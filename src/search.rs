@@ -666,20 +666,20 @@ fn search(node: &mut Bitboard,
                     // if they are, we reduce them less and possibly
                     // do a pseudo check-extension on them.
                     // otherwise, reduce them more
-                    if !is_quiet && score < OK_CAPTURE_OFFSET {
-                        let cap_piece = node.get_last_capture();
-                        if cap_piece != 0 {
-                            node.undo_move(&mv);
-                            let see_score = see(node, mv.end, cap_piece, mv.start, mv.piece);
-                            if see_score < 0 && !is_pv {
-                                r += 1;
-                            } else if see_score > 0 {
-                                r -= 1;
-                                if gives_check { r -= 1; }
-                            }
-                            node.do_move(&mv);
-                        }
-                    }
+                    // if !is_quiet && score < OK_CAPTURE_OFFSET {
+                    //     let cap_piece = node.get_last_capture();
+                    //     if cap_piece != 0 {
+                    //         node.undo_move(&mv);
+                    //         let see_score = see(node, mv.end, cap_piece, mv.start, mv.piece);
+                    //         if see_score < 0 && !is_pv {
+                    //             r += 1;
+                    //         } else if see_score > 0 {
+                    //             r -= 1;
+                    //             if gives_check { r -= 1; }
+                    //         }
+                    //         node.do_move(&mv);
+                    //     }
+                    // }
 
                     // the tt node type here gives us some impression on if we
                     // expect this to be a PV node.  Reduce more or less according to
