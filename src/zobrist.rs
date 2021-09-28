@@ -1,5 +1,3 @@
-use rand::Rng;
-
 use crate::bitboard::Bitboard;
 use crate::util::*;
 
