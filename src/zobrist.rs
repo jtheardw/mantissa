@@ -7,6 +7,8 @@ use crate::util::*;
 // 8 entries for en passant file
 // 1 entry for side to move
 // total is
+
+// this particular table is the same set of numbers used in the polyglot format
 const ZOBRIST_TABLE: [u64; 781] = [
     (0x9D39247E33776D41), (0x2AF7398005AAA5C7), (0x44DB015024623547), (0x9C15F73E62A76AE2),
     (0x75834465489C0C89), (0x3290AC3A203001BF), (0x0FBBAD1F61042279), (0xE83A908FF2FB60CA),
