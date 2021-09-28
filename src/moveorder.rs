@@ -16,7 +16,6 @@ const GEN_QUIET: u8 = 6;
 const QUIET_MOVES: u8 = 7;
 const BAD_NOISY: u8 = 8;
 
-const REMAINING_MOVES: u8 = 1;
 // TODO more stages to come later.  For now
 // let's stay basic
 
@@ -56,7 +55,7 @@ pub struct MovePicker {
 impl MovePicker {
 
     pub fn new(tt_move: Move, killers: [Move; 2], history: [[i32; 64]; 12], countermove: Move, followup_history: [[i32; 64]; 12], q_moves_only: bool) -> MovePicker {
-        let stage = if tt_move.is_null {REMAINING_MOVES} else {TT_MOVE};
+        let stage = if tt_move.is_null {GEN_NOISY} else {TT_MOVE};
         MovePicker {
             noisy_moves_only: q_moves_only,
             move_stage: stage,
@@ -75,7 +74,23 @@ impl MovePicker {
     pub fn q_new() -> MovePicker {
         MovePicker {
             noisy_moves_only: true,
-            move_stage: REMAINING_MOVES,
+            move_stage: GEN_NOISY,
+            tt_move: Move::null_move(),
+            killers: [Move::null_move(); 2],
+            history: [[0; 64]; 12],
+            followup: [[0; 64]; 12],
+            countermove: Move::null_move(),
+            scored_noisy_moves: Vec::new(),
+            scored_quiet_moves: Vec::new(),
+            noisy_i: 0,
+            quiet_i: 0
+        }
+    }
+
+    pub fn perft_new() -> MovePicker {
+        MovePicker {
+            noisy_moves_only: false,
+            move_stage: GEN_NOISY,
             tt_move: Move::null_move(),
             killers: [Move::null_move(); 2],
             history: [[0; 64]; 12],

@@ -247,7 +247,7 @@ fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
 
 pub fn uci_loop() {
     let mut board = Bitboard::default_board();
-    let mut options = UCIOptions {num_threads: 2, move_overhead: 10, hash: 1024};
+    let mut options = UCIOptions {num_threads: 1, move_overhead: 10, hash: 64};
 
     loop {
         let mut inp: String = String::new();
@@ -282,6 +282,9 @@ pub fn uci_loop() {
             uci_go(&mut board, options, &mut params);
         } else if cmd == "stop" {
             abort_search();
+        } else if cmd == "ucinewgame" {
+            // clear the transposition table
+            allocate_tt(options.hash as usize);
         }
     }
 }
