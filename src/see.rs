@@ -96,10 +96,6 @@ pub fn see(pos: &Bitboard, to_idx: i32, target_piece: u8, from_idx: i32, atk_pie
     while from_sq != 0 {
         gain[depth] = get_piece_value(target_piece) - if depth > 0 {gain[depth - 1]} else {0};
 
-        // if depth > 0 {
-        //     if gain[depth - 1] > 0 && gain[depth] < 0 {break;}
-        // }
-
         // remove the attacker from occupancy and attacks
         occ ^= from_sq;
         done_atks |= from_sq;
