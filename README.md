@@ -20,11 +20,11 @@ She accepts challenges from humans and bots in any time format except ultrabulle
 ## Strength
 
 ### Lichess
-As of this writing, Mantissa is currently between 2050 and 2200 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however.
+As of this writing, Mantissa is currently between 2050 and 2300 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however.
 
 ### CCRL
 
-Mantissa currently holds a blitz ELO rating of 2667 on CCRL.  This score may fluctuate in the future, as this is its first entry on the list.
+Mantissa currently holds a blitz ELO rating of 2667 on CCRL (as of version 2.1.1).  This score may fluctuate in the future, as this is its first entry on the list.
 
 ## Features
 
