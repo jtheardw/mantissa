@@ -14,6 +14,7 @@ pub fn allocate_tt(size_mb: usize) {
     }
     // afterwards we know the right power is one less than that.
     unsafe {
+        TT = TT::new(0);
         TT = TT::new(pow - 1);
     }
 }

@@ -57,11 +57,9 @@ pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
     }
 }
 
-pub fn lmp_count(improving: bool, depth: i32, is_pv: bool) -> i32 {
+pub fn lmp_count(improving: bool, depth: i32) -> i32 {
     if improving {
         4 + depth * depth
-    } else if is_pv {
-        3 + 3 * depth * depth / 4
     } else {
         2 + depth * depth / 2
     }

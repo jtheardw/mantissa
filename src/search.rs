@@ -578,7 +578,7 @@ fn search(node: &mut Bitboard,
         let gives_check = node.is_check(node.side_to_move);
 
         // Basic form of late move pruning
-        if best_val > -MIN_MATE_SCORE && depth <= 8 && moves_searched >= lmp_count(improving, depth, is_pv) {
+        if best_val > -MIN_MATE_SCORE && depth <= 8 && moves_searched >= lmp_count(improving, depth) {
             futile = true;
         }
 
@@ -657,7 +657,7 @@ fn search(node: &mut Bitboard,
 
                     // in potential PV nodes, we'll be more careful
                     if is_pv && r > 0 {
-                        r = (r * 3) / 4;
+                        r = (r * 2) / 3;
                     }
 
                     // not (yet) allowing extensions from LMR.
