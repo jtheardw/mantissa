@@ -126,13 +126,14 @@ fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_
     let mut depth = thread_depth;
     let mut val = LB;
     while depth <= max_depth {
-        let mut aspiration_delta = 250;
+        let mut aspiration_delta_high = 125;
+        let mut aspiration_delta_low = 125;
         loop {
             let mut alpha = LB;
             let mut beta = UB;
             if val > LB {
-                alpha = val - aspiration_delta;
-                beta = val + aspiration_delta;
+                alpha = val - aspiration_delta_low;
+                beta = val + aspiration_delta_high;
             }
 
             val = search(&mut node, alpha, beta, depth, 0, true, thread_num);
@@ -140,8 +141,10 @@ fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_
 
             if val > alpha && val < beta {
                 break;
+            } else if val >= beta {
+                aspiration_delta_high *= 2;
             } else {
-                aspiration_delta *= 2;
+                aspiration_delta_low *= 2;
             }
         }
         depth += 1;
@@ -168,7 +171,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         }
     }
 
-    let mut depth: i32 = 2;
+    let mut depth: i32 = if search_limits.use_variable_time { 2 } else { 1 };
     let mut current_time: u128;
 
     let mut best_move_changes = 0;
@@ -190,13 +193,14 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     }
 
     while depth <= search_limits.depth {
-        let mut aspiration_delta = 250;
+        let mut aspiration_delta_high = 125;
+        let mut aspiration_delta_low = 125;
         loop {
             let mut alpha = LB;
             let mut beta = UB;
             if depth > 1 {
-                alpha = val - aspiration_delta;
-                beta = val + aspiration_delta;
+                alpha = val - aspiration_delta_low;
+                beta = val + aspiration_delta_high;
             }
 
             val = search(node, alpha, beta, depth, 0, true, 0);
@@ -204,8 +208,10 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
             if val > alpha && val < beta {
                 break;
+            } else if val >= beta {
+                aspiration_delta_high *= 2;
             } else {
-                aspiration_delta *= 2;
+                aspiration_delta_low *= 2;
             }
         }
         if search_aborted() { break; }
@@ -657,7 +663,7 @@ fn search(node: &mut Bitboard,
 
                     // in potential PV nodes, we'll be more careful
                     if is_pv && r > 0 {
-                        r = (r * 2) / 3;
+                        r = r >> 1; //(r * 3) / 4; // (r * 2) / 3;
                     }
 
                     // not (yet) allowing extensions from LMR.
