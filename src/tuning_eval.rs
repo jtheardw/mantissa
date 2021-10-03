@@ -50,10 +50,10 @@ pub static mut BISHOP_MOBILITY: [Score; 14] = [S!(-139, 115), S!(227, -209), S!(
 pub static mut ROOK_MOBILITY: [Score; 15] = [S!(66, -86), S!(55, 97), S!(-221, -254), S!(-78, -74), S!(-20, 301), S!(13, 468), S!(15, 756), S!(-4, 833), S!(-8, 901), S!(66, 935), S!(139, 967), S!(190, 1001), S!(277, 1005), S!(335, 969), S!(569, 767)];
 pub static mut QUEEN_MOBILITY: [Score; 28] = [S!(42, -24), S!(41, 121), S!(-241, 81), S!(-42, 76), S!(-3, 134), S!(302, -76), S!(-45, -89), S!(92, 47), S!(123, -119), S!(151, 64), S!(227, 178), S!(184, 423), S!(244, 500), S!(249, 627), S!(269, 800), S!(224, 883), S!(250, 910), S!(282, 801), S!(234, 970), S!(334, 811), S!(191, 961), S!(200, 912), S!(192, 935), S!(71, 822), S!(235, 994), S!(443, 631), S!(278, 1125), S!(448, 955)];
 
-pub static mut QUEEN_KING_DANGER: [i32; 8] = [66, 216, 464, 824, 983, 647, 753, 910];
-pub static mut ROOK_KING_DANGER: [i32; 8] = [19, 35, 98, 177, 362, 502, 400, 293];
-pub static mut BISHOP_KING_DANGER: [i32; 8] = [0, 60, 41, 87, 55, 181, 124, 176];
-pub static mut KNIGHT_KING_DANGER: [i32; 8] = [25, 0, 48, 103, 517, 115, 427, 154];
+pub static mut QUEEN_KING_DANGER: [i64; 8] = [S!(75, 75), S!(216, 216), S!(426, 426), S!(680, 680), S!(1068, 1068), S!(782, 782), S!(973, 973), S!(718, 718)];
+pub static mut ROOK_KING_DANGER: [i64; 8] = [S!(92, 92), S!(37, 37), S!(100, 100), S!(177, 177), S!(323, 323), S!(1400, 1400), S!(327, 327), S!(770, 770)];
+pub static mut BISHOP_KING_DANGER: [i64; 8] = [S!(97, 97), S!(93, 93), S!(93, 93), S!(96, 96), S!(92, 92), S!(270, 270), S!(0, 0), S!(166, 166)];
+pub static mut KNIGHT_KING_DANGER: [i64; 8] = [S!(75, 75), S!(26, 26), S!(65, 65), S!(133, 133), S!(71, 71), S!(195, 195), S!(718, 718), S!(207, 207)];
 
 pub static mut DOUBLE_BISHOP_BONUS: Score = S!(109, 972);
 
@@ -130,7 +130,7 @@ unsafe fn pawn_attacks(pawn_bb: u64, side_to_move: Color) -> u64 {
 
 unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
     let mut mobility: Score = make_score(0, 0);
-    let mut king_danger: [i32; 2] = [0, 0];
+    let mut king_danger: [Score; 2] = [0, 0];
     let white = Color::White as usize;
     let black = Color::Black as usize;
     let occ = pos.composite[white] | pos.composite[black];
@@ -141,7 +141,7 @@ unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         let king_bb = pos.king[other_side];
         let mut attackers = 0;
-        let mut attack_value: i32 = 0;
+        let mut attack_value: Score = 0;
         let king_idx = king_bb.trailing_zeros() as i32;
         let king_zone = king_bb | KING_MASK[king_idx as usize];
 
@@ -212,14 +212,14 @@ unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
         }
 
         if attackers > 7 { attackers = 7; }
-        attack_value += QUEEN_KING_DANGER[attackers] * queen_attacks as i32;
-        attack_value += ROOK_KING_DANGER[attackers] * rook_attacks as i32;
-        attack_value += BISHOP_KING_DANGER[attackers] * bishop_attacks as i32;
-        attack_value += KNIGHT_KING_DANGER[attackers] * knight_attacks as i32;
+        attack_value += QUEEN_KING_DANGER[attackers] * queen_attacks as i64;
+        attack_value += ROOK_KING_DANGER[attackers] * rook_attacks as i64;
+        attack_value += BISHOP_KING_DANGER[attackers] * bishop_attacks as i64;
+        attack_value += KNIGHT_KING_DANGER[attackers] * knight_attacks as i64;
         king_danger[side] = attack_value;
     }
 
-    let score = mobility + (make_score(1, 1) * (king_danger[white] - king_danger[black]) as i64);
+    let score = mobility + (king_danger[white] - king_danger[black]);
     return score;
 }
 

@@ -37,67 +37,43 @@ macro_rules! S {
     }
 }
 
-pub const QUEEN_VALUE: Score = S!(10947, 16706);
-pub const ROOK_VALUE: Score = S!(4865, 8652);
-pub const BISHOP_VALUE: Score = S!(3523, 5211);
-pub const KNIGHT_VALUE: Score = S!(3466, 4880);
-pub const PAWN_VALUE: Score = S!(800, 1414);
+pub const QUEEN_VALUE: Score = S!(11245, 16724);
+pub const ROOK_VALUE: Score = S!(5060, 8645);
+pub const BISHOP_VALUE: Score = S!(3523, 5271);
+pub const KNIGHT_VALUE: Score = S!(3487, 4890);
+pub const PAWN_VALUE: Score = S!(883, 1423);
 
-pub const KNIGHT_MOBILITY: [Score; 9] = [
-    S!(-275, 21), S!(-36,  10), S!(145, 148), S!(132, 528),
-    S!(191, 535), S!(183, 563), S!(223, 551), S!(295, 453),
-    S!(297, 333)
-];
-pub const BISHOP_MOBILITY: [Score; 14] = [
-    S!(-139,  115), S!( 227, -209), S!(288, -843), S!(259, -339),
-    S!( 374, -108), S!( 364,   96), S!(472,  310), S!(559,  389),
-    S!( 572,  558), S!( 580,  634), S!(552,  682), S!(579,  621),
-    S!( 440,  651), S!(1141,  511)
-];
-pub const ROOK_MOBILITY: [Score; 15] = [
-    S!( 66,  -86), S!( 55,  97), S!(-221, -254), S!(-78,  -74),
-    S!(-20,  301), S!( 13, 468), S!(  15,  756), S!( -4,  833),
-    S!( -8,  901), S!( 66, 935), S!( 139,  967), S!(190, 1001),
-    S!(277, 1005), S!(335, 969), S!( 569,  767)
-];
-pub const QUEEN_MOBILITY: [Score; 28] = [
-    S!( 42,  -24), S!( 41, 121), S!(-241,   81), S!(-42,  76),
-    S!( -3,  134), S!(302, -76), S!( -45,  -89), S!( 92,  47),
-    S!(123, -119), S!(151,  64), S!( 227,  178), S!(184, 423),
-    S!(244,  500), S!(249, 627), S!( 269,  800), S!(224, 883),
-    S!(250,  910), S!(282, 801), S!( 234,  970), S!(334, 811),
-    S!(191,  961), S!(200, 912), S!( 192,  935), S!( 71, 822),
-    S!(235,  994), S!(443, 631), S!( 278, 1125), S!(448, 955)
-];
+pub const KNIGHT_MOBILITY: [Score; 9] = [S!(-1000, 418), S!(-281, 92), S!(48, 241), S!(149, 554), S!(208, 565), S!(223, 576), S!(257, 608), S!(304, 469), S!(308, 374)];
+pub const BISHOP_MOBILITY: [Score; 14] = [S!(294, -280), S!(-435, -1000), S!(90, -925), S!(249, -349), S!(368, -71), S!(415, 163), S!(485, 383), S!(550, 494), S!(576, 612), S!(589, 697), S!(533, 745), S!(587, 705), S!(553, 539), S!(1032, 395)];
+pub const ROOK_MOBILITY: [Score; 15] = [S!(12, -97), S!(99, -277), S!(-246, -734), S!(-97, -495), S!(-55, 178), S!(22, 441), S!(-20, 698), S!(-17, 860), S!(16, 912), S!(73, 946), S!(133, 1008), S!(219, 1008), S!(283, 1013), S!(335, 997), S!(545, 843)];
+pub const QUEEN_MOBILITY: [Score; 28] = [S!(-292, -280), S!(-254, 256), S!(82, -360), S!(-601, -1000), S!(-478, -1000), S!(-220, -1000), S!(-99, -295), S!(3, -139), S!(30, -5), S!(127, 122), S!(120, 370), S!(185, 586), S!(205, 646), S!(226, 743), S!(262, 801), S!(298, 840), S!(304, 899), S!(296, 917), S!(276, 959), S!(285, 981), S!(315, 944), S!(252, 952), S!(351, 927), S!(307, 794), S!(376, 731), S!(106, 856), S!(931, 358), S!(143, 701)];
 
-pub const QUEEN_KING_DANGER: [i32; 8] = [66, 216, 464, 824, 983, 647, 753, 910];
-pub const ROOK_KING_DANGER: [i32; 8] = [19, 35, 98, 177, 362, 502, 400, 293];
-pub const BISHOP_KING_DANGER: [i32; 8] = [0, 60, 41, 87, 55, 181, 124, 176];
-pub const KNIGHT_KING_DANGER: [i32; 8] = [25, 0, 48, 103, 517, 115, 427, 154];
+pub const QUEEN_KING_DANGER: [Score; 8] = [S!(0, 0), S!(175, 289), S!(364, 443), S!(550, 696), S!(773, 1400), S!(1400, 1400), S!(1076, 776), S!(1068, 710)];
+pub const ROOK_KING_DANGER: [Score; 8] = [S!(0, 0), S!(137, 0), S!(285, 0), S!(395, 0), S!(584, 0), S!(1400, 1295), S!(0, 457), S!(911, 973)];
+pub const BISHOP_KING_DANGER: [Score; 8] = [S!(0, 0), S!(176, 12), S!(210, 0), S!(229, 0), S!(145, 156), S!(568, 0), S!(116, 241), S!(207, 395)];
+pub const KNIGHT_KING_DANGER: [Score; 8] = [S!(0, 0), S!(55, 0), S!(195, 0), S!(280, 0), S!(182, 0), S!(27, 0), S!(1044, 1034), S!(0, 496)];
 
-pub const DOUBLE_BISHOP_BONUS: Score = S!(109, 972);
+pub const DOUBLE_BISHOP_BONUS: Score = S!(138, 1022);
 
 pub const PASSED_PAWN_VALUE: [Score; 8] = [
-    S!(  0,   0), S!( 45,  179), S!(   0,  239), S!(0, 511),
-    S!(234, 794), S!(388, 1465), S!(1316, 1732), S!(0,   0)
+    S!(  0,   0), S!(0, 164), S!(0, 186), S!(0, 510), S!(136, 745), S!(309, 1437), S!(1166, 1781), S!(0,   0)
 ];
 pub const CENTER_PAWN_VALUE: Score = S!(84, 0);
-pub const ISOLATED_PAWN_VALUE: Score = S!(-53, -67);
-pub const DOUBLED_PAWN_VALUE: Score = S!(-64, -284);
-pub const BACKWARDS_PAWN_VALUE: Score = S!(-61, -19);
+pub const ISOLATED_PAWN_VALUE: Score = S!(-98, -62);
+pub const DOUBLED_PAWN_VALUE: Score = S!(-62, -267);
+pub const BACKWARDS_PAWN_VALUE: Score = S!(-24, -31);
 pub const ADVANCED_PAWN_VALUE: [Score; 8] = [
-    S!( 0,   0), S!( 32,  16), S!( 63,  54), S!(68, 82),
-    S!(97, 201), S!(360, 244), S!(289, 500), S!( 0,  0)
+    S!( 0,   0), S!(34, 8), S!(71, 54), S!(62, 80), S!(112, 193), S!(322, 286), S!(500, 439), S!( 0,  0)
 ];
-pub const SUPPORTED_PAWN_BONUS: Score = S!(158, 65);
-pub const SPACE_VALUE: Score = S!(16, 5);
+pub const SUPPORTED_PAWN_BONUS: Score = S!(146, 56);
+pub const SPACE_VALUE: Score = S!(16, 0);
 
-pub const BISHOP_COLOR: Score = S!(-50, -30);
+pub const BISHOP_COLOR: Score = S!(-31, -103);
 
 pub const TEMPO_BONUS: Score = S!(130, 130);
 
-pub const ROOK_ON_SEVENTH: Score = S!(0, 24);
-pub const ROOK_ON_OPEN: Score = S!(124, 95);
+pub const ROOK_ON_SEVENTH: Score = S!(0, 64);
+pub const ROOK_ON_OPEN: Score = S!(105, 106);
 
 pub fn static_eval(pos: &Bitboard, pht: &mut PHT) -> i32 {
     let score = evaluate_position(pos, pht);
@@ -153,7 +129,7 @@ fn pawn_attacks(pawn_bb: u64, side_to_move: Color) -> u64 {
 
 fn mobility_and_king_danger(pos: &Bitboard) -> Score {
     let mut mobility: Score = make_score(0, 0);
-    let mut king_danger: [i32; 2] = [0, 0];
+    let mut king_danger: [Score; 2] = [0, 0];
     let white = Color::White as usize;
     let black = Color::Black as usize;
     let occ = pos.composite[white] | pos.composite[black];
@@ -164,7 +140,7 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         let king_bb = pos.king[other_side];
         let mut attackers = 0;
-        let mut attack_value: i32 = 0;
+        let mut attack_value: Score = 0;
         let king_idx = king_bb.trailing_zeros() as i32;
         let king_zone = king_bb | unsafe{ KING_MASK[king_idx as usize] };
 
@@ -231,14 +207,14 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
         }
 
         if attackers > 7 { attackers = 7; }
-        attack_value += QUEEN_KING_DANGER[attackers] * queen_attacks as i32;
-        attack_value += ROOK_KING_DANGER[attackers] * rook_attacks as i32;
-        attack_value += BISHOP_KING_DANGER[attackers] * bishop_attacks as i32;
-        attack_value += KNIGHT_KING_DANGER[attackers] * knight_attacks as i32;
+        attack_value += QUEEN_KING_DANGER[attackers] * queen_attacks as i64;
+        attack_value += ROOK_KING_DANGER[attackers] * rook_attacks as i64;
+        attack_value += BISHOP_KING_DANGER[attackers] * bishop_attacks as i64;
+        attack_value += KNIGHT_KING_DANGER[attackers] * knight_attacks as i64;
         king_danger[side] = attack_value;
     }
 
-    let score = mobility + (make_score(1, 1) * (king_danger[white] - king_danger[black]) as i64);
+    let score = mobility + (king_danger[white] - king_danger[black]);
     return score;
 }
 

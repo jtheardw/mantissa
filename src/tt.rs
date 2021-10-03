@@ -19,9 +19,15 @@ pub fn allocate_tt(size_mb: usize) {
     }
 }
 
+pub fn clear_tt() {
+    unsafe {
+        TT.clear();
+    }
+}
+
 fn age_threshold(old_depth: i32, new_depth: i32) -> i32 {
     // how old can an entry be and still not be replaced by an entry with lower depth
-    return (old_depth - new_depth) << 4;
+    return (old_depth - new_depth) << 3;
 }
 
 #[derive(Copy, Clone)]
@@ -138,5 +144,11 @@ impl TT {
         }
         self.tt[idx] = to_insert;
         *l = hash | to_insert.0.hash | to_insert.1.hash;
+    }
+
+    pub fn clear(&mut self) {
+        for idx in 0..self.tt.len() {
+            self.tt[idx] = (TTEntry::invalid_entry(), TTEntry::invalid_entry());
+        }
     }
 }

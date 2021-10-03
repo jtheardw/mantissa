@@ -168,7 +168,7 @@ impl Bitboard {
                     b'Q' => {castling_rights |= WHITE_QUEENSIDE_CR_MASK;},
                     b'k' => {castling_rights |= BLACK_KINGSIDE_CR_MASK;},
                     b'q' => {castling_rights |= BLACK_QUEENSIDE_CR_MASK;},
-                    _ => panic!("Malformatted Castling Rights")
+                    _ => {}//panic!("Malformatted Castling Rights")
                 };
             }
         }

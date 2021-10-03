@@ -67,7 +67,7 @@ fn set_eg_score(score: Score, val: i32) -> i64 {
 pub fn get_params_vector() -> Vec<i32> {
     let mut v = Vec::new();
 
-    for i in 0..584 {
+    for i in 0..618 {
         v.push(get_param(i));
     }
 
@@ -75,7 +75,7 @@ pub fn get_params_vector() -> Vec<i32> {
 }
 
 fn load_params_vector(v: &Vec<i32>) {
-    for i in 0..584 {
+    for i in 0..618 {
         set_param(i, v[i]);
     }
 }
@@ -112,12 +112,13 @@ pub fn print_params_vector(v: &Vec<i32>) {
     print_score_vector("rook mobility", &v_copy(v, 56, 71), &v_copy(v, 71, 86));
     print_score_vector("queen mobility", &v_copy(v, 86, 114), &v_copy(v, 114, 142));
 
-    print_score_vector("queen king danger", &v_copy(v, 142, 150), &v_copy(v, 142, 150));
-    print_score_vector("rook king danger", &v_copy(v, 150, 158), &v_copy(v, 150, 158));
-    print_score_vector("bishop king danger", &v_copy(v, 158, 166), &v_copy(v, 158, 166));
-    print_score_vector("knight king danger", &v_copy(v, 166, 174), &v_copy(v, 166, 174));
+    print_score_vector("queen king danger", &v_copy(v, 142, 150), &v_copy(v, 584, 592));
+    print_score_vector("rook king danger", &v_copy(v, 150, 158), &v_copy(v, 592, 600));
+    print_score_vector("bishop king danger", &v_copy(v, 158, 166), &v_copy(v, 600, 608));
+    print_score_vector("knight king danger", &v_copy(v, 166, 174), &v_copy(v, 608, 616));
 
     print_score("double bishop", v[174], v[175]);
+    print_score("bishop color", v[616], v[617]);
 
     print_score_vector("passed pawn", &v_copy(v, 176, 182), &v_copy(v, 182, 188));
     print_score("center pawn", v[188], v[189]);
@@ -207,10 +208,10 @@ fn get_param(idx: usize) -> i32 {
             86..114 => { mg_score(QUEEN_MOBILITY[idx - 86]) },
             114..142 => { eg_score(QUEEN_MOBILITY[idx - 114]) },
 
-            142..150 => { QUEEN_KING_DANGER[idx - 142] },
-            150..158 => { ROOK_KING_DANGER[idx - 150] },
-            158..166 => { BISHOP_KING_DANGER[idx - 158] },
-            166..174 => { KNIGHT_KING_DANGER[idx - 166] },
+            142..150 => { mg_score(QUEEN_KING_DANGER[idx - 142]) },
+            150..158 => { mg_score(ROOK_KING_DANGER[idx - 150]) },
+            158..166 => { mg_score(BISHOP_KING_DANGER[idx - 158]) },
+            166..174 => { mg_score(KNIGHT_KING_DANGER[idx - 166]) },
 
             174 => { mg_score(DOUBLE_BISHOP_BONUS) },
             175 => { eg_score(DOUBLE_BISHOP_BONUS) },
@@ -298,6 +299,12 @@ fn get_param(idx: usize) -> i32 {
                 let pc = (idx - 552) % 4;
                 eg_score(KING_PSQT[pr][pc])
             },
+            584..592 => { eg_score(QUEEN_KING_DANGER[idx - 584]) },
+            592..600 => { eg_score(ROOK_KING_DANGER[idx - 592]) },
+            600..608 => { eg_score(BISHOP_KING_DANGER[idx - 600]) },
+            608..616 => { eg_score(KNIGHT_KING_DANGER[idx - 608]) },
+            616 => { mg_score(BISHOP_COLOR) },
+            617 => { eg_score(BISHOP_COLOR) },
             _ => {0}
         }
     }
@@ -327,10 +334,10 @@ fn set_param(idx: usize, val: i32) {
             86..114 => { QUEEN_MOBILITY[idx - 86] = set_mg_score(QUEEN_MOBILITY[idx - 86], val); },
             114..142 => { QUEEN_MOBILITY[idx - 114] = set_eg_score(QUEEN_MOBILITY[idx - 114], val); },
 
-            142..150 => { QUEEN_KING_DANGER[idx - 142] = val; },
-            150..158 => { ROOK_KING_DANGER[idx - 150] = val; },
-            158..166 => { BISHOP_KING_DANGER[idx - 158] = val; },
-            166..174 => { KNIGHT_KING_DANGER[idx - 166] = val; },
+            142..150 => { QUEEN_KING_DANGER[idx - 142] = set_mg_score(QUEEN_KING_DANGER[idx-142], val); },
+            150..158 => { ROOK_KING_DANGER[idx - 150] = set_mg_score(ROOK_KING_DANGER[idx-150], val); },
+            158..166 => { BISHOP_KING_DANGER[idx - 158] = set_mg_score(BISHOP_KING_DANGER[idx-158], val); },
+            166..174 => { KNIGHT_KING_DANGER[idx - 166] = set_mg_score(KNIGHT_KING_DANGER[idx-166], val); },
 
             174 => { DOUBLE_BISHOP_BONUS = set_mg_score(DOUBLE_BISHOP_BONUS, val); },
             175 => { DOUBLE_BISHOP_BONUS = set_eg_score(DOUBLE_BISHOP_BONUS, val); },
@@ -418,6 +425,12 @@ fn set_param(idx: usize, val: i32) {
                 let pc = (idx - 552) % 4;
                 KING_PSQT[pr][pc] = set_eg_score(KING_PSQT[pr][pc], val);
             },
+            584..592 => { QUEEN_KING_DANGER[idx - 584] = set_eg_score(QUEEN_KING_DANGER[idx-584], val); },
+            592..600 => { ROOK_KING_DANGER[idx - 592] = set_eg_score(ROOK_KING_DANGER[idx-592], val); },
+            600..608 => { BISHOP_KING_DANGER[idx - 600] = set_eg_score(BISHOP_KING_DANGER[idx-600], val); },
+            608..616 => { KNIGHT_KING_DANGER[idx - 608] = set_eg_score(KNIGHT_KING_DANGER[idx-608], val);},
+            616 => { BISHOP_COLOR = set_mg_score(BISHOP_COLOR, val); },
+            617 => { BISHOP_COLOR = set_eg_score(BISHOP_COLOR, val); },
             _ => {}
         }
     }
@@ -566,7 +579,7 @@ pub fn neighbor(param_vec: &Vec<i32>, reach: f64) -> Vec<i32> {
 
     // (minimum, maximum, scale @ zero reach, scale @ full reach)
     let mut dimens: Vec<(f64, f64, f64, f64)> = Vec::new();
-    for i in 0..584 {
+    for i in 0..618 {
         let d = match i {
             0..2   => {(8000.0, 18000.0,  300.0, 2000.0)},
             2..4   => {(4000.0, 12000.0,  200.0, 1000.0)},
@@ -593,23 +606,30 @@ pub fn neighbor(param_vec: &Vec<i32>, reach: f64) -> Vec<i32> {
 
             196..208 => {(    0.0,  500.0,  100.0,   100.0)},
             208..210 => {(    0.0,  300.0,  100.0,    70.0)},
-            210..212 => {(    0.0,  300.0,  100.0,   100.0)},
+            210..212 => {(    0.0,  300.0,   70.0,   100.0)},
 
             212..216 => {(    0.0,  500.0,  100.0,   100.0)},
 
             216..584 => {(-1000.0, 1000.0,  100.0,   200.0)},
+
+            584..592 => {(   0.0, 1400.0,  100.0,  500.0)},
+            592..600 => {(   0.0, 1400.0,  100.0,  500.0)},
+            600..608 => {(   0.0, 1400.0,  100.0,  500.0)},
+            608..616 => {(   0.0, 1400.0,  100.0,  500.0)},
+            616..618 => {(-300.0,  100.0,   40.0,  100.0)},
             _ => {(0.0, 0.0, 0.0, 0.0)}
         };
         dimens.push(d);
     }
 
-    let mut delta = [0f64; 584];
-    let axes = (rand() % 8) + 1;
+    let mut delta = [0f64; 618];
+    let axes = (rand() % 10) + 1;
     for _ in 0..axes {
-        delta[(rand() % 584) as usize] = symunif();
+        let axis = (rand() % 618) as usize;
+        delta[axis] = symunif();
     }
 
-    for idx in 0..584 {
+    for idx in 0..618 {
         let (min, max, zero_scale, full_scale) = dimens[idx];
         let scale = zero_scale + (full_scale - zero_scale) * reach;
         let next = new_params[idx] + (delta[idx] * scale) as i32;
@@ -635,7 +655,7 @@ pub fn tune(v: &mut Vec<(Bitboard, f64)>) -> Vec<i32> {
     let mut reach = 0.00;
     let mut counter: usize = 0;
     loop {
-        let limit = (8192.0 * (1.0 + 7.0*reach*reach)) as usize;
+        let limit = (2048.0 * (1.0 + 7.0*reach*reach)) as usize;
         if counter > limit {
             counter = 0;
             reach += 0.25;
@@ -682,7 +702,7 @@ pub fn get_position_vector(fname: &str) -> Vec<(Bitboard, f64)> {
         if num_bytes == 0 { break; }
         if buf.len() > 0 {
             // fen winner
-            if idx % 20 != 0 {
+            if idx % 22 != 0 {
                 idx += 1;
                 buf.clear();
                 continue;

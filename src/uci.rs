@@ -284,7 +284,8 @@ pub fn uci_loop() {
             abort_search();
         } else if cmd == "ucinewgame" {
             // clear the transposition table
-            allocate_tt(options.hash as usize);
+            clear_tt();
+            reset_stats();
         }
     }
 }

@@ -162,6 +162,23 @@ impl ThreadInfo {
         }
     }
 
+    pub fn age_and_reset(&mut self) {
+        self.killers = [[Move::null_move(); 2]; MAX_PLY];
+        self.countermove_table = [[Move::null_move(); 64]; 12];
+        self.seldepth = 0;
+        self.nodes_searched = 0;
+        for piece_num in 0..12 {
+            for to in 0..64 {
+                self.move_history[piece_num][to] /= 8;
+                for piece_num2 in 0..12 {
+                    for to2 in 0..64 {
+                        self.followup_history[piece_num][to][piece_num2][to2] /= 8;
+                    }
+                }
+            }
+        }
+    }
+
     pub fn clear(&mut self) {
         self.killers = [[Move::null_move(); 2]; MAX_PLY];
         self.seldepth = 0;

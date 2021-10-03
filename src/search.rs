@@ -104,6 +104,13 @@ pub fn thread_killed() -> bool {
     }
 }
 
+pub fn reset_stats() {
+    unsafe {
+        SS = Vec::new();
+        TI = Vec::new();
+    }
+}
+
 fn check_time(search_limits: &SearchLimits) {
     if search_limits.infinite { return; }
     if search_limits.movetime == 0 && !search_limits.use_variable_time {
@@ -162,11 +169,19 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         STOP_THREAD = false;
         START_TIME = start_time;
         SEARCH_LIMITS = search_limits;
-        TI = Vec::new();
+        if TI.len() == 0 {
+            TI = Vec::new();
+        }
         SS = Vec::new();
 
-        for _ in 0..num_threads {
-            TI.push(ThreadInfo::new());
+        for t_num in 0..num_threads {
+            let t_num = t_num as usize;
+            if t_num < TI.len() {
+                TI[t_num].age_and_reset();
+            } else {
+                TI.push(ThreadInfo::new());
+            }
+            // TI.push(ThreadInfo::new());
             SS.push(new_searchstats());
         }
     }
@@ -625,7 +640,7 @@ fn search(node: &mut Bitboard,
         } else {
             let mut do_full_zw_search = true;
             if depth > LMR_DEPTH
-                && !init_node
+                // && !init_node
                 && moves_searched >= 2
                 && !is_check
                 && (is_quiet || score < QUIET_OFFSET) {
@@ -663,7 +678,8 @@ fn search(node: &mut Bitboard,
 
                     // in potential PV nodes, we'll be more careful
                     if is_pv && r > 0 {
-                        r = r >> 1; //(r * 3) / 4; // (r * 2) / 3;
+                        r = (r * 2) / 3;
+                        // r -= 1;
                     }
 
                     // not (yet) allowing extensions from LMR.
