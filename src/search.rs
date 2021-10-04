@@ -788,7 +788,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
         // if we're very behind of where we could be (alpha)
         // we should only accept exceptionally good captures
 
-        if node.has_non_pawn_material() {
+        if node.has_non_pawn_material() && mv.promote_to == 0 {
             let mut futile = false;
             match node.get_last_capture() {
                 b'p' => { if alpha > stand_pat + 3000 { futile = true; }},
@@ -804,19 +804,17 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
             }
         }
 
-        if score <= OK_CAPTURE_OFFSET {
-            // see if this is a viable capture
-            let cap_piece = node.get_last_capture();
-            if cap_piece != 0 {
-                node.undo_move(&mv);
-                let see_score = see(node, mv.end, cap_piece, mv.start, mv.piece);
-                if see_score <= cmp::max(0, alpha - stand_pat) {
-                    continue;
-                } else {
-                    node.do_move(&mv);
-                }
-            }
+        let see_score = if score >= OK_CAPTURE_OFFSET {
+            (score - OK_CAPTURE_OFFSET) as i32
+        } else {
+            -((QUIET_OFFSET - score) as i32)
+        };
+
+        if !is_check && mv.promote_to == 0 && see_score < alpha - stand_pat {
+            node.undo_move(&mv);
+            break;
         }
+
         let val = -qsearch(node, -beta, -alpha, thread_num);
         node.undo_move(&mv);
         if val > best_val {
