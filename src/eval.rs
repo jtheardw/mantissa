@@ -119,9 +119,61 @@ pub fn evaluate_position(pos: &Bitboard, pht: &mut PHT) -> i32 {
     return taper_score(score, pos.get_phase());
 }
 
+fn pawnless_endgame_drawish(pos: &Bitboard) -> bool {
+    // some endgames are known to be drawish
+    // for these, until I can produce more intelligent
+    // heuristics, the first pass is to *discourage*
+    // mantissa from trading into these if she is otherwise
+    // winning and encourage trading into them if she
+    // is losing by supressing the material score in
+    // these endgames, but leaving everything else functional
+    // so that positional play still occurs.
+    if pos.pawn[0] != 0 || pos.pawn[1] != 0 {
+        return false;
+    }
+
+    if pos.queen[0] != 0 || pos.queen[1] != 0 {
+        return false;
+    }
+
+    let kingless_composite = [pos.composite[0] & !pos.king[0], pos.composite[1] & !pos.king[1]];
+
+    if kingless_composite[0].count_ones() > 2 || kingless_composite[1].count_ones() > 2 {
+        return false;
+    }
+
+    if kingless_composite[0].count_ones() == 1 && kingless_composite[1].count_ones() == 1 {
+        // one-on-one endgames
+        // KR v K(B/N)
+        for side in [Color::White, Color::Black] {
+            let us = side as usize;
+            let them = !side as usize;
+            if kingless_composite[us] == pos.rook[us] &&
+                (kingless_composite[them] == pos.bishop[them] | pos.knight[them]) {
+                    return true;
+                }
+        }
+    } else {
+        for side in [Color::White, Color::Black] {
+            let us = side as usize;
+            let them = !side as usize;
+            // KRN v KR
+            // KRB v KR
+            if pos.rook[us].count_ones() == 1 && pos.rook[them].count_ones() == 1 {
+                if kingless_composite[them] == pos.rook[them] &&
+                    kingless_composite[us] == pos.rook[us] | pos.bishop[us] | pos.knight[us] {
+                        return true;
+                    }
+            }
+        }
+    }
+    return false;
+}
+
 pub fn material_score(pos: &Bitboard) -> Score {
     // TODO this will probably be handled incrementally
     let mut score: Score = make_score(0, 0);
+    if pawnless_endgame_drawish(pos) { return score; }
     let white = Color::White as usize;
     let black = Color::Black as usize;
 

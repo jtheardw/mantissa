@@ -717,6 +717,9 @@ fn search(node: &mut Bitboard,
     }
 
     if best_move.is_null {
+        if !sse.excluded_move.is_null {
+            return alpha;
+        }
         if !found_legal_move {
             // some sort of mate
             sse.pv = Vec::new();
