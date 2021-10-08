@@ -17,13 +17,13 @@ static mut LMR_TABLE: [[i32; 64]; 64] = [[0; 64]; 64];
 
 pub fn efp_margin(depth: i32) -> i32 {
     if depth <= 0 { return 0; }
-    if depth > 3 { return 4000 * depth}
-    return [0, 2200, 3200, 5300][depth as usize];
+    if depth > 3 { return 1000 + 2000 * depth}
+    return [0, 3200, 5000, 7300][depth as usize];
     // return base + 1000 * (depth - 1);
 }
 
 pub fn fp_margin(depth: i32) -> i32 {
-    return 1000 + depth * 1000;
+    return 1500 + depth * 1000;
 }
 
 pub fn rfp_margin(depth: i32) -> i32 {

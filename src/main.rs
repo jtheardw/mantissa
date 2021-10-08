@@ -20,8 +20,10 @@ mod uci;
 mod util;
 mod zobrist;
 
+use crate::bitboard::*;
 use crate::magic::*;
 use crate::movegen::*;
+use crate::perft::*;
 use crate::pht::*;
 use crate::searchutil::*;
 use crate::tt::*;

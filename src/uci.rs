@@ -270,21 +270,22 @@ pub fn uci_loop() {
             println!("option name Threads type spin default 1 min 1 max 64");
             println!("option name Move Overhead type spin default 10 min 1 max 1000");
             println!("uciok");
+        } else if cmd == "ucinewgame" {
+            // clear the transposition table
+            board = Bitboard::default_board();
+            clear_tt();
         } else if cmd == "isready" {
             println!("readyok");
         } else if cmd == "setoption" {
             setoption(&mut params, &mut options);
-        } else if cmd == "ucinewgame" {
-            board = Bitboard::default_board();
         } else if cmd == "position" {
             board = set_position(&mut params);
         } else if cmd == "go" {
             uci_go(&mut board, options, &mut params);
         } else if cmd == "stop" {
             abort_search();
-        } else if cmd == "ucinewgame" {
-            // clear the transposition table
-            allocate_tt(options.hash as usize);
+        } else {
+            println!("unrecognized command.");
         }
     }
 }

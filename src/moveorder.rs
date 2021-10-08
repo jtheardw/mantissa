@@ -196,20 +196,23 @@ impl MovePicker {
         }
         if self.move_stage == KILLER_MOVE_1 {
             self.move_stage = KILLER_MOVE_2;
-            if pos.is_pseudolegal(&self.killers[0]) {
+            if self.killers[0] != self.tt_move && pos.is_pseudolegal(&self.killers[0]) {
                 return (self.killers[0], KILLER_OFFSET);
             }
         }
         if self.move_stage == KILLER_MOVE_2 {
             self.move_stage = COUNTER_MOVE;
-            if pos.is_pseudolegal(&self.killers[1]) {
+            if self.killers[1] != self.tt_move && pos.is_pseudolegal(&self.killers[1]) {
                 return (self.killers[1], KILLER_OFFSET);
             }
         }
         if self.move_stage == COUNTER_MOVE {
             self.move_stage = GEN_QUIET;
-            if pos.is_pseudolegal(&self.countermove) {
-                return (self.countermove, COUNTER_OFFSET);
+            if self.countermove != self.killers[0] &&
+                self.countermove != self.killers[1] &&
+                self.countermove != self.tt_move &&
+                pos.is_pseudolegal(&self.countermove) {
+                    return (self.countermove, COUNTER_OFFSET);
             }
         }
         if self.move_stage == GEN_QUIET {

@@ -125,14 +125,16 @@ fn check_time(search_limits: &SearchLimits) {
 fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_num: usize) {
     let mut depth = thread_depth;
     let mut val = LB;
+    let mut best_val = LB;
     while depth <= max_depth {
-        let mut aspiration_delta = 250;
+        let mut aspiration_delta_low = 250;
+        let mut aspiration_delta_high = 250;
         loop {
             let mut alpha = LB;
             let mut beta = UB;
-            if val > LB {
-                alpha = val - aspiration_delta;
-                beta = val + aspiration_delta;
+            if best_val > LB && depth > 1 {
+                alpha = best_val - aspiration_delta_low;
+                beta = best_val + aspiration_delta_high;
             }
 
             val = search(&mut node, alpha, beta, depth, 0, true, thread_num);
@@ -140,10 +142,13 @@ fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_
 
             if val > alpha && val < beta {
                 break;
+            } else if val >= beta {
+                aspiration_delta_high *= 2;
             } else {
-                aspiration_delta *= 2;
+                aspiration_delta_low *= 2;
             }
         }
+        best_val = val;
         depth += 1;
     }
 }
@@ -168,13 +173,14 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         }
     }
 
-    let mut depth: i32 = 2;
+    let mut depth: i32 = 1;
     let mut current_time: u128;
 
     let mut best_move_changes = 0;
     let mut last_best_move_change = 0;
     let mut best_move: Move = Move::null_move();
-    let mut val: i32 = LB;
+    let mut val: i32;
+    let mut best_val: i32 = LB;
     let mut pv: &Vec<Move>;
 
     allow_threads();
@@ -190,25 +196,32 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     }
 
     while depth <= search_limits.depth {
-        let mut aspiration_delta = 250;
+        let mut aspiration_delta_low = 250;
+        let mut aspiration_delta_high = 250;
         loop {
             let mut alpha = LB;
             let mut beta = UB;
             if depth > 1 {
-                alpha = val - aspiration_delta;
-                beta = val + aspiration_delta;
+                alpha = best_val - aspiration_delta_low;
+                beta = best_val + aspiration_delta_high;
             }
 
+            unsafe {
+                SS[0][0].pv = vec![best_move];
+            }
             val = search(node, alpha, beta, depth, 0, true, 0);
             if search_aborted() {break;}
 
             if val > alpha && val < beta {
                 break;
+            } else if val >= beta {
+                aspiration_delta_high *= 2;
             } else {
-                aspiration_delta *= 2;
+                aspiration_delta_low *= 2;
             }
         }
         if search_aborted() { break; }
+        best_val = val;
 
         let elapsed_time;
         unsafe {
@@ -232,10 +245,10 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
                 nodes_searched += TI[t_num as usize].nodes_searched;
             }
 
-            print_info(depth, TI[0].seldepth, &pv, val, current_time - start_time, nodes_searched);
-            for i in 0..MAX_PLY {
-                SS[0][i].pv = Vec::new();
-            }
+            print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
+            // for i in 0..MAX_PLY {
+            //     SS[0][i].pv = Vec::new();
+            // }
         }
 
         // we've obviously run out of time
@@ -317,6 +330,13 @@ fn search(node: &mut Bitboard,
         sse = &mut SS[thread_num][ply as usize];
     }
     let init_node = ply == 0;
+    // let pv_move = if init_node && sse.pv.len() > 0 {
+    //     sse.pv[0]
+    // } else {
+    //     Move::null_move()
+    // };
+    let pv_move = Move::null_move();
+
     sse.pv = Vec::new();
     sse.current_move = Move::null_move();
 
@@ -457,7 +477,8 @@ fn search(node: &mut Bitboard,
         && !init_node
         && sse.static_eval >= beta
         && (!ss[(ply - 1) as usize].searching_null_move)
-        && (ply < 2 || (!ss[(ply - 2) as usize].searching_null_move))
+        && !sse.searching_null_move
+        // && (ply < 2 || (!ss[(ply - 2) as usize].searching_null_move))
         && sse.excluded_move.is_null
         && node.has_non_pawn_material()
         && (!sse.tt_hit || sse.tt_node_type & CUT_NODE == 0 || sse.tt_val >= beta)
@@ -471,7 +492,16 @@ fn search(node: &mut Bitboard,
         sse.searching_null_move = false;
 
         if val >= beta {
-            return beta;
+            if depth > 8 {
+                sse.searching_null_move = true;
+                let val = search(node, beta - 1, beta, depth / 2, ply, false, thread_num);
+                sse.searching_null_move = false;
+                if val >= beta {
+                    return beta;
+                }
+            } else {
+                return beta;
+            }
         }
     }
 
@@ -491,7 +521,7 @@ fn search(node: &mut Bitboard,
         && depth >= 8
         && sse.tt_hit
         && sse.excluded_move.is_null
-        && sse.tt_val.abs() < MATE_SCORE - 100000 // TODO give this a name
+        && sse.tt_val.abs() < MIN_MATE_SCORE
         && (sse.tt_node_type & CUT_NODE) != 0
         && sse.tt_depth >= depth - 3
     {
@@ -545,7 +575,12 @@ fn search(node: &mut Bitboard,
         ti.followup_history[piece_num][my_prev_mv.end as usize]
     };
 
-    let mut movepicker = MovePicker::new(sse.tt_move, ti.killers[ply as usize], ti.move_history, countermove, followup_table, false);
+    let first_move = if init_node && !pv_move.is_null {
+        pv_move
+    } else {
+        sse.tt_move
+    };
+    let mut movepicker = MovePicker::new(first_move, ti.killers[ply as usize], ti.move_history, countermove, followup_table, false);
 
     // Futility Pruning.  The 'futile' flag signals
     // to skip quiet moves.  Different conditions in the search
@@ -594,6 +629,11 @@ fn search(node: &mut Bitboard,
                 && hist < if improving {5000} else {9000} {
                     futile = true;
                 }
+            if !is_check
+                && depth < EFP_DEPTH
+                && eval + efp_margin(depth) <= alpha {
+                    futile = true;
+                }
         }
 
         if futile {
@@ -623,6 +663,7 @@ fn search(node: &mut Bitboard,
                 && moves_searched >= 2
                 && !is_check
                 && (is_quiet || score < QUIET_OFFSET) {
+                // && (!is_tactical || score < QUIET_OFFSET) {
                     // Late Move Reductions.
                     // the ideas here are a mish-mash of various ideas that are
                     // constantly being added, removed, and played around with
@@ -699,14 +740,14 @@ fn search(node: &mut Bitboard,
         if alpha >= beta {
             // fail-high
             if !thread_killed() {
-                if is_quiet {
-                    // update heuristics
-                    ti.update_killers(mv, ply);
-                    ti.update_move_history(mv, node.side_to_move, depth, &searched_moves);
-                    ti.update_countermove(prev_mv, mv, !node.side_to_move);
-                    ti.update_followup(my_prev_mv, mv, node.side_to_move, depth, &searched_moves);
-                }
                 if sse.excluded_move.is_null {
+                    if is_quiet {
+                        // update heuristics
+                        ti.update_killers(mv, ply);
+                        ti.update_move_history(mv, node.side_to_move, depth, &searched_moves);
+                        ti.update_countermove(prev_mv, mv, !node.side_to_move);
+                        ti.update_followup(my_prev_mv, mv, node.side_to_move, depth, &searched_moves);
+                    }
                     unsafe {
                         TT.set(node.hash, best_move, TTEntry::make_tt_score(val, ply), CUT_NODE, depth, node.history.len() as i32);
                     }
