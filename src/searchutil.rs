@@ -31,7 +31,7 @@ pub fn rfp_margin(depth: i32) -> i32 {
 }
 
 pub fn afp_margin(_depth: i32) -> i32 {
-    return 20000;
+    return 30000;
 }
 
 pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {

@@ -629,7 +629,7 @@ fn search(node: &mut Bitboard,
                 && hist < if improving {5000} else {9000} {
                     futile = true;
                 }
-            if !is_check
+            else if !is_check
                 && depth < EFP_DEPTH
                 && eval + efp_margin(depth) <= alpha {
                     futile = true;
@@ -798,6 +798,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
     let stand_pat = static_eval(node, &mut ti.pht);
 
     let is_check = node.is_check(node.side_to_move);
+    let phase = node.get_phase();
     // standing pat check so we *do* stop eventually
     if !is_check {
         if stand_pat >= beta {
@@ -806,7 +807,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
             alpha = stand_pat;
         }
     }
-    if stand_pat < alpha - 11000 && node.has_non_pawn_material() {
+    if stand_pat < alpha - (taper_score(QUEEN_VALUE, phase) + 2000) && node.has_non_pawn_material() {
         return stand_pat;
     }
 
@@ -829,11 +830,11 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
         if node.has_non_pawn_material() {
             let mut futile = false;
             match node.get_last_capture() {
-                b'p' => { if alpha > stand_pat + 3000 { futile = true; }},
-                b'n' => { if alpha > stand_pat + 5000 { futile = true; }},
-                b'b' => { if alpha > stand_pat + 5000 { futile = true; }},
-                b'r' => { if alpha > stand_pat + 7000 { futile = true; }},
-                b'q' => { if alpha > stand_pat + 11000 { futile = true; }},
+                b'p' => { if alpha > stand_pat + taper_score(PAWN_VALUE, phase) + 2000 { futile = true; }},
+                b'n' => { if alpha > stand_pat + taper_score(KNIGHT_VALUE, phase) + 2000 { futile = true; }},
+                b'b' => { if alpha > stand_pat + taper_score(BISHOP_VALUE, phase) + 2000 { futile = true; }},
+                b'r' => { if alpha > stand_pat + taper_score(ROOK_VALUE, phase) + 2000 { futile = true; }},
+                b'q' => { if alpha > stand_pat + taper_score(QUEEN_VALUE, phase) + 2000 { futile = true; }},
                 _ => {}
             }
             if futile {
