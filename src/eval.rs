@@ -104,6 +104,10 @@ pub fn static_eval(pos: &Bitboard, pht: &mut PHT) -> i32 {
     return if pos.side_to_move == Color::White {score} else {-score};
 }
 
+fn halfmove_scale(score: i32, pos: &Bitboard) -> i32 {
+    return ((100 - pos.halfmove as i32) * score) / 100;
+}
+
 pub fn evaluate_position(pos: &Bitboard, pht: &mut PHT) -> i32 {
     // positive is white-favored, negative black-favored
     let mut score: Score = make_score(0, 0);
@@ -116,7 +120,7 @@ pub fn evaluate_position(pos: &Bitboard, pht: &mut PHT) -> i32 {
     score += rook_on_open_value(pos);
     score += nonpawn_psqt_value(pos);
     score += if pos.side_to_move == Color::White {TEMPO_BONUS} else {-TEMPO_BONUS};
-    return taper_score(score, pos.get_phase());
+    return halfmove_scale(taper_score(score, pos.get_phase()), pos);
 }
 
 fn pawnless_endgame_drawish(pos: &Bitboard) -> bool {

@@ -310,13 +310,6 @@ fn search(node: &mut Bitboard,
           ply: i32,
           is_pv: bool,
           thread_num: usize) -> i32 {
-    if thread_num == 0 {
-        // main thread
-        unsafe {
-            check_time(&SEARCH_LIMITS);
-        }
-    }
-
     if thread_killed() {
         return 0;
     }
@@ -328,6 +321,12 @@ fn search(node: &mut Bitboard,
         ti = &mut TI[thread_num];
         ss = &SS[thread_num];
         sse = &mut SS[thread_num][ply as usize];
+
+        if thread_num == 0 && ti.nodes_searched % 1024 == 0 {
+            // main thread
+            check_time(&SEARCH_LIMITS);
+        }
+
     }
     let init_node = ply == 0;
     // let pv_move = if init_node && sse.pv.len() > 0 {
@@ -478,7 +477,7 @@ fn search(node: &mut Bitboard,
         && sse.static_eval >= beta
         && (!ss[(ply - 1) as usize].searching_null_move)
         && !sse.searching_null_move
-        // && (ply < 2 || (!ss[(ply - 2) as usize].searching_null_move))
+        && (ply < 2 || (!ss[(ply - 2) as usize].searching_null_move))
         && sse.excluded_move.is_null
         && node.has_non_pawn_material()
         && (!sse.tt_hit || sse.tt_node_type & CUT_NODE == 0 || sse.tt_val >= beta)
@@ -528,7 +527,7 @@ fn search(node: &mut Bitboard,
         // I've stolen stockfish's idea here to combine singular
         // move detection with multi-cut in the same search
         let former_pv = sse.tt_node_type == PV_NODE && !is_pv;
-        let margin = if former_pv {30 * (depth / 2)} else {25 * (depth / 2)};
+        let margin = if former_pv {40 * (depth / 2)} else {30 * (depth / 2)};
         let depth_to_search = if former_pv {(depth + 2) / 2} else {(depth - 1) / 2};
         let target = sse.tt_val - margin;
 
@@ -693,8 +692,9 @@ fn search(node: &mut Bitboard,
                     // the tt node type here gives us some impression on if we
                     // expect this to be a PV node.  Reduce more or less according to
                     // that expectation.
-                    if sse.tt_hit && sse.tt_node_type == PV_NODE { r -= 1; }
-                    if sse.tt_hit && sse.tt_node_type != PV_NODE { r += 1; }
+                    if is_quiet && is_tactical { r -= 1 };
+                    // if sse.tt_hit && sse.tt_node_type == PV_NODE { r -= 1; }
+                    // if sse.tt_hit && sse.tt_node_type != PV_NODE { r += 1; }
 
                     // in potential PV nodes, we'll be more careful
                     if is_pv && r > 0 {

@@ -30,7 +30,7 @@ pub struct Bitboard {
     castling_rights_stack: Vec<u8>,
     halfmove_stack: Vec<u8>,
 
-    halfmove: u8,
+    pub halfmove: u8,
 
     pub hash: u64,
     pub pawn_hash: u64,
