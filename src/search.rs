@@ -541,6 +541,14 @@ fn search(node: &mut Bitboard,
             // pseudo-multi-cut.  This indicates multiple moves failed high
             // so this is probably a cutnode
             return target;
+        } else if sse.tt_val >= beta && !is_pv {
+            sse.excluded_move = sse.tt_move;
+            let val = search(node, beta - 1, beta, 2 + (depth / 2), ply, false, thread_num);
+            sse.excluded_move = Move::null_move();
+
+            if val >= beta {
+                return beta;
+            }
         }
     }
 
