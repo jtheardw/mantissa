@@ -39,7 +39,7 @@ pub struct TTEntry {
     pub value: i32,
     pub ply: i32,
     pub valid: bool
-}
+} // 8 + 16 + 1 + 4 + 4 + 4 + 1 = 38 bytes
 
 pub struct TT {
     pub tt: Vec<(TTEntry, TTEntry)>,

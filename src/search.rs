@@ -700,9 +700,9 @@ fn search(node: &mut Bitboard,
                     // the tt node type here gives us some impression on if we
                     // expect this to be a PV node.  Reduce more or less according to
                     // that expectation.
-                    if is_quiet && is_tactical { r -= 1 };
-                    // if sse.tt_hit && sse.tt_node_type == PV_NODE { r -= 1; }
-                    // if sse.tt_hit && sse.tt_node_type != PV_NODE { r += 1; }
+                    // if is_quiet && is_tactical { r -= 1 };
+                    if sse.tt_hit && sse.tt_node_type == PV_NODE { r -= 1; }
+                    if sse.tt_hit && sse.tt_node_type != PV_NODE { r += 1; }
 
                     // in potential PV nodes, we'll be more careful
                     if is_pv && r > 0 {

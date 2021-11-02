@@ -597,16 +597,17 @@ pub fn neighbor(param_vec: &Vec<i32>, reach: f64) -> Vec<i32> {
 
             212..216 => {(    0.0,  500.0,  100.0,   100.0)},
 
-            216..584 => {(-1000.0, 1000.0,  100.0,   200.0)},
+            216..584 => {(-2000.0, 2000.0,  75.0,   500.0)},
             _ => {(0.0, 0.0, 0.0, 0.0)}
         };
         dimens.push(d);
     }
 
     let mut delta = [0f64; 584];
-    let axes = (rand() % 8) + 1;
+    let axes = (rand() % 4) + 1;
     for _ in 0..axes {
-        delta[(rand() % 584) as usize] = symunif();
+        let axis = (rand() % 584);
+        delta[axis as usize] = symunif();
     }
 
     for idx in 0..584 {
@@ -621,8 +622,9 @@ pub fn neighbor(param_vec: &Vec<i32>, reach: f64) -> Vec<i32> {
 fn get_error(v: &mut Vec<(Bitboard, f64)>, params: &Vec<i32>) -> f64 {
     let old_params = get_params_vector();
     load_params_vector(params);
-    let e = err(v, K);
+    let mut e = err(v, K);
     load_params_vector(&old_params);
+    e = (e * 10000000.0).round() / 10000000.0;
     return e;
 }
 
@@ -635,7 +637,7 @@ pub fn tune(v: &mut Vec<(Bitboard, f64)>) -> Vec<i32> {
     let mut reach = 0.00;
     let mut counter: usize = 0;
     loop {
-        let limit = (8192.0 * (1.0 + 7.0*reach*reach)) as usize;
+        let limit = (128.0 * (1.0 + 7.0*reach*reach)) as usize;
         if counter > limit {
             counter = 0;
             reach += 0.25;
@@ -682,7 +684,7 @@ pub fn get_position_vector(fname: &str) -> Vec<(Bitboard, f64)> {
         if num_bytes == 0 { break; }
         if buf.len() > 0 {
             // fen winner
-            if idx % 20 != 0 {
+            if idx < 10000000 {
                 idx += 1;
                 buf.clear();
                 continue;
@@ -712,13 +714,13 @@ pub fn get_position_vector(fname: &str) -> Vec<(Bitboard, f64)> {
                 },
                 None => panic!("empty winner!")
             };
-            let qresult = tuning_qsearch(&mut board, LB, UB);
-            let qboard = qresult.1;
+            // let qresult = tuning_qsearch(&mut board, LB, UB);
+            // let qboard = qresult.1;
 
-            v.push((qboard, winner));
+            v.push((board, winner));
             buf.clear();
         }
     }
-
+    println!("length {}", v.len());
     return v;
 }

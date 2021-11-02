@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unreachable_code)]
+#![feature(exclusive_range_pattern)]
 
 mod bitboard;
 mod eval;
@@ -11,9 +12,13 @@ mod moveutil;
 mod perft;
 mod pht;
 mod psqt;
+mod rand;
 mod search;
 mod searchutil;
 mod see;
+mod tuning_eval;
+mod tuning;
+mod tuning_psqt;
 mod time;
 mod tt;
 mod uci;
@@ -26,6 +31,7 @@ use crate::movegen::*;
 use crate::perft::*;
 use crate::pht::*;
 use crate::searchutil::*;
+use crate::tuning::*;
 use crate::tt::*;
 use crate::uci::*;
 use crate::util::*;
@@ -41,4 +47,6 @@ fn init() {
 fn main() {
     init();
     uci_loop();
+    // let mut v = get_position_vector("eth2.book");
+    // let _ = tune(&mut v);
 }

@@ -39,11 +39,12 @@ macro_rules! S {
 
 // TODO might have to make these mutable
 // if tuning needs to mess with them.
-pub static mut QUEEN_VALUE: Score = S!(10947, 16706);
-pub static mut ROOK_VALUE: Score = S!(4865, 8652);
-pub static mut BISHOP_VALUE: Score = S!(3523, 5211);
-pub static mut KNIGHT_VALUE: Score = S!(3466, 4880);
-pub static mut PAWN_VALUE: Score = S!(800, 1414);
+
+pub static mut QUEEN_VALUE: Score = S!(9277, 16706);
+pub static mut ROOK_VALUE: Score = S!(4035, 8618);
+pub static mut BISHOP_VALUE: Score = S!(3352, 5096);
+pub static mut KNIGHT_VALUE: Score = S!(3136, 4738);
+pub static mut PAWN_VALUE: Score = S!(800, 1660);
 
 pub static mut KNIGHT_MOBILITY: [Score; 9] = [S!(-275, 21), S!(-36, 10), S!(145, 148), S!(132, 528), S!(191, 535), S!(183, 563), S!(223, 551), S!(295, 453), S!(297, 333)];
 pub static mut BISHOP_MOBILITY: [Score; 14] = [S!(-139, 115), S!(227, -209), S!(288, -843), S!(259, -339), S!(374, -108), S!(364, 96), S!(472, 310), S!(559, 389), S!(572, 558), S!(580, 634), S!(552, 682), S!(579, 621), S!(440, 651), S!(1141, 511)];
@@ -91,7 +92,7 @@ pub unsafe fn evaluate_position(pos: &Bitboard) -> i32 {
     score += bishop_color_value(pos);
     score += rook_on_seventh_value(pos);
     score += rook_on_open_value(pos);
-    score += nonpawn_psqt_value(pos);
+    score += psqt_value(pos);
     score += if pos.side_to_move == Color::White {TEMPO_BONUS} else {-TEMPO_BONUS};
     return taper_score(score, pos.get_phase());
 }
@@ -237,22 +238,22 @@ unsafe fn double_bishop_bonus(pos: &Bitboard) -> Score {
     return score;
 }
 
-pub unsafe fn print_value(pos: &Bitboard) {
-    println!("material: {}", taper_score(material_score(pos), pos.get_phase()));
-    println!("mobility and king_danger: {}", taper_score(mobility_and_king_danger(pos), pos.get_phase()));
-    println!("passed_pawns: {}", taper_score(passed_pawns_value(pos), pos.get_phase()));
-    println!("center_pawns: {}", taper_score(center_pawns_value(pos), pos.get_phase()));
-    println!("isolated_pawns: {}", taper_score(isolated_pawns_value(pos), pos.get_phase()));
-    println!("doubled_pawns: {}", taper_score(doubled_pawns_value(pos), pos.get_phase()));
-    println!("backwards_pawns: {}", taper_score(backwards_pawns_value(pos), pos.get_phase()));
-    println!("connected_pawns: {}", taper_score(connected_pawns_value(pos), pos.get_phase()));
-    println!("space: {}", taper_score(space_control_value(pos), pos.get_phase()));
-    println!("rook on 7th: {}", taper_score(rook_on_seventh_value(pos), pos.get_phase()));
-    println!("rook on open: {}", taper_score(rook_on_open_value(pos), pos.get_phase()));
-    println!("double_bishop_bonus: {}", taper_score(double_bishop_bonus(pos), pos.get_phase()));
-    println!("bishop_color: {}", taper_score(bishop_color_value(pos), pos.get_phase()));
-    println!("psqt: {}", taper_score(nonpawn_psqt_value(pos) + pawn_psqt_value(pos), pos.get_phase()));
-}
+// pub unsafe fn print_value(pos: &Bitboard) {
+//     println!("material: {}", taper_score(material_score(pos), pos.get_phase()));
+//     println!("mobility and king_danger: {}", taper_score(mobility_and_king_danger(pos), pos.get_phase()));
+//     println!("passed_pawns: {}", taper_score(passed_pawns_value(pos), pos.get_phase()));
+//     println!("center_pawns: {}", taper_score(center_pawns_value(pos), pos.get_phase()));
+//     println!("isolated_pawns: {}", taper_score(isolated_pawns_value(pos), pos.get_phase()));
+//     println!("doubled_pawns: {}", taper_score(doubled_pawns_value(pos), pos.get_phase()));
+//     println!("backwards_pawns: {}", taper_score(backwards_pawns_value(pos), pos.get_phase()));
+//     println!("connected_pawns: {}", taper_score(connected_pawns_value(pos), pos.get_phase()));
+//     println!("space: {}", taper_score(space_control_value(pos), pos.get_phase()));
+//     println!("rook on 7th: {}", taper_score(rook_on_seventh_value(pos), pos.get_phase()));
+//     println!("rook on open: {}", taper_score(rook_on_open_value(pos), pos.get_phase()));
+//     println!("double_bishop_bonus: {}", taper_score(double_bishop_bonus(pos), pos.get_phase()));
+//     println!("bishop_color: {}", taper_score(bishop_color_value(pos), pos.get_phase()));
+//     println!("psqt: {}", taper_score(nonpawn_psqt_value(pos) + pawn_psqt_value(pos), pos.get_phase()));
+// }
 
 unsafe fn pawn_structure_value(pos: &Bitboard) -> Score {
     let mut val: Score = 0;
