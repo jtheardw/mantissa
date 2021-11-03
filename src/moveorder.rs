@@ -149,7 +149,24 @@ impl MovePicker {
             } else {
                 let score = see(pos, mv.end, captured, mv.start, mv.piece);
                 if score >= 0 {
-                    mv_score = OK_CAPTURE_OFFSET + (score as u64);
+                    let victim_val = match captured {
+                        b'p' => 1,
+                        b'n' => 3,
+                        b'b' => 3,
+                        b'r' => 5,
+                        b'q' => 9,
+                        _ => panic!("illegal capture!")
+                    };
+                    let atk_val = match mv.piece {
+                        b'p' => 9,
+                        b'n' => 7,
+                        b'b' => 7,
+                        b'r' => 5,
+                        b'q' => 1,
+                        b'k' => 0,
+                        _ => 0
+                    };
+                    mv_score = OK_CAPTURE_OFFSET + (victim_val << 4) + atk_val;//(score as u64);
                 } else {
                     mv_score = QUIET_OFFSET - cmp::min(score.abs() as u64, QUIET_OFFSET);
                 }
