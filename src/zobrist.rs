@@ -214,11 +214,11 @@ const CR_OFFSET: usize = 768;          // KQkq
 const EP_OFFSET: usize = 772;          // abcdefgh
 const STM_OFFSET: usize = 780;         // on if white is stm
 
-fn get_piece_tile_idx(piece_num: usize, idx: i32) -> usize {
+fn get_piece_tile_idx(piece_num: usize, idx: i8) -> usize {
     (piece_num << 6) + idx as usize
 }
 
-fn get_piece_zobrist(piece: u8, side: Color, idx: i32) -> u64 {
+fn get_piece_zobrist(piece: u8, side: Color, idx: i8) -> u64 {
     return ZOBRIST_TABLE[get_piece_tile_idx(get_piece_num(piece, side), idx)];
 }
 
@@ -226,7 +226,7 @@ fn get_zobrist_for_piece_board(piece: u8, side: Color, board: u64) -> u64 {
     let mut board = board;
     let mut hash = 0;
     while board != 0 {
-        let idx = board.trailing_zeros() as i32;
+        let idx = board.trailing_zeros() as i8;
         hash ^= get_piece_zobrist(piece, side, idx);
         board &= board - 1;
     }
@@ -289,19 +289,19 @@ pub fn simple_move_hash(piece: u8,
                         side_to_move: Color) -> u64 {
     let piece_num = get_piece_num(piece, side_to_move);
     let mut hash = 0;
-    hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, start_idx)];
-    hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, end_idx)];
+    hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, start_idx as i8)];
+    hash ^= ZOBRIST_TABLE[get_piece_tile_idx(piece_num, end_idx as i8)];
     return hash;
 }
 
 pub fn en_passant_hash(ep_idx: i32, removed_side: Color) -> u64 {
     let captured_num = get_piece_num(b'p', removed_side);
-    return ZOBRIST_TABLE[get_piece_tile_idx(captured_num, ep_idx)];
+    return ZOBRIST_TABLE[get_piece_tile_idx(captured_num, ep_idx as i8)];
 }
 
 pub fn update_hash(piece: u8,
-                   start_idx: i32,
-                   end_idx: i32,
+                   start_idx: i8,
+                   end_idx: i8,
                    captured_piece: u8,
                    promoted_piece: u8,
                    old_ep_file: i32, // -1 if none
@@ -351,8 +351,8 @@ pub fn update_hash(piece: u8,
 }
 
 pub fn update_pawn_hash(piece: u8,
-                               start_idx: i32,
-                               end_idx: i32,
+                               start_idx: i8,
+                               end_idx: i8,
                                captured_piece: u8,
                                promoted_piece: u8,
                                side_to_move: Color) -> u64 {

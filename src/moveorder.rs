@@ -55,7 +55,7 @@ pub struct MovePicker {
 impl MovePicker {
 
     pub fn new(tt_move: Move, killers: [Move; 2], history: [[i32; 64]; 12], countermove: Move, followup_history: [[i32; 64]; 12], q_moves_only: bool) -> MovePicker {
-        let stage = if tt_move.is_null {GEN_NOISY} else {TT_MOVE};
+        let stage = if tt_move.is_null() {GEN_NOISY} else {TT_MOVE};
         MovePicker {
             noisy_moves_only: q_moves_only,
             move_stage: stage,

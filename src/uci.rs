@@ -106,22 +106,22 @@ fn uci_go(board: &Bitboard, options: UCIOptions, params: &mut SplitWhitespace) {
 
 fn apply_uci_move(board: &mut Bitboard, move_str: String) {
     let move_bytes = move_str.as_bytes();
-    let start = bytes_to_idx(move_bytes[0], move_bytes[1]);
-    let end = bytes_to_idx(move_bytes[2], move_bytes[3]);
+    let start = bytes_to_idx(move_bytes[0], move_bytes[1]) as i8;
+    let end = bytes_to_idx(move_bytes[2], move_bytes[3]) as i8;
     let mv: Move;
     if move_bytes.len() == 5 {
         // promotion
         let promote_to = move_bytes[4];
         mv = Move::promotion(start, end, promote_to);
     } else {
-        let piece = board.piece_at_square(start, board.side_to_move);
+        let piece = board.piece_at_square(start as i8, board.side_to_move);
         if piece == b'p' {
             let is_sixth = if board.side_to_move == Color::White {
                 (end / 8) == 5
             } else {
                 (end / 8) == 2
             };
-            if board.ep_file == (end % 8) && is_sixth {
+            if board.ep_file == (end % 8) as i32 && is_sixth {
                 mv = Move::ep_capture(start, end);
             } else {
                 mv = Move::pawn_move(start, end);

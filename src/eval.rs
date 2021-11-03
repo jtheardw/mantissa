@@ -209,7 +209,7 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         let mut board = pos.queen[side];
         while board != 0 {
-            let start_idx = board.trailing_zeros() as i32;
+            let start_idx = board.trailing_zeros() as i8;
             let move_board = queen_moves_board(start_idx, occ);
             let moves = move_board.count_ones() as usize;
             let attacks = move_board & king_zone;
@@ -223,7 +223,7 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         board = pos.rook[side];
         while board != 0 {
-            let start_idx = board.trailing_zeros() as i32;
+            let start_idx = board.trailing_zeros() as i8;
             let move_board = rook_moves_board(start_idx, occ & !(pos.queen[side] | pos.rook[side]));
             let moves = move_board.count_ones() as usize;
             let attacks = move_board & king_zone;
@@ -237,7 +237,7 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         board = pos.bishop[side];
         while board != 0 {
-            let start_idx = board.trailing_zeros() as i32;
+            let start_idx = board.trailing_zeros() as i8;
             let move_board = bishop_moves_board(start_idx, occ & !(pos.queen[side] | pos.bishop[side]));
             let moves = move_board.count_ones() as usize;
             let attacks = move_board & king_zone;
@@ -251,7 +251,7 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         board = pos.knight[side];
         while board != 0 {
-            let start_idx = board.trailing_zeros() as i32;
+            let start_idx = board.trailing_zeros() as i8;
             let enemy = if side == white {black} else {white};
             let move_board = knight_moves_board(start_idx) & !pawn_attacks(pos.pawn[enemy], !pos.side_to_move);
             let moves = move_board.count_ones() as usize;
@@ -463,14 +463,14 @@ fn connected_pawns_value(pos: &Bitboard) -> Score {
 
             // supported?
             // aka is it protected by another pawn
-            let supported = idx_to_bb(idx) & my_atks != 0;
+            let supported = idx_to_bb(idx as i8) & my_atks != 0;
             if supported {
                 connected_pawns[me] += SUPPORTED_PAWN_BONUS;
             }
 
             // part of a phalanx?
             // aka is its stop square covered by one of its neighbors?
-            let phalanx = if color == Color::White {idx_to_bb(idx) << 8} else {idx_to_bb(idx) >> 8} & my_atks != 0;
+            let phalanx = if color == Color::White {idx_to_bb(idx as i8) << 8} else {idx_to_bb(idx as i8) >> 8} & my_atks != 0;
             if phalanx || supported {
                 let rank = if color == Color::White { idx / 8 } else { 7 - (idx / 8) } as usize;
                 let file = (idx % 8) as usize;

@@ -299,10 +299,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     }
 }
 
-fn see_score(pos: &mut Bitboard, mv: Move) -> i32 {
-    return see(pos, mv.end, pos.piece_at_square(mv.end, !pos.side_to_move), mv.start, mv.piece);
-}
-
 fn search(node: &mut Bitboard,
           alpha: i32,
           beta: i32,
@@ -371,11 +367,11 @@ fn search(node: &mut Bitboard,
 
     unsafe {
         let tt_entry = TT.get(node.hash);
-        if tt_entry.valid {
+        if tt_entry.valid() {
             sse.tt_hit = true;
             sse.tt_move = tt_entry.mv;
             sse.tt_val = TTEntry::read_tt_score(tt_entry.value, ply);
-            sse.tt_depth = tt_entry.depth;
+            sse.tt_depth = tt_entry.depth as i32;
             sse.tt_node_type = tt_entry.node_type;
         } else {
             sse.tt_hit = false;
@@ -386,7 +382,7 @@ fn search(node: &mut Bitboard,
         }
     }
     if sse.tt_hit {
-        if !is_pv && sse.tt_depth >= depth && sse.excluded_move.is_null {
+        if !is_pv && sse.tt_depth >= depth && sse.excluded_move.is_null() {
             let node_type = sse.tt_node_type;
             let tt_val = sse.tt_val;
             if (node_type & CUT_NODE) != 0 && tt_val >= beta {
@@ -478,7 +474,7 @@ fn search(node: &mut Bitboard,
         && (!ss[(ply - 1) as usize].searching_null_move)
         && !sse.searching_null_move
         && (ply < 2 || (!ss[(ply - 2) as usize].searching_null_move))
-        && sse.excluded_move.is_null
+        && sse.excluded_move.is_null()
         && node.has_non_pawn_material()
         && (!sse.tt_hit || sse.tt_node_type & CUT_NODE == 0 || sse.tt_val >= beta)
     {
@@ -519,7 +515,7 @@ fn search(node: &mut Bitboard,
     if !init_node
         && depth >= 8
         && sse.tt_hit
-        && sse.excluded_move.is_null
+        && sse.excluded_move.is_null()
         && sse.tt_val.abs() < MIN_MATE_SCORE
         && (sse.tt_node_type & CUT_NODE) != 0
         && sse.tt_depth >= depth - 3
@@ -564,7 +560,7 @@ fn search(node: &mut Bitboard,
     // i.e. a counter. When a quiet move causes a fail high
     // we may consider that move a potential "counter" to the move
     // that preceded it, so we give it a bonus in move ordering
-    let countermove = if prev_mv.is_null {
+    let countermove = if prev_mv.is_null() {
         Move::null_move()
     } else {
         let piece_num = get_piece_num(prev_mv.piece, !node.side_to_move);
@@ -575,14 +571,14 @@ fn search(node: &mut Bitboard,
     // Similarly to the CM heuristic above, moves by you may
     // have a natural follow-up in executing a plan.  Here instead
     // of a specific move, we hold on to a full history table for each move
-    let followup_table = if my_prev_mv.is_null {
+    let followup_table = if my_prev_mv.is_null() {
         [[0; 64]; 12]
     } else {
         let piece_num = get_piece_num(my_prev_mv.piece, node.side_to_move);
         ti.followup_history[piece_num][my_prev_mv.end as usize]
     };
 
-    let first_move = if init_node && !pv_move.is_null {
+    let first_move = if init_node && !pv_move.is_null() {
         pv_move
     } else {
         sse.tt_move
@@ -600,7 +596,7 @@ fn search(node: &mut Bitboard,
     loop {
         let (mv, score) = movepicker.next(node);
         sse.current_move = mv;
-        if mv.is_null {
+        if mv.is_null() {
             // we've exhausted all the moves
             break;
         }
@@ -748,7 +744,7 @@ fn search(node: &mut Bitboard,
         if alpha >= beta {
             // fail-high
             if !thread_killed() {
-                if sse.excluded_move.is_null {
+                if sse.excluded_move.is_null() {
                     if is_quiet {
                         // update heuristics
                         ti.update_killers(mv, ply);
@@ -765,8 +761,8 @@ fn search(node: &mut Bitboard,
         }
     }
 
-    if best_move.is_null {
-        if !sse.excluded_move.is_null {
+    if best_move.is_null() {
+        if !sse.excluded_move.is_null() {
             return alpha;
         }
         if !found_legal_move {
@@ -784,7 +780,7 @@ fn search(node: &mut Bitboard,
     }
 
     unsafe {
-        if sse.excluded_move.is_null && !thread_killed() {
+        if sse.excluded_move.is_null() && !thread_killed() {
             TT.set(node.hash, best_move, TTEntry::make_tt_score(best_val, ply), if raised_alpha {PV_NODE} else {ALL_NODE}, depth, node.history.len() as i32);
         }
     }
@@ -824,7 +820,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
     let mut movepicker = MovePicker::q_new();
     loop {
         let (mv, score) = movepicker.next(node);
-        if mv.is_null {
+        if mv.is_null() {
             break;
         }
 

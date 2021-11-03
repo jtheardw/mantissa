@@ -266,7 +266,7 @@ impl Bitboard {
         }
     }
 
-    pub fn is_square_attacked(&self, idx: i32, side_to_move: Color) -> bool {
+    pub fn is_square_attacked(&self, idx: i8, side_to_move: Color) -> bool {
         // process:
         // create "virtual pieces" at the idx and see if they can
         // attack enemy pieces of the appropriate types.  If so,
@@ -301,7 +301,7 @@ impl Bitboard {
     }
 
     pub fn is_check(&self, side: Color) -> bool {
-        return self.is_square_attacked(self.king[side as usize].trailing_zeros() as i32, side);
+        return self.is_square_attacked(self.king[side as usize].trailing_zeros() as i8, side);
     }
 
     pub fn can_castle(&self, side: Color, queenside: bool) -> bool {
@@ -341,7 +341,7 @@ impl Bitboard {
         }
     }
 
-    pub fn piece_at_square(&self, idx: i32, side: Color) -> u8 {
+    pub fn piece_at_square(&self, idx: i8, side: Color) -> u8 {
         let idx_board = idx_to_bb(idx);
         let side = side as usize;
         if (idx_board & self.composite[side]) == 0 {
@@ -369,7 +369,7 @@ impl Bitboard {
         panic!("Found a piece that should exist at idx {} but doesn't", idx);
     }
 
-    fn void_castling_rights(&mut self, start_idx: i32, end_idx: i32) {
+    fn void_castling_rights(&mut self, start_idx: i8, end_idx: i8) {
         let mut new_castling_rights = self.castling_rights;
         if new_castling_rights == 0 { return; }
         if start_idx == 4 {
@@ -444,7 +444,7 @@ impl Bitboard {
         let mut captured_piece: u8 = self.piece_at_square(mv.end, !self.side_to_move);
 
         // check ep first
-        if mv.is_ep {
+        if captured_piece == 0 && mv.is_pawn_cap() {
             captured_piece = b'p';
             let actual_pawn_idx = if self.side_to_move == Color::White {
                 coord_to_idx((self.ep_file, 4))
@@ -454,7 +454,7 @@ impl Bitboard {
 
             // remove enemy pawn
             self.pawn[them] ^= idx_to_bb(actual_pawn_idx);
-            self.hash ^= en_passant_hash(actual_pawn_idx, !self.side_to_move);
+            self.hash ^= en_passant_hash(actual_pawn_idx as i32, !self.side_to_move);
         } else if captured_piece != 0 {
             match captured_piece {
                 b'p' => { self.pawn[them] ^= end_point; },
@@ -469,13 +469,13 @@ impl Bitboard {
 
         // castling
         if mv.piece == b'k' && (mv.end - mv.start).abs() == 2 {
-            let old_rook_idx: i32 = if mv.end > mv.start { mv.start + 3 } else { mv.start - 4 };
-            let new_rook_idx: i32 = if mv.end > mv.start { mv.start + 1 } else { mv.start - 1 };
+            let old_rook_idx: i8 = if mv.end > mv.start { mv.start + 3 } else { mv.start - 4 };
+            let new_rook_idx: i8 = if mv.end > mv.start { mv.start + 1 } else { mv.start - 1 };
 
             // move the rook
             let rook_mask = idx_to_bb(old_rook_idx) | idx_to_bb(new_rook_idx);
             self.rook[me] ^= rook_mask;
-            self.hash ^= simple_move_hash(b'r', old_rook_idx, new_rook_idx, self.side_to_move);
+            self.hash ^= simple_move_hash(b'r', old_rook_idx as i32, new_rook_idx as i32, self.side_to_move);
         }
 
         // move piece
@@ -512,7 +512,7 @@ impl Bitboard {
             captured_piece,
             mv.promote_to,
             self.ep_file,
-            mv.ep_file,
+            mv.ep_file(),
             old_castling_rights,
             self.castling_rights,
             self.side_to_move
@@ -528,7 +528,7 @@ impl Bitboard {
         );
 
         // update ep_file
-        self.ep_file = mv.ep_file;
+        self.ep_file = mv.ep_file();
 
         // update composite
         self.composite[me] = self.pawn[me] | self.knight[me] | self.bishop[me] |
@@ -569,7 +569,8 @@ impl Bitboard {
             None => panic!("empty cr stack!")
         };
 
-        if mv.is_ep {
+
+        if mv.is_pawn_cap() && captured_piece == b'p' && (mv.end as i32 % 8) == self.ep_file && ((self.side_to_move == Color::White && mv.end / 8 == 5) || (self.side_to_move == Color::Black && mv.end / 8 == 2)) {
             let actual_pawn_idx = if self.side_to_move == Color::White {
                 coord_to_idx((self.ep_file, 4))
             } else {
@@ -591,8 +592,8 @@ impl Bitboard {
 
         // castling
         if mv.piece == b'k' && (mv.end - mv.start).abs() == 2 {
-            let old_rook_idx: i32 = if mv.end > mv.start { mv.start + 3 } else { mv.start - 4 };
-            let new_rook_idx: i32 = if mv.end > mv.start { mv.start + 1 } else { mv.start - 1 };
+            let old_rook_idx: i8 = if mv.end > mv.start { mv.start + 3 } else { mv.start - 4 };
+            let new_rook_idx: i8 = if mv.end > mv.start { mv.start + 1 } else { mv.start - 1 };
 
             // move the rook
             let rook_mask = idx_to_bb(old_rook_idx) | idx_to_bb(new_rook_idx);
@@ -660,7 +661,7 @@ impl Bitboard {
 
         let mut queens = self.queen[me];
         while queens != 0 {
-            let idx = queens.trailing_zeros() as i32;
+            let idx = queens.trailing_zeros() as i8;
             let atks = queen_moves_board(idx, occ) & enemy_occ;
             if atks != 0 { return false; }
             queens &= queens - 1;
@@ -668,7 +669,7 @@ impl Bitboard {
 
         let mut rooks = self.rook[me];
         while rooks != 0 {
-            let idx = rooks.trailing_zeros() as i32;
+            let idx = rooks.trailing_zeros() as i8;
             let atks = rook_moves_board(idx, occ) & enemy_occ;
             if atks != 0 { return false; }
             rooks &= rooks - 1;
@@ -676,7 +677,7 @@ impl Bitboard {
 
         let mut bishops = self.bishop[me];
         while bishops != 0 {
-            let idx = bishops.trailing_zeros() as i32;
+            let idx = bishops.trailing_zeros() as i8;
             let atks = bishop_moves_board(idx, occ) & enemy_occ;
             if atks != 0 { return false; }
             bishops &= bishops - 1;
@@ -684,7 +685,7 @@ impl Bitboard {
 
         let mut knights = self.knight[me];
         while knights != 0 {
-            let idx = knights.trailing_zeros() as i32;
+            let idx = knights.trailing_zeros() as i8;
             let atks = knight_moves_board(idx) & enemy_occ;
             if atks != 0 { return false; }
             knights &= knights - 1;
@@ -707,7 +708,7 @@ impl Bitboard {
 
         let mut kings = self.king[me];
         while kings != 0 {
-            let idx = kings.trailing_zeros() as i32;
+            let idx = kings.trailing_zeros() as i8;
             let atks = king_normal_moves_board(idx) & enemy_occ;
             if atks != 0 { return false; }
             kings &= kings - 1;
@@ -779,12 +780,8 @@ impl Bitboard {
     }
 
     pub fn is_pseudolegal(&self, mv: &Move) -> bool {
-        if mv.is_null || mv.piece != self.piece_at_square(mv.start, self.side_to_move) {
+        if mv.is_null() || mv.piece != self.piece_at_square(mv.start, self.side_to_move) {
             return false;
-        }
-
-        if mv.is_ep {
-            return mv.end % 8 == self.ep_file;
         }
 
         if mv.piece == b'k' && (mv.end - mv.start).abs() == 2 {
@@ -802,26 +799,31 @@ impl Bitboard {
             return false;
         }
 
+        if mv.is_pawn_cap() && (enemy_occ & end_bb == 0) {
+            // en passant
+            return mv.end as i32 % 8 == self.ep_file;
+        }
+
         // all that's left should be more "normal" moves
         let moves_board = match mv.piece {
             b'k' => {
-                king_normal_moves_board(mv.start)
+                king_normal_moves_board(mv.start as i8)
             },
             b'q' => {
-                queen_moves_board(mv.start, occ)
+                queen_moves_board(mv.start as i8, occ)
             },
             b'r' => {
-                rook_moves_board(mv.start, occ)
+                rook_moves_board(mv.start as i8, occ)
             },
             b'b' => {
-                bishop_moves_board(mv.start, occ)
+                bishop_moves_board(mv.start as i8, occ)
             },
             b'n' => {
-                knight_moves_board(mv.start)
+                knight_moves_board(mv.start as i8)
             },
             b'p' => {
-                pawn_walk_board(occ, mv.start, self.side_to_move)
-                    | (pawn_attack_board(mv.start, self.side_to_move) & enemy_occ)
+                pawn_walk_board(occ, mv.start as i8, self.side_to_move)
+                    | (pawn_attack_board(mv.start as i8, self.side_to_move) & enemy_occ)
             },
             _ => {return false;}
         };

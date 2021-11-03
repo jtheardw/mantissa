@@ -190,13 +190,13 @@ impl ThreadInfo {
     }
 
     pub fn update_countermove(&mut self, prev_mv: Move, mv: Move, side: Color) {
-        if prev_mv.is_null || mv.is_null { return; }
+        if prev_mv.is_null() || mv.is_null() { return; }
         let piece_num = get_piece_num(prev_mv.piece, side);
         self.countermove_table[piece_num][prev_mv.end as usize] = mv;
     }
 
     pub fn update_followup(&mut self, prev_mv: Move, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
-        if prev_mv.is_null || mv.is_null { return; }
+        if prev_mv.is_null() || mv.is_null() { return; }
         let prev_piece_num = get_piece_num(prev_mv.piece, side);
         let prev_end = prev_mv.end as usize;
         for s_mv in searched_moves {

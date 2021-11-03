@@ -5,23 +5,28 @@ use crate::util::*;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Move {
-    pub start: i32,
-    pub end: i32,
+    pub start: i8,
+    pub end: i8,
     pub piece: u8,
-    pub is_ep: bool,
-    pub ep_file: i32,
     pub promote_to: u8,
-    pub is_null: bool
 }
 
 impl Move {
+    pub fn is_null(&self) -> bool {
+        return self.start == self.end;
+    }
+
+    pub fn is_pawn_cap(&self) -> bool {
+        return self.piece == b'p' && (self.end % 8 != self.start % 8);
+    }
+
     pub fn get_repr(&self) -> String {
         // UCI compatible representation of move
-        if self.is_null {
+        if self.is_null() {
             return format!("0000");
         }
-        let start = idx_to_str(self.start);
-        let end = idx_to_str(self.end);
+        let start = idx_to_str(self.start as i8);
+        let end = idx_to_str(self.end as i8);
         let mut promote = "".to_string();
 
         if self.promote_to != 0 {
@@ -31,59 +36,55 @@ impl Move {
         return format!("{}{}{}", start, end, promote)
     }
 
-    pub fn piece_move(start: i32, end: i32, piece: u8) -> Move {
+    pub fn piece_move(start: i8, end: i8, piece: u8) -> Move {
         // standard type of move for all pieces except pawns
         Move {
-            start: start,
-            end: end,
+            start: start as i8,
+            end: end as i8,
             piece: piece,
-            ep_file: -1,
-            is_ep: false,
             promote_to: 0,
-            is_null: false,
         }
     }
 
-    pub fn pawn_move(start: i32, end: i32) -> Move {
-        // pawn walk, double walk, or typical capture
+    pub fn ep_file(&self) -> i32 {
         let mut ep_file = -1;
-        if (end - start).abs() == 16 {
-            ep_file = start % 8;
+        if self.piece == b'p' && (self.end - self.start).abs() == 16 {
+            ep_file = (self.start as i32) % 8;
         }
+        return ep_file;
+    }
+
+    pub fn pawn_move(start: i8, end: i8) -> Move {
+        // pawn walk, double walk, or typical capture
+        // let mut ep_file = -1;
+        // if (end - start).abs() == 16 {
+        //     ep_file = start % 8;
+        // }
         Move {
-            start: start,
-            end: end,
+            start: start as i8,
+            end: end as i8,
             piece: b'p',
-            is_ep: false,
-            ep_file: ep_file,
             promote_to: 0,
-            is_null: false
         }
     }
 
     // Next are the pawn move constructors
-    pub fn ep_capture(start: i32, end: i32) -> Move {
+    pub fn ep_capture(start: i8, end: i8) -> Move {
         // capture en-passant
         Move {
-            start: start,
-            end: end,
+            start: start as i8,
+            end: end as i8,
             piece: b'p',
-            ep_file: -1,
-            is_ep: true,
             promote_to: 0,
-            is_null: false,
         }
     }
 
-    pub fn promotion(start: i32, end: i32, piece: u8) -> Move {
+    pub fn promotion(start: i8, end: i8, piece: u8) -> Move {
         Move {
-            start: start,
-            end: end,
+            start: start as i8,
+            end: end as i8,
             piece: b'p',
-            is_ep: false,
-            ep_file: -1,
             promote_to: piece,
-            is_null: false
         }
     }
 
@@ -96,10 +97,7 @@ impl Move {
             start: 0,
             end: 0,
             piece: 0,
-            is_ep: false,
-            ep_file: -1,
             promote_to: 0,
-            is_null: true
         }
     }
 }
@@ -111,7 +109,7 @@ impl fmt::Display for Move {
 }
 
 pub fn is_quiet_move(mv: &Move, pos: &Bitboard) -> bool {
-    if mv.is_ep { return false; }
+    if mv.is_pawn_cap() { return false; }
     if (idx_to_bb(mv.end) & pos.composite[!pos.side_to_move as usize]) != 0 { return false; }
     return true;
 }
@@ -122,7 +120,7 @@ pub fn is_tactical_move(mv: &Move, pos: &Bitboard) -> bool {
     // - a promotion
     // - a pawn walking to the 7th rank
     if mv.promote_to != 0 { return true; }
-    if mv.is_ep { return true; }
+    if mv.is_pawn_cap() { return true; }
     if mv.piece == b'p' {
         if pos.side_to_move == Color::White {
             if mv.end >= 48 {

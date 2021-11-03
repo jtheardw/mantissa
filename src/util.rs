@@ -28,19 +28,19 @@ impl std::ops::Not for Color {
 // coordinate-related convenience functions
 
 #[inline]
-pub fn coord_to_idx(coord: (i32, i32)) -> i32 {
+pub fn coord_to_idx(coord: (i32, i32)) -> i8 {
     // turn an x, y coordinate into a bb (0-63) index
-    (coord.1 << 3) + coord.0
+    ((coord.1 << 3) + coord.0) as i8
 }
 
 #[inline]
-pub fn idx_to_coord(idx: i32) -> (i32, i32) {
+pub fn idx_to_coord(idx: i8) -> (i32, i32) {
     // turn a bb index into an x, y coordinate
-    (idx % 8, idx >> 3)
+    (idx as i32 % 8, idx as i32 >> 3)
 }
 
 #[inline]
-pub fn idx_to_bb(idx: i32) -> u64 {
+pub fn idx_to_bb(idx: i8) -> u64 {
     // turn a bb index into a bitboard with 1 at that index
     1 << idx
 }
@@ -56,19 +56,19 @@ fn at_idx(bb: u64, idx: i32) -> u64{
     bb & (1 << idx)
 }
 
-pub fn idx_to_str(idx: i32) -> String {
+pub fn idx_to_str(idx: i8) -> String {
     let coords = (idx % 8, idx >> 3);
     let f = "abcdefgh".as_bytes()[coords.0 as usize] as char;
     let r = (coords.1 + 1).to_string();
     return format!("{}{}", f.to_string(), r);
 }
 
-pub fn str_to_idx(s: String) -> i32 {
+pub fn str_to_idx(s: String) -> i8 {
     let s = s.as_bytes();
     return coord_to_idx(((s[0] - b'a') as i32, (s[1] - b'1') as i32));
 }
 
-pub fn bytes_to_idx(file_byte: u8, rank_byte: u8) -> i32 {
+pub fn bytes_to_idx(file_byte: u8, rank_byte: u8) -> i8 {
     return coord_to_idx(((file_byte - b'a') as i32, (rank_byte - b'1') as i32));
 }
 

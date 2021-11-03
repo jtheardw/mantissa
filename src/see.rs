@@ -9,22 +9,22 @@ use crate::util::*;
 fn lva(pos: &Bitboard, atk_bb: u64, side: Color) -> (u64, u8) {
     let side = side as usize;
     if atk_bb & pos.pawn[side] != 0 {
-        return (idx_to_bb((atk_bb & pos.pawn[side]).trailing_zeros() as i32), b'p');
+        return (idx_to_bb((atk_bb & pos.pawn[side]).trailing_zeros() as i8), b'p');
     }
     if atk_bb & pos.knight[side] != 0 {
-        return (idx_to_bb((atk_bb & pos.knight[side]).trailing_zeros() as i32), b'n');
+        return (idx_to_bb((atk_bb & pos.knight[side]).trailing_zeros() as i8), b'n');
     }
     if atk_bb & pos.bishop[side] != 0 {
-        return (idx_to_bb((atk_bb & pos.bishop[side]).trailing_zeros() as i32), b'b');
+        return (idx_to_bb((atk_bb & pos.bishop[side]).trailing_zeros() as i8), b'b');
     }
     if atk_bb & pos.rook[side] != 0 {
-        return (idx_to_bb((atk_bb & pos.rook[side]).trailing_zeros() as i32), b'r');
+        return (idx_to_bb((atk_bb & pos.rook[side]).trailing_zeros() as i8), b'r');
     }
     if atk_bb & pos.queen[side] != 0 {
-        return (idx_to_bb((atk_bb & pos.queen[side]).trailing_zeros() as i32), b'q');
+        return (idx_to_bb((atk_bb & pos.queen[side]).trailing_zeros() as i8), b'q');
     }
     if atk_bb & pos.king[side] != 0 {
-        return (idx_to_bb((atk_bb & pos.king[side]).trailing_zeros() as i32), b'k');
+        return (idx_to_bb((atk_bb & pos.king[side]).trailing_zeros() as i8), b'k');
     }
     return (0, 0);
 }
@@ -41,7 +41,7 @@ fn get_piece_value(piece: u8) -> i32 {
     };
 }
 
-fn idx_attacks(pos: &Bitboard, idx: i32, occ: u64) -> u64 {
+fn idx_attacks(pos: &Bitboard, idx: i8, occ: u64) -> u64 {
     // process:
     // create "virtual pieces" at the idx and see
     // if they can attack enemy pieces of the appropriate
@@ -78,7 +78,7 @@ fn idx_attacks(pos: &Bitboard, idx: i32, occ: u64) -> u64 {
     return attackers_bb;
 }
 
-pub fn see(pos: &Bitboard, to_idx: i32, target_piece: u8, from_idx: i32, atk_piece: u8) -> i32 {
+pub fn see(pos: &Bitboard, to_idx: i8, target_piece: u8, from_idx: i8, atk_piece: u8) -> i32 {
     let white = Color::White as usize;
     let black = Color::Black as usize;
 

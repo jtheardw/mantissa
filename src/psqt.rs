@@ -83,7 +83,7 @@ fn get_psqt_bonus(psqt: &[[Score; 4]; 8], bb: u64, side_to_move: Color) -> Score
         let psqt_idx = bb.trailing_zeros() as i32;
         bb &= bb - 1;
 
-        let r = if side_to_move == Color::White {(psqt_idx / 8)} else {7 - (psqt_idx / 8)} as usize;
+        let r = if side_to_move == Color::White {psqt_idx / 8} else {7 - (psqt_idx / 8)} as usize;
         let potential_f = psqt_idx % 8;
         // psqt tables are mirrored horizontally
         // file 4 (zero-indexed) should get the 3th entry
