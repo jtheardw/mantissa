@@ -411,7 +411,7 @@ fn search(node: &mut Bitboard,
                 return tt_val;
             }
         }
-    } else if depth >= 6 && !init_node && is_pv {
+    } else if depth >= 6 && !init_node {
         // internal iterative reductions
         // First place I can find IIR comes from a thread by Rebel and ProDeo author
         // wherein they found success simply reducing the depth at unsorted subtrees

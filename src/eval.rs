@@ -37,45 +37,67 @@ macro_rules! S {
     }
 }
 
-pub const QUEEN_VALUE: Score = S!(9383, 17225);
-pub const ROOK_VALUE: Score = S!(4188, 8778);
-pub const BISHOP_VALUE: Score = S!(3225, 5354);
-pub const KNIGHT_VALUE: Score = S!(3161, 4970);
-pub const PAWN_VALUE: Score = S!(963, 1360);
+pub const QUEEN_VALUE: Score = S!(10947, 16706);
+pub const ROOK_VALUE: Score = S!(4865, 8652);
+pub const BISHOP_VALUE: Score = S!(3523, 5211);
+pub const KNIGHT_VALUE: Score = S!(3466, 4880);
+pub const PAWN_VALUE: Score = S!(800, 1414);
 
-pub const KNIGHT_MOBILITY: [Score; 9] = [S!(-271, -184), S!(-145, 190), S!(58, 391), S!(136, 626), S!(184, 621), S!(162, 644), S!(203, 637), S!(251, 495), S!(263, 378)];
-pub const BISHOP_MOBILITY: [Score; 14] = [S!(-67, 65), S!(43, -648), S!(271, -817), S!(281, -351), S!(402, -133), S!(403, 126), S!(471, 349), S!(561, 449), S!(577, 581), S!(572, 643), S!(564, 689), S!(599, 640), S!(577, 573), S!(1120, 347)];
-pub const ROOK_MOBILITY: [Score; 15] = [S!(-40, -204), S!(-69, 48), S!(-90, -552), S!(-5, -188), S!(23, 120), S!(68, 453), S!(34, 618), S!(29, 801), S!(20, 872), S!(74, 952), S!(115, 1016), S!(202, 1036), S!(281, 1011), S!(302, 1008), S!(513, 860)];
-pub const QUEEN_MOBILITY: [Score; 28] = [S!(-455, 23), S!(101, 80), S!(-190, -150), S!(-129, 108), S!(-260, -6), S!(74, -438), S!(-10, -176), S!(89, -359), S!(90, 32), S!(139, 142), S!(161, 384), S!(170, 545), S!(198, 653), S!(199, 769), S!(207, 868), S!(223, 891), S!(259, 893), S!(257, 935), S!(244, 936), S!(243, 936), S!(212, 985), S!(249, 890), S!(219, 862), S!(218, 806), S!(280, 812), S!(479, 572), S!(85, 551), S!(391, 1016)];
+pub const KNIGHT_MOBILITY: [Score; 9] = [
+    S!(-275, 21), S!(-36,  10), S!(145, 148), S!(132, 528),
+    S!(191, 535), S!(183, 563), S!(223, 551), S!(295, 453),
+    S!(297, 333)
+];
+pub const BISHOP_MOBILITY: [Score; 14] = [
+    S!(-139,  115), S!( 227, -209), S!(288, -843), S!(259, -339),
+    S!( 374, -108), S!( 364,   96), S!(472,  310), S!(559,  389),
+    S!( 572,  558), S!( 580,  634), S!(552,  682), S!(579,  621),
+    S!( 440,  651), S!(1141,  511)
+];
+pub const ROOK_MOBILITY: [Score; 15] = [
+    S!( 66,  -86), S!( 55,  97), S!(-221, -254), S!(-78,  -74),
+    S!(-20,  301), S!( 13, 468), S!(  15,  756), S!( -4,  833),
+    S!( -8,  901), S!( 66, 935), S!( 139,  967), S!(190, 1001),
+    S!(277, 1005), S!(335, 969), S!( 569,  767)
+];
+pub const QUEEN_MOBILITY: [Score; 28] = [
+    S!( 42,  -24), S!( 41, 121), S!(-241,   81), S!(-42,  76),
+    S!( -3,  134), S!(302, -76), S!( -45,  -89), S!( 92,  47),
+    S!(123, -119), S!(151,  64), S!( 227,  178), S!(184, 423),
+    S!(244,  500), S!(249, 627), S!( 269,  800), S!(224, 883),
+    S!(250,  910), S!(282, 801), S!( 234,  970), S!(334, 811),
+    S!(191,  961), S!(200, 912), S!( 192,  935), S!( 71, 822),
+    S!(235,  994), S!(443, 631), S!( 278, 1125), S!(448, 955)
+];
 
-pub const QUEEN_KING_DANGER: [i32; 8] = [0, 204, 410, 692, 1049, 703, 975, 741];
-pub const ROOK_KING_DANGER: [i32; 8] = [0, 29, 82, 136, 282, 403, 471, 321];
-pub const BISHOP_KING_DANGER: [i32; 8] = [0, 60, 67, 105, 120, 112, 86, 27];
-pub const KNIGHT_KING_DANGER: [i32; 8] = [0, 17, 37, 129, 82, 0, 261, 344];
+pub const QUEEN_KING_DANGER: [i32; 8] = [66, 216, 464, 824, 983, 647, 753, 910];
+pub const ROOK_KING_DANGER: [i32; 8] = [19, 35, 98, 177, 362, 502, 400, 293];
+pub const BISHOP_KING_DANGER: [i32; 8] = [0, 60, 41, 87, 55, 181, 124, 176];
+pub const KNIGHT_KING_DANGER: [i32; 8] = [25, 0, 48, 103, 517, 115, 427, 154];
 
-pub const DOUBLE_BISHOP_BONUS: Score = S!(104, 978);
+pub const DOUBLE_BISHOP_BONUS: Score = S!(109, 972);
 
 pub const PASSED_PAWN_VALUE: [Score; 8] = [
-    S!(  0,   0), S!( 0,  180), S!(   0,  236), S!(0, 517),
-    S!(187, 770), S!(599, 1126), S!(0, 395), S!(0,   0)
+    S!(  0,   0), S!( 45,  179), S!(   0,  239), S!(0, 511),
+    S!(234, 794), S!(388, 1465), S!(1316, 1732), S!(0,   0)
 ];
-pub const CENTER_PAWN_VALUE: Score = S!(49, 143);
-pub const ISOLATED_PAWN_VALUE: Score = S!(-12, -99);
-pub const DOUBLED_PAWN_VALUE: Score = S!(-93, -222);
-pub const BACKWARDS_PAWN_VALUE: Score = S!(-37, -8);
+pub const CENTER_PAWN_VALUE: Score = S!(84, 0);
+pub const ISOLATED_PAWN_VALUE: Score = S!(-53, -67);
+pub const DOUBLED_PAWN_VALUE: Score = S!(-64, -284);
+pub const BACKWARDS_PAWN_VALUE: Score = S!(-61, -19);
 pub const ADVANCED_PAWN_VALUE: [Score; 8] = [
-    S!( 0,   0), S!( 32,  0), S!( 63,  61), S!(58, 99),
-    S!(104, 178), S!(342, 300), S!(500, 453), S!( 0,  0)
+    S!( 0,   0), S!( 32,  16), S!( 63,  54), S!(68, 82),
+    S!(97, 201), S!(360, 244), S!(289, 500), S!( 0,  0)
 ];
-pub const SUPPORTED_PAWN_BONUS: Score = S!(141, 62);
-pub const SPACE_VALUE: Score = S!(0, 0);
+pub const SUPPORTED_PAWN_BONUS: Score = S!(158, 65);
+pub const SPACE_VALUE: Score = S!(16, 5);
 
 pub const BISHOP_COLOR: Score = S!(-50, -30);
 
 pub const TEMPO_BONUS: Score = S!(130, 130);
 
-pub const ROOK_ON_SEVENTH: Score = S!(0, 65);
-pub const ROOK_ON_OPEN: Score = S!(114, 64);
+pub const ROOK_ON_SEVENTH: Score = S!(0, 24);
+pub const ROOK_ON_OPEN: Score = S!(124, 95);
 
 pub fn static_eval(pos: &Bitboard, pht: &mut PHT) -> i32 {
     let score = evaluate_position(pos, pht);
@@ -199,7 +221,7 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
         let king_bb = pos.king[other_side];
         let mut attackers = 0;
         let mut attack_value: i32 = 0;
-        let king_idx = king_bb.trailing_zeros() as i32;
+        let king_idx = king_bb.trailing_zeros() as i8;
         let king_zone = king_bb | unsafe{ KING_MASK[king_idx as usize] };
 
         let mut queen_attacks = 0;
@@ -458,19 +480,19 @@ fn connected_pawns_value(pos: &Bitboard) -> Score {
         let mut pawn_bb = pos.pawn[me];
         let my_atks = pawn_attacks(pos.pawn[me], color);
         while pawn_bb != 0 {
-            let idx = pawn_bb.trailing_zeros() as i32;
+            let idx = pawn_bb.trailing_zeros() as i8;
             pawn_bb &= pawn_bb - 1;
 
             // supported?
             // aka is it protected by another pawn
-            let supported = idx_to_bb(idx as i8) & my_atks != 0;
+            let supported = idx_to_bb(idx) & my_atks != 0;
             if supported {
                 connected_pawns[me] += SUPPORTED_PAWN_BONUS;
             }
 
             // part of a phalanx?
             // aka is its stop square covered by one of its neighbors?
-            let phalanx = if color == Color::White {idx_to_bb(idx as i8) << 8} else {idx_to_bb(idx as i8) >> 8} & my_atks != 0;
+            let phalanx = if color == Color::White {idx_to_bb(idx) << 8} else {idx_to_bb(idx) >> 8} & my_atks != 0;
             if phalanx || supported {
                 let rank = if color == Color::White { idx / 8 } else { 7 - (idx / 8) } as usize;
                 let file = (idx % 8) as usize;
@@ -536,7 +558,7 @@ fn rook_on_open_value(pos: &Bitboard) -> Score {
         let enemy_side = if side == white {black} else {white};
         let mut rook_bb = pos.rook[side];
         while rook_bb != 0 {
-            let idx = rook_bb.trailing_zeros() as i32;
+            let idx = rook_bb.trailing_zeros() as i8;
             rook_bb &= rook_bb - 1;
 
             let f = (idx % 8) as usize;
