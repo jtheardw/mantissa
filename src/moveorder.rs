@@ -45,7 +45,6 @@ pub struct MovePicker {
     killers: [Move; 2],
     history: [[i32; 64]; 12],
     countermove: Move,
-    followup: [[i32; 64]; 12],
     scored_noisy_moves: Vec<(Move, u64)>,
     scored_quiet_moves: Vec<(Move, u64)>,
     noisy_i: usize,
@@ -53,8 +52,8 @@ pub struct MovePicker {
 }
 
 impl MovePicker {
-
-    pub fn new(tt_move: Move, killers: [Move; 2], history: [[i32; 64]; 12], countermove: Move, followup_history: [[i32; 64]; 12], q_moves_only: bool) -> MovePicker {
+    // pub fn new(tt_move: Move, killers: [Move; 2], history: [[i32; 64]; 12], capture_history: [[[i32; 6]; 64]; 12], countermove: Move, followup_history: [[i32; 64]; 12], q_moves_only: bool) -> MovePicker {
+    pub fn new(tt_move: Move, killers: [Move; 2], history: [[i32; 64]; 12], countermove: Move, q_moves_only: bool) -> MovePicker {
         let stage = if tt_move.is_null() {GEN_NOISY} else {TT_MOVE};
         MovePicker {
             noisy_moves_only: q_moves_only,
@@ -62,7 +61,6 @@ impl MovePicker {
             tt_move: tt_move,
             killers: killers,
             history: history,
-            followup: followup_history,
             countermove: countermove,
             scored_noisy_moves: Vec::new(),
             scored_quiet_moves: Vec::new(),
@@ -78,7 +76,6 @@ impl MovePicker {
             tt_move: Move::null_move(),
             killers: [Move::null_move(); 2],
             history: [[0; 64]; 12],
-            followup: [[0; 64]; 12],
             countermove: Move::null_move(),
             scored_noisy_moves: Vec::new(),
             scored_quiet_moves: Vec::new(),
@@ -94,7 +91,6 @@ impl MovePicker {
             tt_move: Move::null_move(),
             killers: [Move::null_move(); 2],
             history: [[0; 64]; 12],
-            followup: [[0; 64]; 12],
             countermove: Move::null_move(),
             scored_noisy_moves: Vec::new(),
             scored_quiet_moves: Vec::new(),
@@ -144,7 +140,8 @@ impl MovePicker {
                     continue;
                 } else {
                     let piece_num = get_piece_num(mv.piece, pos.side_to_move);
-                    mv_score = QUIET_OFFSET + (self.history[piece_num][mv.end as usize] + self.followup[piece_num][mv.end as usize]) as u64;
+                    // mv_score = QUIET_OFFSET + (self.history[piece_num][mv.end as usize] + self.followup[piece_num][mv.end as usize]) as u64;
+                    mv_score = QUIET_OFFSET + self.history[piece_num][mv.end as usize] as u64;
                 }
             } else {
                 let score = see(pos, mv.end, captured, mv.start, mv.piece);
@@ -166,7 +163,15 @@ impl MovePicker {
                         b'k' => 0,
                         _ => 0
                     };
-                    mv_score = OK_CAPTURE_OFFSET + (victim_val << 4) + atk_val;//(score as u64);
+                    // if self.noisy_moves_only {
+                    //     mv_score = OK_CAPTURE_OFFSET + (victim_val << 4) + atk_val;//(score as u64);
+                    // } else {
+                    //     let piece_num = get_piece_num(mv.piece, pos.side_to_move);
+                    //     let cap_piece_num = get_piece_num(captured, pos.side_to_move) % 6;
+                    //     mv_score = OK_CAPTURE_OFFSET + (victim_val << 4) + atk_val;//(score as u64);
+                    //     // mv_score = (OK_CAPTURE_OFFSET as i64 + (victim_val as i32 * 1000 + self.capture_history[piece_num][mv.end as usize][cap_piece_num]) as i64) as u64;
+                    // }
+                    mv_score = OK_CAPTURE_OFFSET + score as u64;
                 } else {
                     mv_score = QUIET_OFFSET - cmp::min(score.abs() as u64, QUIET_OFFSET);
                 }

@@ -6,9 +6,9 @@ use crate::time::*;
 use crate::tt::*;
 use crate::util::*;
 
-pub const EFP_DEPTH: i32 = 3;         // extended futility pruning
+pub const EFP_DEPTH: i32 = 8;         // extended futility pruning
 pub const FP_DEPTH: i32 = 5;
-pub const RFP_DEPTH: i32 = 6;         // reverse futility pruning
+pub const RFP_DEPTH: i32 = 8;         // reverse futility pruning
 pub const AFP_DEPTH: i32 = 8;         // reverse futility pruning
 pub const NMP_DEPTH: i32 = 3;         // null-move pruning/reductions
 pub const LMR_DEPTH: i32 = 2;         // late move reductions
@@ -17,8 +17,9 @@ static mut LMR_TABLE: [[i32; 64]; 64] = [[0; 64]; 64];
 
 pub fn efp_margin(depth: i32) -> i32 {
     if depth <= 0 { return 0; }
-    if depth > 3 { return 1000 + 2000 * depth}
-    return [0, 3200, 5000, 7300][depth as usize];
+    // if depth > 3 { return 1000 + 2000 * depth}
+    // return [0, 3200, 5000, 7300][depth as usize];
+    return 1300 * depth;
     // return base + 1000 * (depth - 1);
 }
 
@@ -27,7 +28,7 @@ pub fn fp_margin(depth: i32) -> i32 {
 }
 
 pub fn rfp_margin(depth: i32) -> i32 {
-    return 1300 * depth;
+    return 1100 * depth;
 }
 
 pub fn afp_margin(_depth: i32) -> i32 {
@@ -35,15 +36,15 @@ pub fn afp_margin(_depth: i32) -> i32 {
 }
 
 pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
-    let mut r = 3 + (depth / 6);
-    r += cmp::min(4, (static_eval - beta) / 2300) as i32;
+    let mut r = 4 + (depth / 4);
+    r += cmp::min(4, (static_eval - beta) / 5000) as i32;
     return r;
 }
 
 pub fn lmr_table_gen() {
     for d in 0..64 {
         for m in 0..64 {
-            let r = (0.75 + (d as f64).log2() * (m as f64).log2() / 2.25).floor() as i32;
+            let r = (0.80 + (d as f64).log2() * (m as f64).log2() / 2.25).floor() as i32;
             unsafe {LMR_TABLE[d as usize][m as usize] = r;}
         }
     }
@@ -139,6 +140,7 @@ pub struct ThreadInfo {
     pub seldepth: i32,
     pub killers: [[Move; 2]; MAX_PLY],
     pub move_history: [[i32; 64]; 12],
+    pub capture_history: [[[i32; 6]; 64]; 12],
     pub countermove_table: [[Move; 64]; 12],
     pub followup_history: Vec<[[[i32; 64]; 12]; 64]>,
     pub pht: PHT,
@@ -148,6 +150,7 @@ impl ThreadInfo {
     pub fn new() -> ThreadInfo {
         let killers = [[Move::null_move(); 2]; MAX_PLY];
         let move_history = [[0; 64]; 12];
+        let capture_history = [[[0; 6]; 64]; 12];
         let countermove_table = [[Move::null_move(); 64]; 12];
         let followup_history = vec![[[[0; 64]; 12]; 64]; 12];
         let pht = PHT::get_pht(14);
@@ -156,6 +159,7 @@ impl ThreadInfo {
             seldepth: 0,
             killers: killers,
             move_history: move_history,
+            capture_history: capture_history,
             countermove_table: countermove_table,
             followup_history: followup_history,
             pht: pht
@@ -166,7 +170,9 @@ impl ThreadInfo {
         self.killers = [[Move::null_move(); 2]; MAX_PLY];
         self.seldepth = 0;
         self.nodes_searched = 0;
+self.move_history = [[0; 64]; 12];
         self.move_history = [[0; 64]; 12];
+        self.capture_history = [[[0; 6]; 64]; 12];
         self.countermove_table = [[Move::null_move(); 64]; 12];
         self.followup_history = vec![[[[0; 64]; 12]; 64]; 12];
     }
@@ -175,10 +181,33 @@ impl ThreadInfo {
         for s_mv in searched_moves {
             if *s_mv == mv {continue;}
             let piece_num = get_piece_num(s_mv.piece, side);
-            self.move_history[piece_num][s_mv.end as usize] -= depth * depth;
+            let cur = self.move_history[piece_num][s_mv.end as usize];
+            self.move_history[piece_num][s_mv.end as usize] = self.decay_update(cur, -depth * depth);
         }
         let piece_num = get_piece_num(mv.piece, side);
-        self.move_history[piece_num][mv.end as usize] += depth * depth;
+        let cur = self.move_history[piece_num][mv.end as usize];
+        self.move_history[piece_num][mv.end as usize] = self.decay_update(cur, depth * depth);
+    }
+
+    fn decay_update(&self, cur: i32, delta: i32) -> i32 {
+        return cur - (cur * delta.abs()) / 512 + delta * 32;
+    }
+
+    pub fn update_capture_history(&mut self, mv: Move, captured_piece: u8, side: Color, depth: i32, searched_moves: &Vec<(Move, u8)>) {
+        for s_mv in searched_moves {
+            let s_mv = *s_mv;
+            if s_mv.0 == mv {continue;}
+            let piece_num = get_piece_num(s_mv.0.piece, side);
+            let cap_piece_num = get_piece_num(s_mv.1, side) % 6;
+            let cur = self.capture_history[piece_num][s_mv.0.end as usize][cap_piece_num];
+            self.capture_history[piece_num][s_mv.0.end as usize][cap_piece_num] = self.decay_update(cur, -depth * depth);
+        }
+        let piece_num = get_piece_num(mv.piece, side);
+        if captured_piece != 0 {
+            let cap_piece_num = get_piece_num(captured_piece, side) % 6;
+            let cur = self.capture_history[piece_num][mv.end as usize][cap_piece_num as usize];
+            self.capture_history[piece_num][mv.end as usize][cap_piece_num as usize] = self.decay_update(cur, depth * depth);
+        }
     }
 
     pub fn update_killers(&mut self, mv: Move, ply: i32) {
@@ -206,13 +235,15 @@ impl ThreadInfo {
             let piece_num = get_piece_num(s_mv.piece, side);
             let end = s_mv.end as usize;
 
-            self.followup_history[prev_piece_num][prev_end][piece_num][end] -= depth * depth;
+            let cur = self.followup_history[prev_piece_num][prev_end][piece_num][end];
+            self.followup_history[prev_piece_num][prev_end][piece_num][end] = self.decay_update(cur, -depth * depth);
         }
 
         let piece_num = get_piece_num(mv.piece, side);
         let end = mv.end as usize;
 
-        self.followup_history[prev_piece_num][prev_end][piece_num][end] += depth * depth;
+        let cur = self.followup_history[prev_piece_num][prev_end][piece_num][end];
+        self.followup_history[prev_piece_num][prev_end][piece_num][end] = self.decay_update(cur, -depth * depth);
     }
 }
 
