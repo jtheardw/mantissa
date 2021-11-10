@@ -19,7 +19,7 @@ pub fn efp_margin(depth: i32) -> i32 {
     if depth <= 0 { return 0; }
     // if depth > 3 { return 1000 + 2000 * depth}
     // return [0, 3200, 5000, 7300][depth as usize];
-    return 1300 * depth;
+    return 500 + 1000 * depth;
     // return base + 1000 * (depth - 1);
 }
 
@@ -28,7 +28,7 @@ pub fn fp_margin(depth: i32) -> i32 {
 }
 
 pub fn rfp_margin(depth: i32) -> i32 {
-    return 1100 * depth;
+    return 1000 * depth;
 }
 
 pub fn afp_margin(_depth: i32) -> i32 {
@@ -36,15 +36,15 @@ pub fn afp_margin(_depth: i32) -> i32 {
 }
 
 pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
-    let mut r = 4 + (depth / 4);
-    r += cmp::min(4, (static_eval - beta) / 5000) as i32;
+    let mut r = 4 + (depth / 6);
+    r += cmp::min(3, (static_eval - beta) / 2500) as i32;
     return r;
 }
 
 pub fn lmr_table_gen() {
-    for d in 0..64 {
-        for m in 0..64 {
-            let r = (0.80 + (d as f64).log2() * (m as f64).log2() / 2.25).floor() as i32;
+    for d in 1..64 {
+        for m in 1..64 {
+            let r = (0.8 + ((d as f64).ln() * (m as f64).ln()) / 2.10).floor() as i32;
             unsafe {LMR_TABLE[d as usize][m as usize] = r;}
         }
     }

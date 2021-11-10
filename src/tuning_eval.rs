@@ -129,6 +129,36 @@ unsafe fn pawn_attacks(pawn_bb: u64, side_to_move: Color) -> u64 {
     }
 }
 
+fn king_zone(pos:&Bitboard, idx: i8, side: Color) -> u64 {
+    // following same rules as SF king ring
+    let mut virt_king_idx = idx;
+    if idx % 8 == 0 {
+        virt_king_idx += 1;
+    }
+    if idx % 8 == 7 {
+        virt_king_idx -= 1;
+    }
+    if idx / 8 == 0 {
+        virt_king_idx += 8;
+    }
+    if idx / 8 == 7 {
+        virt_king_idx -= 8;
+    }
+    let base_ring = unsafe{ KING_MASK[virt_king_idx as usize] } | idx_to_bb(virt_king_idx);
+    // squares defended by 2 pawns are omitted
+    let defended;
+    if side == Color::White {
+        let pawn_bb = pos.pawn[Color::White as usize];
+        defended = ((pawn_bb & !FILE_MASKS[0]) << 7) & ((pawn_bb & !FILE_MASKS[7]) << 9);
+    } else {
+        let pawn_bb = pos.pawn[Color::Black as usize];
+        defended = ((pawn_bb & !FILE_MASKS[0]) >> 9) & ((pawn_bb & !FILE_MASKS[7]) >> 7)
+    }
+
+    let zone = base_ring & !defended;
+    return zone;
+}
+
 unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
     let mut mobility: Score = make_score(0, 0);
     let mut king_danger: [i32; 2] = [0, 0];
@@ -143,8 +173,9 @@ unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
         let king_bb = pos.king[other_side];
         let mut attackers = 0;
         let mut attack_value: i32 = 0;
-        let king_idx = king_bb.trailing_zeros() as i32;
-        let king_zone = king_bb | KING_MASK[king_idx as usize];
+        let king_idx = king_bb.trailing_zeros() as i8;
+        let king_zone = king_zone(pos, king_idx, if other_side == white {Color::White} else {Color::Black});
+            //king_bb | unsafe{ KING_MASK[king_idx as usize] };
 
         let mut queen_attacks = 0;
         let mut rook_attacks = 0;
@@ -153,14 +184,13 @@ unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         let mut board = pos.queen[side];
         while board != 0 {
-            let start_idx = board.trailing_zeros() as i32;
+            let start_idx = board.trailing_zeros() as i8;
             let move_board = queen_moves_board(start_idx, occ);
             let moves = move_board.count_ones() as usize;
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
                 queen_attacks += attacks.count_ones();
-                // attack_value += QUEEN_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * QUEEN_MOBILITY[moves];
             board &= board - 1;
@@ -168,14 +198,13 @@ unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         board = pos.rook[side];
         while board != 0 {
-            let start_idx = board.trailing_zeros() as i32;
+            let start_idx = board.trailing_zeros() as i8;
             let move_board = rook_moves_board(start_idx, occ & !(pos.queen[side] | pos.rook[side]));
             let moves = move_board.count_ones() as usize;
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
                 rook_attacks += attacks.count_ones();
-                // attack_value += ROOK_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * ROOK_MOBILITY[moves];
             board &= board - 1;
@@ -183,14 +212,13 @@ unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         board = pos.bishop[side];
         while board != 0 {
-            let start_idx = board.trailing_zeros() as i32;
+            let start_idx = board.trailing_zeros() as i8;
             let move_board = bishop_moves_board(start_idx, occ & !(pos.queen[side] | pos.bishop[side]));
             let moves = move_board.count_ones() as usize;
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
                 bishop_attacks += attacks.count_ones();
-                // attack_value += BISHOP_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * BISHOP_MOBILITY[moves];
             board &= board - 1;
@@ -198,7 +226,7 @@ unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         board = pos.knight[side];
         while board != 0 {
-            let start_idx = board.trailing_zeros() as i32;
+            let start_idx = board.trailing_zeros() as i8;
             let enemy = if side == white {black} else {white};
             let move_board = knight_moves_board(start_idx) & !pawn_attacks(pos.pawn[enemy], !pos.side_to_move);
             let moves = move_board.count_ones() as usize;
@@ -206,7 +234,6 @@ unsafe fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             if attacks != 0 {
                 attackers += 1;
                 knight_attacks += attacks.count_ones();
-                // attack_value += KNIGHT_KING_DANGER * attacks.count_ones() as i32;
             }
             mobility += multiplier * KNIGHT_MOBILITY[moves];
             board &= board - 1;
@@ -396,7 +423,7 @@ unsafe fn connected_pawns_value(pos: &Bitboard) -> Score {
         let mut pawn_bb = pos.pawn[me];
         let my_atks = pawn_attacks(pos.pawn[me], color);
         while pawn_bb != 0 {
-            let idx = pawn_bb.trailing_zeros() as i32;
+            let idx = pawn_bb.trailing_zeros() as i8;
             pawn_bb &= pawn_bb - 1;
 
             // supported?
@@ -474,7 +501,7 @@ unsafe fn rook_on_open_value(pos: &Bitboard) -> Score {
         let enemy_side = if side == white {black} else {white};
         let mut rook_bb = pos.rook[side];
         while rook_bb != 0 {
-            let idx = rook_bb.trailing_zeros() as i32;
+            let idx = rook_bb.trailing_zeros() as i8;
             rook_bb &= rook_bb - 1;
 
             let f = (idx % 8) as usize;

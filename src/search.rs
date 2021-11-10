@@ -900,22 +900,22 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 if is_quiet_move(&mv, node) {
                     // we still want to update our heuristic counters
                     // here.
-                    let prev_mv = if !init_node {
-                        ss[(ply - 1) as usize].current_move
-                    } else {
-                        Move::null_move()
-                    };
+                    // let prev_mv = if !init_node {
+                    //     ss[(ply - 1) as usize].current_move
+                    // } else {
+                    //     Move::null_move()
+                    // };
 
-                    ti.update_killers(mv, ply);
-                    ti.update_move_history(mv, node.side_to_move, depth, &Vec::new());
-                    ti.update_countermove(prev_mv, mv, !node.side_to_move);
+                    // ti.update_killers(mv, ply);
+                    // ti.update_move_history(mv, node.side_to_move, depth, &Vec::new());
+                    // ti.update_countermove(prev_mv, mv, !node.side_to_move);
                 }
                 return tt_val;
             } else if (node_type & ALL_NODE) != 0 && tt_val <= alpha {
                 return tt_val;
             }
         }
-    } else if depth >= 6 && !init_node {
+    } else if depth >= 8 && !init_node {
         // internal iterative reductions
         // First place I can find IIR comes from a thread by Rebel and ProDeo author
         // wherein they found success simply reducing the depth at unsorted subtrees
@@ -937,12 +937,12 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     // - there is an excluded move
     // - we are in check
     // - we are in a pv node search
-    let pruning_safe = !is_check && sse.excluded_move.is_null() && !is_pv && !init_node;
+    let pruning_safe = !is_check && sse.excluded_move.is_null() && !is_pv && !init_node && (ply + depth > 3);
 
     // razoring
-    if pruning_safe && depth < 3 && 2 * eval + 6000 < beta {
-        return qsearch(node, alpha, beta, thread_num);
-    }
+    // if pruning_safe && depth < 3 && (2 * eval + 6000) < beta {
+    //     return qsearch(node, alpha, beta, thread_num);
+    // }
 
     // Reverse Futility Pruning
     // AKA if our position is really really good
@@ -984,8 +984,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
         sse.searching_null_move = true;
         node.do_null_move();
-        let depth_to_search = cmp::max(1, depth - 1 - r);
-        let val = -search(node, -beta, -beta + 1, depth_to_search, ply + 1, false, thread_num);
+        let val = -search(node, -beta, -beta + 1, depth - r, ply + 1, false, thread_num);
         node.undo_null_move();
         sse.searching_null_move = false;
 
@@ -1025,7 +1024,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
         if val < target {
             sing_extend = true;
-        } else if target >= beta && pruning_safe {
+        } else if target >= beta {
             return target;
         }
     }
@@ -1073,6 +1072,34 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
         let is_tactical = is_tactical_move(&mv, node);
         let is_quiet = is_quiet_move(&mv, node);
+
+        if !is_check && (depth + ply > 3) && !init_node && best_val > -MIN_MATE_SCORE && !futile {
+            // Basic form of late move pruning
+            if depth <= 8 && moves_searched >= lmp_count(improving, depth) {
+                futile = true;
+            }
+
+            if depth < EFP_DEPTH && eval + efp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE {
+                // println!("depth {} eval {} alpha {}", depth, eval, alpha);
+                futile = true;
+            }
+
+            // if depth <= 4 && eval <= alpha && alpha < MIN_MATE_SCORE && !is_quiet && score < QUIET_OFFSET {
+            //     // negative see capture
+            //     println!("mv depth {} see {} piece {} cap {}", depth, -(QUIET_OFFSET as i32 - score as i32), mv.piece, node.get_last_capture());
+            //     node.undo_move(&mv);
+            //     break;
+            // }
+        }
+
+        if futile {
+            // found_legal_move = true;
+            if is_quiet && mv.promote_to == 0 && score < COUNTER_OFFSET {
+                // node.undo_move(&mv);
+                continue;
+            }
+        }
+
         node.do_move(&mv);
         if node.is_check(!node.side_to_move) {
             // Illegal
@@ -1080,41 +1107,13 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             continue;
         }
         let gives_check = node.is_check(node.side_to_move);
-
-        // Basic form of late move pruning
-        if best_val > -MIN_MATE_SCORE && depth <= 8 && moves_searched >= lmp_count(improving, depth) {
-            futile = true;
-        }
-
-        if is_quiet && !futile && score < COUNTER_OFFSET && best_val > -MIN_MATE_SCORE {
-            // Futuility Pruning
-            if !is_check
-                && depth < EFP_DEPTH
-                && eval + efp_margin(depth) <= alpha {
-                    futile = true;
-                }
-        }
-
-        // if depth <= 4 && eval <= alpha && alpha < MIN_MATE_SCORE && !is_quiet && score < QUIET_OFFSET {
-        //     // negative see capture
-        //     node.undo_move(&mv);
-        //     break;
-        // }
-
-        if futile {
-            found_legal_move = true;
-            if !is_tactical {
-                node.undo_move(&mv);
-                continue;
-            }
-        }
-
         found_legal_move = true;
         if is_quiet {
             searched_moves.push(mv);
         }
+        moves_searched += 1;
         let mut val = LB;
-        if moves_searched == 0 {
+        if moves_searched == 1 {
             val = -search(node, -beta, -alpha, if sing_extend {depth} else {depth - 1}, ply + 1, is_pv, thread_num);
             unsafe {
                 let child_ss = &mut SS[thread_num][(ply + 1) as usize];
@@ -1124,32 +1123,32 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         } else {
             let mut do_full_zw_search = true;
             if depth > LMR_DEPTH
-                && !init_node
+                // && !init_node
                 && moves_searched > if is_pv {3} else {2}
                 && is_quiet
                 && mv.promote_to == 0
             {
-                    do_full_zw_search = false;
-                    let mut r = lmr_reduction(depth, moves_searched);
+                do_full_zw_search = false;
+                let mut r = lmr_reduction(depth, moves_searched);
 
-                    if is_check { r -= 1; }
-                    if !improving { r += 1; }
-                    if is_pv { r -= 1; }
-                    if score >= COUNTER_OFFSET { r -= 1; }
+                if is_check { r -= 1; }
+                if !improving { r += 1; }
+                if is_pv { r -= 1; }
+                if score >= COUNTER_OFFSET { r -= 1; }
 
-                    // adjust r based on history of other quiet moves
-                    if score < COUNTER_OFFSET {
-                        let quiet_score = (score as i32) - QUIET_OFFSET as i32;
-                        r -= cmp::max(-3, cmp::min(2, quiet_score / 8000));
-                    }
+                // adjust r based on history of other quiet moves
+                if score < COUNTER_OFFSET {
+                    let quiet_score = (score as i32) - QUIET_OFFSET as i32;
+                    r -= cmp::max(-2, cmp::min(2, quiet_score / 10000));
+                }
 
-                    let lmr_depth = cmp::min(cmp::max(1, depth - r), depth - 1);
-                    val = -search(node, -alpha - 1, -alpha, lmr_depth, ply + 1, false, thread_num);
-                    if val > alpha && lmr_depth < depth - 1 {
-                        // if we raise alpha in the reduced search,
-                        // we have to see if we can raise it in the full-depth
-                        do_full_zw_search = true;
-                    }
+                let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);
+                val = -search(node, -alpha - 1, -alpha, lmr_depth, ply + 1, false, thread_num);
+                if val > alpha && lmr_depth < depth - 1 {
+                    // if we raise alpha in the reduced search,
+                    // we have to see if we can raise it in the full-depth
+                    do_full_zw_search = true;
+                }
             }
             if do_full_zw_search {
                 val = -search(node, -alpha - 1, -alpha, depth - 1, ply + 1, false, thread_num);
@@ -1166,7 +1165,6 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         node.undo_move(&mv);
         if thread_killed() { return 0; }
 
-        moves_searched += 1;
         if val > best_val {
             best_move = mv;
             best_val = val;
@@ -1229,8 +1227,23 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
     }
     ti.nodes_searched += 1;
 
-    if node.is_quiet() { return static_eval(node, &mut ti.pht); }
+    // if node.is_quiet() { return static_eval(node, &mut ti.pht); }
+    // unsafe {
+    //     let tt_entry = TT.get(node.hash);
+    //     if tt_entry.valid() {
+    //         if (tt_entry.node_type == PV_NODE) {
+    //             return tt_entry.value;
+    //         }
+    //         if (tt_entry.node_type & CUT_NODE != 0) && tt_entry.value >= beta {
+    //             return tt_entry.value;
+    //         }
+    //         if (tt_entry.node_type & ALL_NODE != 0) && tt_entry.value <= alpha {
+    //             return tt_entry.value;
+    //         }
+    //     }
+    // }
 
+    let mut raised_alpha = false;
     let mut alpha = alpha;
 
     let stand_pat = static_eval(node, &mut ti.pht);
@@ -1242,10 +1255,11 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
         if stand_pat >= beta {
             return stand_pat;
         } else if stand_pat > alpha {
+            raised_alpha = true;
             alpha = stand_pat;
         }
     }
-    if stand_pat < alpha - (taper_score(QUEEN_VALUE, phase) + 2000) && node.has_non_pawn_material() {
+    if stand_pat < alpha - (taper_score(QUEEN_VALUE, phase) + 2000) {
         return stand_pat;
     }
 
@@ -1281,18 +1295,9 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
             }
         }
 
-        if score <= OK_CAPTURE_OFFSET {
-            // see if this is a viable capture
-            let cap_piece = node.get_last_capture();
-            if cap_piece != 0 {
-                node.undo_move(&mv);
-                let see_score = see(node, mv.end, cap_piece, mv.start, mv.piece);
-                if see_score <= cmp::max(0, alpha - stand_pat) {
-                    continue;
-                } else {
-                    node.do_move(&mv);
-                }
-            }
+        if score < QUIET_OFFSET && mv.promote_to == 0 {
+            node.undo_move(&mv);
+            continue;
         }
         let val = -qsearch(node, -beta, -alpha, thread_num);
         node.undo_move(&mv);
@@ -1300,12 +1305,16 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
             best_val = val;
         }
         if val > alpha {
+            raised_alpha = true;
             alpha = val;
         }
         if val >= beta {
             break;
         }
     }
+
+    // let node_type = if best_val >= beta {CUT_NODE} else {if raised_alpha {PV_NODE} else {ALL_NODE}};
+    // unsafe { TT.set(node.hash, Move::null_move(), best_val, node_type, 0, 0); }
 
     return best_val;
 }

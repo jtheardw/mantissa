@@ -456,7 +456,7 @@ fn tuning_qsearch(node: &mut Bitboard, alpha: i32, beta: i32) -> (i32, Bitboard)
     let mut movepicker = MovePicker::q_new();
     loop {
         let (mv, score) = movepicker.next(node);
-        if mv.is_null {
+        if mv.is_null() {
             break;
         }
 
@@ -684,7 +684,7 @@ pub fn get_position_vector(fname: &str) -> Vec<(Bitboard, f64)> {
         if num_bytes == 0 { break; }
         if buf.len() > 0 {
             // fen winner
-            if idx < 10000000 {
+            if idx % 4 != 0 {
                 idx += 1;
                 buf.clear();
                 continue;
