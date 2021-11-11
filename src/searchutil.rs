@@ -9,7 +9,7 @@ use crate::util::*;
 pub const EFP_DEPTH: i32 = 8;         // extended futility pruning
 pub const FP_DEPTH: i32 = 5;
 pub const RFP_DEPTH: i32 = 8;         // reverse futility pruning
-pub const AFP_DEPTH: i32 = 8;         // reverse futility pruning
+pub const AFP_DEPTH: i32 = 5;         // reverse futility pruning
 pub const NMP_DEPTH: i32 = 3;         // null-move pruning/reductions
 pub const LMR_DEPTH: i32 = 2;         // late move reductions
 
@@ -144,6 +144,7 @@ pub struct ThreadInfo {
     pub countermove_table: [[Move; 64]; 12],
     pub followup_history: Vec<[[[i32; 64]; 12]; 64]>,
     pub pht: PHT,
+    pub root_moves: Vec<Move>
 }
 
 impl ThreadInfo {
@@ -162,7 +163,8 @@ impl ThreadInfo {
             capture_history: capture_history,
             countermove_table: countermove_table,
             followup_history: followup_history,
-            pht: pht
+            pht: pht,
+            root_moves: Vec::new()
         }
     }
 
@@ -175,6 +177,7 @@ self.move_history = [[0; 64]; 12];
         self.capture_history = [[[0; 6]; 64]; 12];
         self.countermove_table = [[Move::null_move(); 64]; 12];
         self.followup_history = vec![[[[0; 64]; 12]; 64]; 12];
+        self.root_moves = Vec::new();
     }
 
     pub fn update_move_history(&mut self, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
