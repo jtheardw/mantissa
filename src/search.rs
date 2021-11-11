@@ -1084,10 +1084,10 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 futile = true;
             }
 
-            // if depth <= 4 && eval <= alpha && alpha < MIN_MATE_SCORE && !is_quiet && score < QUIET_OFFSET {
+            // if depth <= 4 && eval <= alpha && alpha < MIN_MATE_SCORE && !is_quiet && mv.promote_to == 0 && score < QUIET_OFFSET {
             //     // negative see capture
-            //     println!("mv depth {} see {} piece {} cap {}", depth, -(QUIET_OFFSET as i32 - score as i32), mv.piece, node.get_last_capture());
-            //     node.undo_move(&mv);
+            //     // println!("mv depth {} see {} piece {} cap {}", depth, -(QUIET_OFFSET as i32 - score as i32), mv.piece, node.get_last_capture());
+            //     // node.undo_move(&mv);
             //     break;
             // }
         }
@@ -1126,7 +1126,6 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 // && !init_node
                 && moves_searched > if is_pv {3} else {2}
                 && is_quiet
-                && mv.promote_to == 0
             {
                 do_full_zw_search = false;
                 let mut r = lmr_reduction(depth, moves_searched);
@@ -1139,7 +1138,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 // adjust r based on history of other quiet moves
                 if score < COUNTER_OFFSET {
                     let quiet_score = (score as i32) - QUIET_OFFSET as i32;
-                    r -= cmp::max(-2, cmp::min(2, quiet_score / 10000));
+                    r -= cmp::max(-2, cmp::min(2, quiet_score / 7000));
                 }
 
                 let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);

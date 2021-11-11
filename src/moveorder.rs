@@ -128,7 +128,7 @@ impl MovePicker {
             if mv == self.tt_move {
                 continue;
             }
-            if captured == 0 {
+            if captured == 0 && mv.promote_to == 0 {
                 // not a capture
                 if mv == self.killers[0] || mv == self.killers[1] {
                     // mv_score = KILLER_OFFSET;
@@ -143,7 +143,7 @@ impl MovePicker {
                     // mv_score = QUIET_OFFSET + (self.history[piece_num][mv.end as usize] + self.followup[piece_num][mv.end as usize]) as u64;
                     mv_score = QUIET_OFFSET + self.history[piece_num][mv.end as usize] as u64;
                 }
-            } else {
+            } else if mv.promote_to == 0 {
                 let score = see(pos, mv.end, captured, mv.start, mv.piece);
                 if score >= 0 {
                     let victim_val = match captured {
@@ -175,6 +175,15 @@ impl MovePicker {
                 } else {
                     mv_score = QUIET_OFFSET - cmp::min(score.abs() as u64, QUIET_OFFSET);
                 }
+            } else {
+                let score = match mv.promote_to {
+                    b'n' => 3000,
+                    b'b' => 3000,
+                    b'r' => 5000,
+                    b'q' => 9000,
+                    _ => panic!("wat. Bad promotion")
+                };
+                mv_score = OK_CAPTURE_OFFSET + score;
             }
             scored_moves.push((mv, mv_score));
         }
