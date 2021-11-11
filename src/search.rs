@@ -887,20 +887,22 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         depth += 1
     }
 
-    unsafe {
-        let tt_entry = TT.get(node.hash);
-        if tt_entry.valid() {
-            sse.tt_hit = true;
-            sse.tt_move = tt_entry.mv;
-            sse.tt_val = TTEntry::read_tt_score(tt_entry.value, ply);
-            sse.tt_depth = tt_entry.depth as i32;
-            sse.tt_node_type = tt_entry.node_type;
-        } else {
-            sse.tt_hit = false;
-            sse.tt_move = Move::null_move();
-            sse.tt_val = 0;
-            sse.tt_depth = 0;
-            sse.tt_node_type = PV_NODE;
+    if sse.excluded_move.is_null() {
+        unsafe {
+            let tt_entry = TT.get(node.hash);
+            if tt_entry.valid() {
+                sse.tt_hit = true;
+                sse.tt_move = tt_entry.mv;
+                sse.tt_val = TTEntry::read_tt_score(tt_entry.value, ply);
+                sse.tt_depth = tt_entry.depth as i32;
+                sse.tt_node_type = tt_entry.node_type;
+            } else {
+                sse.tt_hit = false;
+                sse.tt_move = Move::null_move();
+                sse.tt_val = 0;
+                sse.tt_depth = 0;
+                sse.tt_node_type = PV_NODE;
+            }
         }
     }
     if sse.tt_hit {
@@ -908,20 +910,20 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             let node_type = sse.tt_node_type;
             let tt_val = sse.tt_val;
             if (node_type & CUT_NODE) != 0 && tt_val >= beta {
-                let mv = sse.tt_move;
-                if is_quiet_move(&mv, node) {
-                    // we still want to update our heuristic counters
-                    // here.
-                    // let prev_mv = if !init_node {
-                    //     ss[(ply - 1) as usize].current_move
-                    // } else {
-                    //     Move::null_move()
-                    // };
+                // let mv = sse.tt_move;
+                // if is_quiet_move(&mv, node) {
+                //     // we still want to update our heuristic counters
+                //     // here.
+                //     // let prev_mv = if !init_node {
+                //     //     ss[(ply - 1) as usize].current_move
+                //     // } else {
+                //     //     Move::null_move()
+                //     // };
 
-                    // ti.update_killers(mv, ply);
-                    // ti.update_move_history(mv, node.side_to_move, depth, &Vec::new());
-                    // ti.update_countermove(prev_mv, mv, !node.side_to_move);
-                }
+                //     // ti.update_killers(mv, ply);
+                //     // ti.update_move_history(mv, node.side_to_move, depth, &Vec::new());
+                //     // ti.update_countermove(prev_mv, mv, !node.side_to_move);
+                // }
                 return tt_val;
             } else if (node_type & ALL_NODE) != 0 && tt_val <= alpha {
                 return tt_val;
@@ -936,7 +938,14 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         depth -= 1;
     }
 
-    sse.static_eval = static_eval(node, &mut ti.pht);
+    if is_check {
+        // We won't do any pruning based on static eval here
+        // so this is for the improving flag.  Set the eval prohibitively high
+        // so the improving flag for subsequent move is false
+        sse.static_eval = MATE_SCORE + 1;
+    } else if sse.excluded_move.is_null() {
+        sse.static_eval = static_eval(node, &mut ti.pht);
+    }
     let eval = sse.static_eval;
 
     // is our position getting better than it was a move ago?
@@ -983,11 +992,12 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     // and we don't want to pollute our singular move search
     if pruning_safe
         && depth >= NMP_DEPTH
-        && sse.static_eval >= beta
+        && eval >= beta
         && !ss[(ply - 1) as usize].searching_null_move
+        && (ply < 2 || !ss[(ply - 2) as usize].searching_null_move)
         && node.has_non_pawn_material()
     {
-        let r = null_move_r(sse.static_eval, beta, depth);
+        let r = null_move_r(eval, beta, depth);
 
         sse.searching_null_move = true;
         node.do_null_move();
@@ -1124,7 +1134,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             node.undo_move(&mv);
             continue;
         }
-        let gives_check = node.is_check(node.side_to_move);
+
         found_legal_move = true;
         if is_quiet {
             searched_moves.push(mv);
@@ -1157,7 +1167,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 if score < COUNTER_OFFSET {
                     // let quiet_score = (score as i32) - QUIET_OFFSET as i32;
                     let hist = ti.move_history[get_piece_num(mv.piece, !node.side_to_move)][mv.end as usize];
-                    r -= cmp::max(-2, cmp::min(2, hist / 7000));
+                    r -= cmp::max(-2, cmp::min(2, hist / 4500));
                 }
 
                 let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);
@@ -1229,7 +1239,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             }
         } else {
             // futility pruning weirdness?
-            return sse.static_eval;
+            return alpha;
         }
     }
 
