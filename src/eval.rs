@@ -247,21 +247,19 @@ pub fn pawn_structure_value(pos: &Bitboard) -> Score {
             // enemy pawns preventing this pawn from being considered passed
             let stoppers = their_pawns & unsafe{PASSED_PAWN_MASKS[me][idx as usize]};
             // pawns that attack this pawn
-            let threats = their_pawns & unsafe{pawn_attacks(this_pawn, side)};
+            let threats = their_pawns & pawn_attacks(this_pawn, side);
             // pawns that defend this pawn
-            let support = my_pawns & unsafe{pawn_attacks(this_pawn, !side)};
+            let support = my_pawns & pawn_attacks(this_pawn, !side);
             // pawns that attack the stop square of this pawn
-            let push_threats = their_pawns & unsafe{pawn_attacks(this_pawn_pushed, side)};
+            let push_threats = their_pawns & pawn_attacks(this_pawn_pushed, side);
             // pawns that would defend this pawn if it pushed
-            let push_support = my_pawns & unsafe{pawn_attacks(this_pawn_pushed, !side)};
+            let push_support = my_pawns & pawn_attacks(this_pawn_pushed, !side);
             // pawns that are stoppers which aren't one of the immediate threats
             let leftover_stoppers = stoppers & !(threats | push_threats);
             // friendly pawns in front of this pawn
             let own_blockers = my_pawns & unsafe{FILE_MASKS[f] & AHEAD_RANK_MASKS[me][r]};
             // enemy pawns in front of this pawn
             let enemy_blockers = their_pawns & unsafe{FILE_MASKS[f] & AHEAD_RANK_MASKS[me][r]};
-            // neighbors to the immediate left and right
-            let phalanx_pawns = my_pawns & unsafe{RANK_MASKS[r] & ADJACENT_FILE_MASKS[f]};
 
 
             // passed pawns
@@ -287,14 +285,14 @@ pub fn pawn_structure_value(pos: &Bitboard) -> Score {
             }
 
             // backwards pawns
-            if push_threats != 0 && backup == 0 {
+            if push_threats != 0 && backup == 0 && push_support == 0 {
                 pawn_score[me] += BACKWARDS_PAWN_VALUE;
             }
 
             // connected pawns
             // Specific implementation here from the SF evaluation guid
             let supported_count = support.count_ones() as i32;
-            let phalanx = if phalanx_pawns != 0 {1} else {0};
+            let phalanx = if push_support != 0 {1} else {0};
             let opposed = if enemy_blockers != 0 {1} else {0};
 
             if supported_count != 0 || phalanx != 0 {

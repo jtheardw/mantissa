@@ -68,6 +68,6 @@ unsafe fn king_ring_mask_init() {
             king_virt_idx *= 2;
         }
 
-        KING_RING_MASKS[i] == KING_MASK[king_virt_idx];
+        KING_RING_MASKS[i] = KING_MASK[king_virt_idx];
     }
 }

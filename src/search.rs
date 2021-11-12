@@ -1167,7 +1167,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 if score < COUNTER_OFFSET {
                     // let quiet_score = (score as i32) - QUIET_OFFSET as i32;
                     let hist = ti.move_history[get_piece_num(mv.piece, !node.side_to_move)][mv.end as usize];
-                    r -= cmp::max(-2, cmp::min(2, hist / 4500));
+                    r -= cmp::max(-2, cmp::min(2, hist / 5000));
                 }
 
                 let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);
