@@ -1,4 +1,5 @@
 use crate::bitboard::*;
+use crate::evalutil::*;
 use crate::movegen::*;
 use crate::pht::*;
 use crate::psqt::*;
@@ -81,6 +82,11 @@ pub const PASSED_PAWN_VALUE: [Score; 8] = [
     S!(  0,   0), S!( 45,  179), S!(   0,  239), S!(0, 511),
     S!(234, 794), S!(388, 1465), S!(1316, 1732), S!(0,   0)
 ];
+
+pub const CANDIDATE_PASSED_PAWN_VALUE: [Score; 8] = [
+    S!(  0,   0), S!( 10,  40), S!(   0,  50), S!(0, 100),
+    S!(50, 170), S!(80, 300), S!(100, 400), S!(0,   0)
+];
 pub const CENTER_PAWN_VALUE: Score = S!(84, 0);
 pub const ISOLATED_PAWN_VALUE: Score = S!(-53, -67);
 pub const DOUBLED_PAWN_VALUE: Score = S!(-64, -284);
@@ -113,7 +119,7 @@ pub fn evaluate_position(pos: &Bitboard, pht: &mut PHT) -> i32 {
     let mut score: Score = make_score(0, 0);
     score += material_score(pos);
     score += mobility_and_king_danger(pos);
-    score += pawn_structure_value(pos, pht);
+    score += pawn_value(pos, pht);
     score += double_bishop_bonus(pos);
     score += bishop_color_value(pos);
     score += rook_on_seventh_value(pos);
@@ -205,6 +211,103 @@ fn pawn_attacks(pawn_bb: u64, side_to_move: Color) -> u64 {
     } else {
         ((pawn_bb & !FILE_MASKS[0]) >> 9) | ((pawn_bb & !FILE_MASKS[7]) >> 7)
     }
+}
+
+pub fn pawn_structure_value(pos: &Bitboard) -> Score {
+    let white = Color::White;
+    let black = Color::Black;
+    let mut pawn_score: [Score; 2] = [0, 0];
+
+    for side in [white, black] {
+        let me = side as usize;
+        let them = !side as usize;
+        let forward = if side == Color::White {8} else {-8};
+
+        let my_pawns = pos.pawn[me];
+        let their_pawns = pos.pawn[them];
+
+        let mut pawn_bb = my_pawns;
+
+        while pawn_bb != 0 {
+            let idx = pawn_bb.trailing_zeros() as i8;
+            let this_pawn = idx_to_bb(idx);
+            let this_pawn_pushed = idx_to_bb(idx + forward);
+            let r = (idx / 8) as usize;
+            let f = (idx % 8) as usize;
+
+            let score_r = if side == Color::White {r} else {7-r};
+
+            // This particular organization of bb's I learned from Ethereal
+            // I'll try to give explanations to the importance of each though
+
+            // friendly pawns on adjacent files
+            let neighbors = my_pawns & unsafe{ADJACENT_FILE_MASKS[f]};
+            // friendly pawns that could conceivably walk up to aid in this pawn's advance
+            let backup = my_pawns & unsafe{PASSED_PAWN_MASKS[them][idx as usize]};
+            // enemy pawns preventing this pawn from being considered passed
+            let stoppers = their_pawns & unsafe{PASSED_PAWN_MASKS[me][idx as usize]};
+            // pawns that attack this pawn
+            let threats = their_pawns & unsafe{pawn_attacks(this_pawn, side)};
+            // pawns that defend this pawn
+            let support = my_pawns & unsafe{pawn_attacks(this_pawn, !side)};
+            // pawns that attack the stop square of this pawn
+            let push_threats = their_pawns & unsafe{pawn_attacks(this_pawn_pushed, side)};
+            // pawns that would defend this pawn if it pushed
+            let push_support = my_pawns & unsafe{pawn_attacks(this_pawn_pushed, !side)};
+            // pawns that are stoppers which aren't one of the immediate threats
+            let leftover_stoppers = stoppers & !(threats | push_threats);
+            // friendly pawns in front of this pawn
+            let own_blockers = my_pawns & unsafe{FILE_MASKS[f] & AHEAD_RANK_MASKS[me][r]};
+            // enemy pawns in front of this pawn
+            let enemy_blockers = their_pawns & unsafe{FILE_MASKS[f] & AHEAD_RANK_MASKS[me][r]};
+            // neighbors to the immediate left and right
+            let phalanx_pawns = my_pawns & unsafe{RANK_MASKS[r] & ADJACENT_FILE_MASKS[f]};
+
+
+            // passed pawns
+            if stoppers == 0 { pawn_score[me] += PASSED_PAWN_VALUE[score_r];}
+
+            // candidate passed pawns
+            // we do a brief calculation to see if we have enough supporters
+            // to push by any final, immediate threats
+            else if leftover_stoppers == 0 && push_support.count_ones() >= push_threats.count_ones() {
+                if support.count_ones() >= threats.count_ones() {
+                    pawn_score[me] += CANDIDATE_PASSED_PAWN_VALUE[score_r];
+                }
+            }
+
+            // Isolated pawns
+            if neighbors == 0 && threats == 0 {
+                pawn_score[me] += ISOLATED_PAWN_VALUE;
+            }
+
+            // doubled pawns
+            if own_blockers != 0 {
+                pawn_score[me] += DOUBLED_PAWN_VALUE;
+            }
+
+            // backwards pawns
+            if push_threats != 0 && backup == 0 {
+                pawn_score[me] += BACKWARDS_PAWN_VALUE;
+            }
+
+            // connected pawns
+            // Specific implementation here from the SF evaluation guid
+            let supported_count = support.count_ones() as i32;
+            let phalanx = if phalanx_pawns != 0 {1} else {0};
+            let opposed = if enemy_blockers != 0 {1} else {0};
+
+            if supported_count != 0 || phalanx != 0 {
+                pawn_score[me] += ADVANCED_PAWN_VALUE[score_r] * (2 + phalanx - opposed) as i64;
+                pawn_score[me] += SUPPORTED_PAWN_BONUS * supported_count as i64;
+            }
+
+            // pop off this pawn
+            pawn_bb &= pawn_bb - 1;
+        }
+    }
+
+    return pawn_score[1] - pawn_score[0];
 }
 
 fn mobility_and_king_danger(pos: &Bitboard) -> Score {
@@ -329,7 +432,7 @@ pub fn print_value(pos: &Bitboard) {
     println!("psqt: {}", taper_score(nonpawn_psqt_value(pos) + pawn_psqt_value(pos), pos.get_phase()));
 }
 
-fn pawn_structure_value(pos: &Bitboard, pht: &mut PHT) -> Score {
+fn pawn_value(pos: &Bitboard, pht: &mut PHT) -> Score {
     // let pht;
     // unsafe {
     //     pht = &mut PHT;
@@ -339,13 +442,14 @@ fn pawn_structure_value(pos: &Bitboard, pht: &mut PHT) -> Score {
     if pht_entry.valid {
         val = pht_entry.value;
     } else {
-        val += passed_pawns_value(pos);
+        // val += passed_pawns_value(pos);
         val += center_pawns_value(pos);
-        val += isolated_pawns_value(pos);
-        val += doubled_pawns_value(pos);
-        val += backwards_pawns_value(pos);
-        val += connected_pawns_value(pos);
-        val += space_control_value(pos);
+        // val += isolated_pawns_value(pos);
+        // val += doubled_pawns_value(pos);
+        // val += backwards_pawns_value(pos);
+        // val += connected_pawns_value(pos);
+        // val += space_control_value(pos);
+        val += pawn_structure_value(pos);
         val += pawn_psqt_value(pos);
         pht.set(pos.pawn_hash, val);
     }
