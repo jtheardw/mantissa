@@ -30,17 +30,6 @@ fn age_threshold(old_depth: i8, new_depth: i8) -> i32 {
     return ((old_depth - new_depth) as i32) << 4;
 }
 
-// #[derive(Copy, Clone)]
-// pub struct TTEntry {
-//     pub hash: u64,
-//     pub mv: Move,
-//     pub node_type: u8,
-//     pub depth: i32,
-//     pub value: i32,
-//     pub ply: i32,
-//     pub valid: bool
-// } // 8 + 16 + 1 + 4 + 4 + 4 + 1 = 38 bytes
-
 #[derive(Copy, Clone)]
 pub struct TTEntry {
     pub hash: u64,

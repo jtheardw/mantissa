@@ -1,3 +1,5 @@
+use std::cmp;
+
 use crate::bitboard::*;
 use crate::evalutil::*;
 use crate::movegen::*;
@@ -38,75 +40,78 @@ macro_rules! S {
     }
 }
 
-pub const QUEEN_VALUE: Score = S!(10947, 16706);
-pub const ROOK_VALUE: Score = S!(4865, 8652);
-pub const BISHOP_VALUE: Score = S!(3523, 5211);
-pub const KNIGHT_VALUE: Score = S!(3466, 4880);
-pub const PAWN_VALUE: Score = S!(800, 1414);
+pub const QUEEN_VALUE: Score = S!(10949, 16252);
+pub const ROOK_VALUE: Score = S!(4919, 8583);
+pub const BISHOP_VALUE: Score = S!(3523, 5315);
+pub const KNIGHT_VALUE: Score = S!(3466, 4834);
+pub const PAWN_VALUE: Score = S!(841, 1440);
 
-pub const KNIGHT_MOBILITY: [Score; 9] = [
-    S!(-275, 21), S!(-36,  10), S!(145, 148), S!(132, 528),
-    S!(191, 535), S!(183, 563), S!(223, 551), S!(295, 453),
-    S!(297, 333)
+pub const KNIGHT_MOBILITY: [Score; 9] = [S!(-507, 133), S!(-112, 2), S!(-5, 326), S!(151, 520), S!(224, 528), S!(226, 538), S!(272, 528), S!(320, 427), S!(313, 359)];
+pub const BISHOP_MOBILITY: [Score; 14] = [S!(-108, 52), S!(-26, -198), S!(275, -808), S!(271, -251), S!(448, -61), S!(440, 190), S!(474, 373), S!(571, 478), S!(559, 590), S!(553, 661), S!(551, 686), S!(567, 627), S!(449, 664), S!(1135, 336)];
+pub const ROOK_MOBILITY: [Score; 15] = [S!(147, -2), S!(519, 255), S!(-154, -376), S!(-54, -73), S!(-33, 177), S!(9, 446), S!(-23, 627), S!(-24, 788), S!(19, 832), S!(60, 903), S!(113, 962), S!(170, 988), S!(262, 968), S!(288, 975), S!(541, 780)];
+pub const QUEEN_MOBILITY: [Score; 28] = [S!(30, -158), S!(-204, 340), S!(-361, -96), S!(-231, -84), S!(6, -217), S!(89, -183), S!(87, 4), S!(145, -33), S!(193, -169), S!(191, 100), S!(225, 231), S!(222, 436), S!(239, 594), S!(239, 705), S!(299, 673), S!(260, 780), S!(284, 868), S!(265, 904), S!(223, 929), S!(257, 874), S!(159, 981), S!(260, 741), S!(224, 792), S!(-71, 938), S!(46, 830), S!(320, 565), S!(84, 759), S!(208, 699)];
+pub const KNIGHT_OUTPOST_VALUE: Score = S!(318, 334);
+pub const BISHOP_OUTPOST_VALUE: Score = S!(374, 73);
+pub const BISHOP_LONG_DIAGONAL_VALUE: Score = S!(118, 120);
+
+pub const PAWN_PROXIMITY_VALUE: [Score; 8] = [S!(110, 130), S!(-61, -71), S!(-124, 136), S!(-35, -10), S!(-44, -17), S!(59, -5), S!(-74, -270), S!(30, -15)];
+pub const PAWN_SHELTER_VALUE: [[Score; 8]; 2] = [
+    [S!(240, 25), S!(88, -11), S!(0, 57), S!(-120, -61), S!(-6, -251), S!(-13, -328), S!(-41, -70), S!(-268, 31)],
+    [S!(-48, -119), S!(188, 31), S!(155, 34), S!(25, -55), S!(-80, -37), S!(19, -242), S!(-334, -176), S!(-266, 29)]
 ];
-pub const BISHOP_MOBILITY: [Score; 14] = [
-    S!(-139,  115), S!( 227, -209), S!(288, -843), S!(259, -339),
-    S!( 374, -108), S!( 364,   96), S!(472,  310), S!(559,  389),
-    S!( 572,  558), S!( 580,  634), S!(552,  682), S!(579,  621),
-    S!( 440,  651), S!(1141,  511)
-];
-pub const ROOK_MOBILITY: [Score; 15] = [
-    S!( 66,  -86), S!( 55,  97), S!(-221, -254), S!(-78,  -74),
-    S!(-20,  301), S!( 13, 468), S!(  15,  756), S!( -4,  833),
-    S!( -8,  901), S!( 66, 935), S!( 139,  967), S!(190, 1001),
-    S!(277, 1005), S!(335, 969), S!( 569,  767)
-];
-pub const QUEEN_MOBILITY: [Score; 28] = [
-    S!( 42,  -24), S!( 41, 121), S!(-241,   81), S!(-42,  76),
-    S!( -3,  134), S!(302, -76), S!( -45,  -89), S!( 92,  47),
-    S!(123, -119), S!(151,  64), S!( 227,  178), S!(184, 423),
-    S!(244,  500), S!(249, 627), S!( 269,  800), S!(224, 883),
-    S!(250,  910), S!(282, 801), S!( 234,  970), S!(334, 811),
-    S!(191,  961), S!(200, 912), S!( 192,  935), S!( 71, 822),
-    S!(235,  994), S!(443, 631), S!( 278, 1125), S!(448, 955)
+pub const PAWN_STORM_VALUE: [[Score; 8]; 2] = [
+    [S!(516, 602), S!(871, 555), S!(-341, 140), S!(-154, -12), S!(6, -55), S!(43, -94), S!(-5, -66), S!(-17, -107)],
+    [S!(2, -70), S!(16, 22), S!(-398, -195), S!(43, -190), S!(92, -110), S!(8, -154), S!(104, 142), S!(-55, -235)]
 ];
 
-pub const QUEEN_KING_DANGER: [i32; 8] = [66, 216, 464, 824, 983, 647, 753, 910];
-pub const ROOK_KING_DANGER: [i32; 8] = [19, 35, 98, 177, 362, 502, 400, 293];
-pub const BISHOP_KING_DANGER: [i32; 8] = [0, 60, 41, 87, 55, 181, 124, 176];
-pub const KNIGHT_KING_DANGER: [i32; 8] = [25, 0, 48, 103, 517, 115, 427, 154];
+pub const QUEEN_KING_DANGER: [Score; 6] = [
+    S!(0, 0), S!(95, 1), S!(314, 64), S!(662, 152), S!(938, 1005), S!(473, 563)
+];
+pub const ROOK_KING_DANGER: [Score; 6] = [
+    S!(0, 0), S!(4, 113), S!(167, 48), S!(184, 147), S!(336, 211), S!(652, 668)
+];
+pub const BISHOP_KING_DANGER: [Score; 6] = [
+    S!(0, 0), S!(51, 301), S!(207, 88), S!(235, 34), S!(114, 71), S!(171, 1)
+];
+pub const KNIGHT_KING_DANGER: [Score; 6] = [
+    S!(0, 0), S!(1, 392), S!(178, 81), S!(332, 1), S!(62, 321), S!(22, 151)
+];
+pub const NO_QUEEN_ATTACK_VALUE: Score = S!(-276, -462);
+pub const WEAK_SQUARE_VALUE: Score = S!(0, 0);
+pub const QUEEN_CHECK_VALUE: Score = S!(241, 256);
+pub const ROOK_CHECK_VALUE: Score = S!(436, 112);
+pub const BISHOP_CHECK_VALUE: Score = S!(118, 131);
+pub const KNIGHT_CHECK_VALUE: Score = S!(1000, 21);
 
-pub const DOUBLE_BISHOP_BONUS: Score = S!(109, 972);
+pub const DOUBLE_BISHOP_BONUS: Score = S!(149, 978);
 
 pub const PASSED_PAWN_VALUE: [Score; 8] = [
-    S!(  0,   0), S!( 45,  179), S!(   0,  239), S!(0, 511),
-    S!(234, 794), S!(388, 1465), S!(1316, 1732), S!(0,   0)
+    S!(  0,   0), S!(0, 188), S!(0, 214), S!(0, 537), S!(260, 823), S!(661, 1261), S!(663, 1188), S!(0,   0)
 ];
 
 pub const CANDIDATE_PASSED_PAWN_VALUE: [Score; 8] = [
-    S!(  0,   0), S!( 10,  40), S!(   0,  50), S!(0, 100),
-    S!(50, 170), S!(80, 300), S!(100, 400), S!(0,   0)
+    S!(  0,   0),S!(0, 0), S!(0, 0), S!(0, 191), S!(410, 506), S!(315, 604), S!(175, 245), S!(0,   0)
 ];
-pub const CENTER_PAWN_VALUE: Score = S!(84, 0);
-pub const ISOLATED_PAWN_VALUE: Score = S!(-53, -67);
-pub const DOUBLED_PAWN_VALUE: Score = S!(-64, -284);
-pub const BACKWARDS_PAWN_VALUE: Score = S!(-61, -19);
+pub const CENTER_PAWN_VALUE: Score = S!(0, 1);
+pub const ISOLATED_PAWN_VALUE: Score = S!(-33, -80);
+pub const DOUBLED_PAWN_VALUE: Score = S!(0, -252);
+pub const BACKWARDS_PAWN_VALUE: Score = S!(-45, -62);
 pub const ADVANCED_PAWN_VALUE: [Score; 8] = [
-    S!( 0,   0), S!( 32,  16), S!( 63,  54), S!(68, 82),
-    S!(97, 201), S!(360, 244), S!(289, 500), S!( 0,  0)
+    S!( 0,   0), S!(25, 0), S!(63, 43), S!(68, 69), S!(104, 156), S!(353, 302), S!(478, 414), S!( 0,  0)
 ];
-pub const SUPPORTED_PAWN_BONUS: Score = S!(158, 65);
-pub const SPACE_VALUE: Score = S!(16, 5);
+pub const SUPPORTED_PAWN_BONUS: Score = S!(137, 64);
+pub const SPACE_VALUE: Score = S!(16, 0);
 
-pub const BISHOP_COLOR: Score = S!(-50, -30);
+pub const BISHOP_COLOR: Score = S!(-33, -111);
 
 pub const TEMPO_BONUS: Score = S!(130, 130);
 
-pub const ROOK_ON_SEVENTH: Score = S!(0, 24);
-pub const ROOK_ON_OPEN: Score = S!(124, 95);
+pub const ROOK_ON_SEVENTH: Score = S!(0, 74);
+pub const ROOK_ON_OPEN: Score = S!(118, 90);
 
 pub fn static_eval(pos: &Bitboard, pht: &mut PHT) -> i32 {
     let score = evaluate_position(pos, pht);
+    // println!("static score {}", score);
     return if pos.side_to_move == Color::White {score} else {-score};
 }
 
@@ -125,6 +130,8 @@ pub fn evaluate_position(pos: &Bitboard, pht: &mut PHT) -> i32 {
     score += rook_on_seventh_value(pos);
     score += rook_on_open_value(pos);
     score += nonpawn_psqt_value(pos);
+    score += outpost_value(pos);
+    score += king_pawns_value(pos);
     score += if pos.side_to_move == Color::White {TEMPO_BONUS} else {-TEMPO_BONUS};
     return halfmove_scale(taper_score(score, pos.get_phase()), pos);
 }
@@ -232,9 +239,9 @@ pub fn pawn_structure_value(pos: &Bitboard) -> Score {
             let idx = pawn_bb.trailing_zeros() as i8;
             let this_pawn = idx_to_bb(idx);
             let this_pawn_pushed = idx_to_bb(idx + forward);
+
             let r = (idx / 8) as usize;
             let f = (idx % 8) as usize;
-
             let score_r = if side == Color::White {r} else {7-r};
 
             // This particular organization of bb's I learned from Ethereal
@@ -267,7 +274,8 @@ pub fn pawn_structure_value(pos: &Bitboard) -> Score {
 
             // candidate passed pawns
             // we do a brief calculation to see if we have enough supporters
-            // to push by any final, immediate threats
+            // to push by any final, immediate threats by trading off all
+            // supporters and threateners and seeing if we come out on top.
             else if leftover_stoppers == 0 && push_support.count_ones() >= push_threats.count_ones() {
                 if support.count_ones() >= threats.count_ones() {
                     pawn_score[me] += CANDIDATE_PASSED_PAWN_VALUE[score_r];
@@ -290,7 +298,7 @@ pub fn pawn_structure_value(pos: &Bitboard) -> Score {
             }
 
             // connected pawns
-            // Specific implementation here from the SF evaluation guid
+            // Specific implementation here from the SF evaluation guide
             let supported_count = support.count_ones() as i32;
             let phalanx = if push_support != 0 {1} else {0};
             let opposed = if enemy_blockers != 0 {1} else {0};
@@ -308,12 +316,151 @@ pub fn pawn_structure_value(pos: &Bitboard) -> Score {
     return pawn_score[1] - pawn_score[0];
 }
 
+fn is_outpost(pos: &Bitboard, idx: i8, side: Color) -> bool {
+    let bounds = if side == Color::White {(4, 6)} else {(1, 3)};
+    let r = idx / 8;
+    let f = idx % 8;
+    if r < bounds.0 || r > bounds.1 { return false; }
+
+    let enemy_pawns = pos.pawn[(!side) as usize];
+    let my_pawns = pos.pawn[side as usize];
+    let support = my_pawns & pawn_attacks(idx_to_bb(idx), !side);
+    if support == 0 { return false; }
+
+    let atk_span = unsafe{ADJACENT_FILE_MASKS[f as usize] & AHEAD_RANK_MASKS[side as usize][r as usize]};
+    return (atk_span & enemy_pawns) == 0;
+}
+
+fn outpost_value(pos: &Bitboard) -> Score {
+    let mut outpost = [0, 0];
+    for side in [Color::White, Color::Black] {
+        let me = side as usize;
+
+        let mut bishop_bb = pos.bishop[me];
+        let mut knight_bb = pos.knight[me];
+
+        while bishop_bb != 0 {
+            let idx = bishop_bb.trailing_zeros() as i8;
+            if is_outpost(pos, idx, side) {
+                // println!("bishop outpost at {}", idx_to_str(idx));
+                outpost[me] += BISHOP_OUTPOST_VALUE;
+            }
+
+            // pop bishop
+            bishop_bb &= bishop_bb - 1;
+        }
+
+        while knight_bb != 0 {
+            let idx = knight_bb.trailing_zeros() as i8;
+            if is_outpost(pos, idx, side) {
+                // println!("knight outpost at {}", idx_to_str(idx));
+                outpost[me] += KNIGHT_OUTPOST_VALUE;
+            }
+
+            // pop knight
+            knight_bb &= knight_bb - 1;
+        }
+    }
+    return outpost[1] - outpost[0];
+}
+
+fn king_pawns_value(pos: &Bitboard) -> Score {
+    // credit to SF Evaluation Guide
+    // and Ethereal Source
+    let mut pawn_proximity: [Score; 2] = [0, 0];
+    let mut pawn_shelter: [Score; 2] = [0, 0];
+    let mut pawn_storm: [Score; 2] = [0, 0];
+
+    for side in [Color::White, Color::Black] {
+        let me = side as usize;
+        let them = !side as usize;
+        let king_idx = pos.king[me].trailing_zeros() as i8;
+        let king_rank = king_idx / 8;
+        let king_file = king_idx % 8;
+
+        // first find the nearest file-wise pawn
+        let pawns = pos.pawn[me] | pos.pawn[them];
+        if pawns != 0 {
+            let mut pawn_distance = 0;
+            for i in 0..7 {
+                let mut mask = 0;
+                if king_file - i >= 0 {
+                    mask |= unsafe{FILE_MASKS[(king_file - i) as usize]};
+                }
+                if king_file + i < 8 {
+                    mask |= unsafe{FILE_MASKS[(king_file + i) as usize]};
+                }
+                if mask & pawns != 0 {
+                    pawn_distance = i as usize;
+                    // println!("pawn distance for side {} is {}", side as i8, pawn_distance);
+                    break;
+                }
+            }
+
+            pawn_proximity[me] += PAWN_PROXIMITY_VALUE[pawn_distance];
+        }
+
+        // king shelter and storm
+        let bounds = (cmp::max(king_file - 1, 0), cmp::min(king_file + 2, 8));
+        let at_or_above_mask = unsafe{AHEAD_RANK_MASKS[me][king_rank as usize] | RANK_MASKS[king_rank as usize]};
+        let my_pawns = pos.pawn[me];
+        let their_pawns = pos.pawn[them];
+
+        for file in bounds.0..bounds.1 {
+            let mask = unsafe{FILE_MASKS[file as usize] & at_or_above_mask};
+            // println!("checking file {}", file);
+
+            // closest friendly pawn at or above
+            let friendly_pawn = my_pawns & mask;
+            let friendly_distance = if friendly_pawn != 0 {
+                (king_rank - (friendly_pawn.trailing_zeros() as i8 / 8)).abs()
+            } else {
+                7
+            };
+
+            // println!("friendly distance {}", friendly_distance);
+
+            // closest enemy pawn at or above
+            let enemy_pawn = their_pawns & mask;
+            let enemy_distance = if enemy_pawn != 0 {
+                (king_rank - (enemy_pawn.trailing_zeros() as i8 / 8)).abs()
+            } else {
+                7
+            };
+
+            // println!("enemy distance {}", enemy_distance);
+
+            // going a bit more basic than Ethereal for now
+            // just consider whether this is the king file and the distance
+            pawn_shelter[me] += PAWN_SHELTER_VALUE[(file == king_file) as usize][friendly_distance as usize];
+
+            // check if we have a pawn in the way before updating storm score
+            let blocked = friendly_distance == enemy_distance - 1;
+            // println!("blocked {}", blocked);
+            pawn_storm[me] += PAWN_STORM_VALUE[blocked as usize][enemy_distance as usize];
+        }
+    }
+
+    return (pawn_shelter[1] + pawn_storm[1]) - (pawn_shelter[0] + pawn_storm[0]);
+}
+
 fn mobility_and_king_danger(pos: &Bitboard) -> Score {
     let mut mobility: Score = make_score(0, 0);
-    let mut king_danger: [i32; 2] = [0, 0];
+    let mut piece_bonus: [Score; 2] = [0, 0];
+    let mut king_danger: [Score; 2] = [0, 0];
     let white = Color::White as usize;
     let black = Color::Black as usize;
     let occ = pos.composite[white] | pos.composite[black];
+
+    let center_diagonal_1 = idx_to_bb(27) | idx_to_bb(36);
+    let center_diagonal_2 = idx_to_bb(28) | idx_to_bb(35);
+
+    let mut attacked: [u64; 2] = [pawn_attacks(pos.pawn[black], Color::Black), pawn_attacks(pos.pawn[white], Color::White)];
+    let mut attacked_by_queens: [u64; 2] = [0, 0];
+    let mut attacked_by_rooks: [u64; 2] = [0, 0];
+    let mut attacked_by_bishops: [u64; 2] = [0, 0];
+    let mut attacked_by_knights: [u64; 2] = [0, 0];
+    let mut attacked_by_two: [u64; 2] = [0, 0];
 
     for side in [white, black] {
         let other_side = if side == white {black} else {white};
@@ -321,7 +468,7 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
 
         let king_bb = pos.king[other_side];
         let mut attackers = 0;
-        let mut attack_value: i32 = 0;
+        let mut attack_value: i64 = 0;
         let king_idx = king_bb.trailing_zeros() as i8;
         let king_zone = king_bb | unsafe{ KING_MASK[king_idx as usize] };
 
@@ -335,6 +482,10 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             let start_idx = board.trailing_zeros() as i8;
             let move_board = queen_moves_board(start_idx, occ);
             let moves = move_board.count_ones() as usize;
+
+            attacked_by_two[side] |= attacked[side] & move_board;
+            attacked[side] |= move_board;
+            attacked_by_queens[side] |= move_board;
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
@@ -349,6 +500,10 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             let start_idx = board.trailing_zeros() as i8;
             let move_board = rook_moves_board(start_idx, occ & !(pos.queen[side] | pos.rook[side]));
             let moves = move_board.count_ones() as usize;
+
+            attacked_by_two[side] |= attacked[side] & move_board;
+            attacked[side] |= move_board;
+            attacked_by_rooks[side] |= move_board;
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
@@ -362,7 +517,15 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
         while board != 0 {
             let start_idx = board.trailing_zeros() as i8;
             let move_board = bishop_moves_board(start_idx, occ & !(pos.queen[side] | pos.bishop[side]));
+
+            if move_board & center_diagonal_1 == center_diagonal_1 { piece_bonus[side] += BISHOP_LONG_DIAGONAL_VALUE; }
+            else if move_board & center_diagonal_2 == center_diagonal_2 { piece_bonus[side] += BISHOP_LONG_DIAGONAL_VALUE; }
+
             let moves = move_board.count_ones() as usize;
+            attacked_by_two[side] |= attacked[side] & move_board;
+            attacked[side] |= move_board;
+            attacked_by_bishops[side] |= move_board;
+
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
@@ -378,6 +541,9 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             let enemy = if side == white {black} else {white};
             let move_board = knight_moves_board(start_idx) & !pawn_attacks(pos.pawn[enemy], !pos.side_to_move);
             let moves = move_board.count_ones() as usize;
+            attacked_by_two[side] |= attacked[side] & move_board;
+            attacked[side] |= move_board;
+            attacked_by_knights[side] |= move_board;
             let attacks = move_board & king_zone;
             if attacks != 0 {
                 attackers += 1;
@@ -387,15 +553,63 @@ fn mobility_and_king_danger(pos: &Bitboard) -> Score {
             board &= board - 1;
         }
 
-        if attackers > 7 { attackers = 7; }
-        attack_value += QUEEN_KING_DANGER[attackers] * queen_attacks as i32;
-        attack_value += ROOK_KING_DANGER[attackers] * rook_attacks as i32;
-        attack_value += BISHOP_KING_DANGER[attackers] * bishop_attacks as i32;
-        attack_value += KNIGHT_KING_DANGER[attackers] * knight_attacks as i32;
-        king_danger[side] = attack_value;
+        if attackers > 5 { attackers = 5; }
+        // println!("num attackers side {}: {}", side, attackers);
+        if attackers >= if pos.queen[side] != 0 {1} else {2} {
+            attack_value += QUEEN_KING_DANGER[attackers] * queen_attacks as i64;
+            attack_value += ROOK_KING_DANGER[attackers] * rook_attacks as i64;
+            attack_value += BISHOP_KING_DANGER[attackers] * bishop_attacks as i64;
+            attack_value += KNIGHT_KING_DANGER[attackers] * knight_attacks as i64;
+
+            king_danger[side] = attack_value;
+        }
+
+        // if piece_bonus[side] != 0 {println!("LONG DIAGONAL");}
+
     }
 
-    let score = mobility + (make_score(1, 1) * (king_danger[white] - king_danger[black]) as i64);
+    let total_occ = pos.composite[1] | pos.composite[0];
+    // safe checks.
+    for side in [white, black] {
+        let me = side;
+        let them = if side == white {black} else {white};
+        let weak_squares = attacked[me] & !attacked_by_two[them] & (!attacked[them] | attacked_by_queens[them]);
+        let safe_squares = !pos.composite[me] & (!attacked[them] | (attacked_by_two[me] & weak_squares));
+
+        let king_bb = pos.king[them];
+        let king_idx = king_bb.trailing_zeros() as i8;
+
+        let king_rook_threats = rook_moves_board(king_idx, total_occ);
+        let king_bishop_threats = bishop_moves_board(king_idx, total_occ);
+        let king_queen_threats = king_rook_threats | king_bishop_threats;
+        let king_knight_threats = knight_moves_board(king_idx);
+
+        let queen_checks = attacked_by_queens[me] & safe_squares & king_queen_threats;
+        let rook_checks = attacked_by_rooks[me] & safe_squares & king_rook_threats;
+        let bishop_checks = attacked_by_bishops[me] & safe_squares & king_bishop_threats;
+        let knight_checks = attacked_by_knights[me] & safe_squares & king_knight_threats;
+
+        if king_danger[side] != 0 {
+            // println!("safe queen checks side {}: {}", side, queen_checks.count_ones());
+            // println!("safe rook checks side {}: {}", side, rook_checks.count_ones());
+            // println!("safe bishop checks side {}: {}", side, bishop_checks.count_ones());
+            // println!("safe knight checks side {}: {}", side, knight_checks.count_ones());
+            // println!("enemy weak squares side {}: {}", side, weak_squares.count_ones());
+
+            king_danger[side] += queen_checks.count_ones() as i64 * QUEEN_CHECK_VALUE;
+            king_danger[side] += rook_checks.count_ones() as i64 * ROOK_CHECK_VALUE;
+            king_danger[side] += bishop_checks.count_ones() as i64 * BISHOP_CHECK_VALUE;
+            king_danger[side] += knight_checks.count_ones() as i64 * KNIGHT_CHECK_VALUE;
+
+            king_danger[side] += WEAK_SQUARE_VALUE * weak_squares.count_ones() as i64;
+            if pos.queen[side] == 0 {
+                king_danger[side] += NO_QUEEN_ATTACK_VALUE;
+            }
+            // println!("king danger! {}", mg_score(king_danger[side]));
+        }
+    }
+
+    let score = mobility + (piece_bonus[white] - piece_bonus[black]) + (king_danger[white] - king_danger[black]);
     return score;
 }
 

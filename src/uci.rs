@@ -274,6 +274,7 @@ pub fn uci_loop() {
             // clear the transposition table
             board = Bitboard::default_board();
             clear_tt();
+            clear_info();
         } else if cmd == "isready" {
             println!("readyok");
         } else if cmd == "setoption" {

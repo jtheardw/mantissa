@@ -67,7 +67,7 @@ fn set_eg_score(score: Score, val: i32) -> i64 {
 pub fn get_params_vector() -> Vec<i32> {
     let mut v = Vec::new();
 
-    for i in 0..584 {
+    for i in 0..728 {
         v.push(get_param(i));
     }
 
@@ -75,7 +75,7 @@ pub fn get_params_vector() -> Vec<i32> {
 }
 
 fn load_params_vector(v: &Vec<i32>) {
-    for i in 0..584 {
+    for i in 0..728 {
         set_param(i, v[i]);
     }
 }
@@ -112,13 +112,25 @@ pub fn print_params_vector(v: &Vec<i32>) {
     print_score_vector("rook mobility", &v_copy(v, 56, 71), &v_copy(v, 71, 86));
     print_score_vector("queen mobility", &v_copy(v, 86, 114), &v_copy(v, 114, 142));
 
-    print_score_vector("queen king danger", &v_copy(v, 142, 150), &v_copy(v, 142, 150));
-    print_score_vector("rook king danger", &v_copy(v, 150, 158), &v_copy(v, 150, 158));
-    print_score_vector("bishop king danger", &v_copy(v, 158, 166), &v_copy(v, 158, 166));
-    print_score_vector("knight king danger", &v_copy(v, 166, 174), &v_copy(v, 166, 174));
+    print_score_vector("queen king danger", &v_copy(v, 142, 150), &v_copy(v, 606, 614));
+    print_score_vector("rook king danger", &v_copy(v, 150, 158), &v_copy(v, 614, 622));
+    print_score_vector("bishop king danger", &v_copy(v, 158, 166), &v_copy(v, 622, 630));
+    print_score_vector("knight king danger", &v_copy(v, 166, 174), &v_copy(v, 630, 638));
+    print_score("no queen attack value", v[598], v[599]);
+    print_score("weak square", v[718], v[719]);
+    print_score("queen check", v[720], v[721]);
+    print_score("rook check", v[722], v[723]);
+    print_score("bishop check", v[724], v[725]);
+    print_score("knight check", v[726], v[727]);
 
     print_score("double bishop", v[174], v[175]);
+    print_score("bishop color", v[584], v[585]);
+    print_score("bishop long diagonal", v[604], v[605]);
 
+    print_score("knight outpost", v[600], v[601]);
+    print_score("bishop outpost", v[602], v[603]);
+
+    print_score_vector("candidate passed pawn", &v_copy(v, 586, 592), &v_copy(v, 592, 598));
     print_score_vector("passed pawn", &v_copy(v, 176, 182), &v_copy(v, 182, 188));
     print_score("center pawn", v[188], v[189]);
     print_score("isolated pawn", v[190], v[191]);
@@ -127,6 +139,11 @@ pub fn print_params_vector(v: &Vec<i32>) {
     print_score_vector("advanced pawn", &v_copy(v, 196, 202), &v_copy(v, 202, 208));
     print_score("supported pawn", v[208], v[209]);
     print_score("space", v[210], v[211]);
+    print_score_vector("pawn_proximity", &v_copy(v, 638, 646), &v_copy(v, 646, 654));
+    print_score_vector("pawn_shelter non-king file", &v_copy(v, 654, 662), &v_copy(v, 662, 670));
+    print_score_vector("pawn_shelter king file", &v_copy(v, 670, 678), &v_copy(v, 678, 686));
+    print_score_vector("pawn_storm non-king file", &v_copy(v, 686, 694), &v_copy(v, 694, 702));
+    print_score_vector("pawn_storm king file", &v_copy(v, 702, 710), &v_copy(v, 710, 718));
 
     print_score("rook on 7th", v[212], v[213]);
     print_score("rook on open", v[214], v[215]);
@@ -207,10 +224,10 @@ fn get_param(idx: usize) -> i32 {
             86..114 => { mg_score(QUEEN_MOBILITY[idx - 86]) },
             114..142 => { eg_score(QUEEN_MOBILITY[idx - 114]) },
 
-            142..150 => { QUEEN_KING_DANGER[idx - 142] },
-            150..158 => { ROOK_KING_DANGER[idx - 150] },
-            158..166 => { BISHOP_KING_DANGER[idx - 158] },
-            166..174 => { KNIGHT_KING_DANGER[idx - 166] },
+            142..150 => { mg_score(QUEEN_KING_DANGER[idx - 142]) },
+            150..158 => { mg_score(ROOK_KING_DANGER[idx - 150]) },
+            158..166 => { mg_score(BISHOP_KING_DANGER[idx - 158]) },
+            166..174 => { mg_score(KNIGHT_KING_DANGER[idx - 166]) },
 
             174 => { mg_score(DOUBLE_BISHOP_BONUS) },
             175 => { eg_score(DOUBLE_BISHOP_BONUS) },
@@ -298,6 +315,52 @@ fn get_param(idx: usize) -> i32 {
                 let pc = (idx - 552) % 4;
                 eg_score(KING_PSQT[pr][pc])
             },
+
+            584 => { mg_score(BISHOP_COLOR) },
+            585 => { eg_score(BISHOP_COLOR) },
+
+            586..592 => { mg_score(CANDIDATE_PASSED_PAWN_VALUE[idx - 585]) },
+            592..598 => { eg_score(CANDIDATE_PASSED_PAWN_VALUE[idx - 591]) },
+
+            598 => { mg_score(NO_QUEEN_ATTACK_VALUE) },
+            599 => { eg_score(NO_QUEEN_ATTACK_VALUE) },
+
+            600 => { mg_score(KNIGHT_OUTPOST_VALUE) },
+            601 => { eg_score(KNIGHT_OUTPOST_VALUE) },
+            602 => { mg_score(BISHOP_OUTPOST_VALUE) },
+            603 => { eg_score(BISHOP_OUTPOST_VALUE) },
+            604 => { mg_score(BISHOP_LONG_DIAGONAL_VALUE) },
+            605 => { eg_score(BISHOP_LONG_DIAGONAL_VALUE) },
+
+            606..614 => { eg_score(QUEEN_KING_DANGER[idx - 606]) },
+            614..622 => { eg_score(ROOK_KING_DANGER[idx - 614]) },
+            622..630 => { eg_score(BISHOP_KING_DANGER[idx - 622]) },
+            630..638 => { eg_score(KNIGHT_KING_DANGER[idx - 630]) },
+
+            638..646 => { mg_score(PAWN_PROXIMITY_VALUE[idx - 638]) },
+            646..654 => { eg_score(PAWN_PROXIMITY_VALUE[idx - 646]) },
+            654..662 => { mg_score(PAWN_SHELTER_VALUE[0][idx - 654]) },
+            662..670 => { eg_score(PAWN_SHELTER_VALUE[0][idx - 662]) },
+            670..678 => { mg_score(PAWN_SHELTER_VALUE[1][idx - 670]) },
+            678..686 => { eg_score(PAWN_SHELTER_VALUE[1][idx - 678]) },
+
+            686..694 => { mg_score(PAWN_STORM_VALUE[0][idx - 686]) },
+            694..702 => { eg_score(PAWN_STORM_VALUE[0][idx - 694]) },
+            702..710 => { mg_score(PAWN_STORM_VALUE[1][idx - 702]) },
+            710..718 => { eg_score(PAWN_STORM_VALUE[1][idx - 710]) },
+
+            718 => { mg_score(WEAK_SQUARE_VALUE) },
+            719 => { eg_score(WEAK_SQUARE_VALUE) },
+
+            720 => { mg_score(QUEEN_CHECK_VALUE) },
+            721 => { eg_score(QUEEN_CHECK_VALUE) },
+            722 => { mg_score(ROOK_CHECK_VALUE) },
+            723 => { eg_score(ROOK_CHECK_VALUE) },
+            724 => { mg_score(BISHOP_CHECK_VALUE) },
+            725 => { eg_score(BISHOP_CHECK_VALUE) },
+            726 => { mg_score(KNIGHT_CHECK_VALUE) },
+            727 => { eg_score(KNIGHT_CHECK_VALUE) },
+
             _ => {0}
         }
     }
@@ -327,10 +390,10 @@ fn set_param(idx: usize, val: i32) {
             86..114 => { QUEEN_MOBILITY[idx - 86] = set_mg_score(QUEEN_MOBILITY[idx - 86], val); },
             114..142 => { QUEEN_MOBILITY[idx - 114] = set_eg_score(QUEEN_MOBILITY[idx - 114], val); },
 
-            142..150 => { QUEEN_KING_DANGER[idx - 142] = val; },
-            150..158 => { ROOK_KING_DANGER[idx - 150] = val; },
-            158..166 => { BISHOP_KING_DANGER[idx - 158] = val; },
-            166..174 => { KNIGHT_KING_DANGER[idx - 166] = val; },
+            142..150 => { QUEEN_KING_DANGER[idx - 142] = set_mg_score(QUEEN_KING_DANGER[idx-142], val); },
+            150..158 => { ROOK_KING_DANGER[idx - 150] = set_mg_score(ROOK_KING_DANGER[idx-150], val); },
+            158..166 => { BISHOP_KING_DANGER[idx - 158] = set_mg_score(BISHOP_KING_DANGER[idx-158], val); },
+            166..174 => { KNIGHT_KING_DANGER[idx - 166] = set_mg_score(KNIGHT_KING_DANGER[idx-166], val); },
 
             174 => { DOUBLE_BISHOP_BONUS = set_mg_score(DOUBLE_BISHOP_BONUS, val); },
             175 => { DOUBLE_BISHOP_BONUS = set_eg_score(DOUBLE_BISHOP_BONUS, val); },
@@ -418,6 +481,51 @@ fn set_param(idx: usize, val: i32) {
                 let pc = (idx - 552) % 4;
                 KING_PSQT[pr][pc] = set_eg_score(KING_PSQT[pr][pc], val);
             },
+            584 => { BISHOP_COLOR = set_mg_score(BISHOP_COLOR, val); },
+            585 => { BISHOP_COLOR = set_eg_score(BISHOP_COLOR, val); },
+
+            586..592 => { CANDIDATE_PASSED_PAWN_VALUE[idx - 585] = set_mg_score(CANDIDATE_PASSED_PAWN_VALUE[idx - 585], val); },
+            592..598 => { CANDIDATE_PASSED_PAWN_VALUE[idx - 591] = set_eg_score(CANDIDATE_PASSED_PAWN_VALUE[idx - 591], val); },
+
+            598 => { NO_QUEEN_ATTACK_VALUE = set_mg_score(NO_QUEEN_ATTACK_VALUE, val); },
+            599 => { NO_QUEEN_ATTACK_VALUE = set_eg_score(NO_QUEEN_ATTACK_VALUE, val); },
+
+            600 => { KNIGHT_OUTPOST_VALUE = set_mg_score(KNIGHT_OUTPOST_VALUE, val); },
+            601 => { KNIGHT_OUTPOST_VALUE = set_eg_score(KNIGHT_OUTPOST_VALUE, val); },
+            602 => { BISHOP_OUTPOST_VALUE = set_mg_score(BISHOP_OUTPOST_VALUE, val); },
+            603 => { BISHOP_OUTPOST_VALUE = set_eg_score(BISHOP_OUTPOST_VALUE, val); },
+            604 => { BISHOP_LONG_DIAGONAL_VALUE = set_mg_score(BISHOP_LONG_DIAGONAL_VALUE, val); },
+            605 => { BISHOP_LONG_DIAGONAL_VALUE = set_eg_score(BISHOP_LONG_DIAGONAL_VALUE, val); },
+
+            606..614 => { QUEEN_KING_DANGER[idx - 606] = set_eg_score(QUEEN_KING_DANGER[idx-606], val); },
+            614..622 => { ROOK_KING_DANGER[idx - 614] = set_eg_score(ROOK_KING_DANGER[idx-614], val); },
+            622..630 => { BISHOP_KING_DANGER[idx - 622] = set_eg_score(BISHOP_KING_DANGER[idx-622], val); },
+            630..638 => { KNIGHT_KING_DANGER[idx - 630] = set_eg_score(KNIGHT_KING_DANGER[idx-630], val); },
+
+            638..646 => { PAWN_PROXIMITY_VALUE[idx - 638] = set_mg_score(PAWN_PROXIMITY_VALUE[idx - 638], val); },
+            646..654 => { PAWN_PROXIMITY_VALUE[idx - 646] = set_eg_score(PAWN_PROXIMITY_VALUE[idx - 646], val); },
+
+            654..662 => { PAWN_SHELTER_VALUE[0][idx - 654] = set_mg_score(PAWN_SHELTER_VALUE[0][idx - 654], val); },
+            662..670 => { PAWN_SHELTER_VALUE[0][idx - 662] = set_eg_score(PAWN_SHELTER_VALUE[0][idx - 662], val); },
+            670..678 => { PAWN_SHELTER_VALUE[1][idx - 670] = set_mg_score(PAWN_SHELTER_VALUE[1][idx - 670], val); },
+            678..686 => { PAWN_SHELTER_VALUE[1][idx - 678] = set_eg_score(PAWN_SHELTER_VALUE[1][idx - 678], val); },
+
+            686..694 => { PAWN_STORM_VALUE[0][idx - 686] = set_mg_score(PAWN_STORM_VALUE[0][idx - 686], val); },
+            694..702 => { PAWN_STORM_VALUE[0][idx - 694] = set_eg_score(PAWN_STORM_VALUE[0][idx - 694], val); },
+            702..710 => { PAWN_STORM_VALUE[1][idx - 702] = set_mg_score(PAWN_STORM_VALUE[1][idx - 702], val); },
+            710..718 => { PAWN_STORM_VALUE[1][idx - 710] = set_eg_score(PAWN_STORM_VALUE[1][idx - 710], val); },
+
+            718 => { WEAK_SQUARE_VALUE = set_mg_score(WEAK_SQUARE_VALUE, val); },
+            719 => { WEAK_SQUARE_VALUE = set_eg_score(WEAK_SQUARE_VALUE, val); },
+            720 => { QUEEN_CHECK_VALUE = set_mg_score(QUEEN_CHECK_VALUE, val); },
+            721 => { QUEEN_CHECK_VALUE = set_eg_score(QUEEN_CHECK_VALUE, val); },
+            722 => { ROOK_CHECK_VALUE = set_mg_score(ROOK_CHECK_VALUE, val); },
+            723 => { ROOK_CHECK_VALUE = set_eg_score(ROOK_CHECK_VALUE, val); },
+            724 => { BISHOP_CHECK_VALUE = set_mg_score(BISHOP_CHECK_VALUE, val); },
+            725 => { BISHOP_CHECK_VALUE = set_eg_score(BISHOP_CHECK_VALUE, val); },
+            726 => { KNIGHT_CHECK_VALUE = set_mg_score(KNIGHT_CHECK_VALUE, val); },
+            727 => { KNIGHT_CHECK_VALUE = set_eg_score(KNIGHT_CHECK_VALUE, val); },
+
             _ => {}
         }
     }
@@ -427,8 +535,6 @@ fn get_value(node: &mut Bitboard) -> i32 {
     let multiplier = if node.side_to_move == Color::White {1} else {-1};
     return multiplier * static_eval(node);
 }
-
-
 
 fn tuning_qsearch(node: &mut Bitboard, alpha: i32, beta: i32) -> (i32, Bitboard) {
     if node.is_quiet() { return (static_eval(node), node.thread_copy()); }
@@ -566,7 +672,7 @@ pub fn neighbor(param_vec: &Vec<i32>, reach: f64) -> Vec<i32> {
 
     // (minimum, maximum, scale @ zero reach, scale @ full reach)
     let mut dimens: Vec<(f64, f64, f64, f64)> = Vec::new();
-    for i in 0..584 {
+    for i in 0..728 {
         let d = match i {
             0..2   => {(8000.0, 18000.0,  300.0, 2000.0)},
             2..4   => {(4000.0, 12000.0,  200.0, 1000.0)},
@@ -579,10 +685,10 @@ pub fn neighbor(param_vec: &Vec<i32>, reach: f64) -> Vec<i32> {
             56..86  => {(-1000.0, 1500.0,  100.0,  500.0)},
             86..142 => {(-1000.0, 1500.0,  100.0,  500.0)},
 
-            142..150 => {(   0.0, 1400.0,  100.0,  500.0)},
-            150..158 => {(   0.0, 1400.0,  100.0,  500.0)},
-            158..166 => {(   0.0, 1400.0,  100.0,  500.0)},
-            166..174 => {(   0.0, 1400.0,  100.0,  500.0)},
+            142..150 => {(   1.0, 1400.0,  100.0,  500.0)},
+            150..158 => {(   1.0, 1400.0,  100.0,  500.0)},
+            158..166 => {(   1.0, 1400.0,  100.0,  500.0)},
+            166..174 => {(   1.0, 1400.0,  100.0,  500.0)},
 
             174..176 => {(   0.0, 1500.0,  100.0,  300.0)},
 
@@ -598,19 +704,31 @@ pub fn neighbor(param_vec: &Vec<i32>, reach: f64) -> Vec<i32> {
             212..216 => {(    0.0,  500.0,  100.0,   100.0)},
 
             216..584 => {(-2000.0, 2000.0,  75.0,   500.0)},
+
+            584..586 => {( -500.0,    0.0,  30.0,   100.0)},
+
+            586..598 => {(    0.0, 2000.0,  70.0,   200.0)},
+            598..600 => {(-1000.0,    0.0,  70.0,   400.0)},
+            600..606 => {(    0.0, 1000.0,  70.0,   300.0)},
+            606..638 => {(   1.0, 1400.0,  100.0,  500.0)},
+
+            638..718 => {(-2000.0, 2000.0,  75.0,   500.0)},
+            718..720 => {(    0.0,  500.0,  75.0,   200.0)},
+            720..728 => {(    0.0, 1000.0, 100.0,   400.0)},
+
             _ => {(0.0, 0.0, 0.0, 0.0)}
         };
         dimens.push(d);
     }
 
-    let mut delta = [0f64; 584];
-    let axes = (rand() % 4) + 1;
+    let mut delta = [0f64; 728];
+    let axes = (rand() % 5) + 1;
     for _ in 0..axes {
-        let axis = (rand() % 584);
+        let axis = (rand() % 728);
         delta[axis as usize] = symunif();
     }
 
-    for idx in 0..584 {
+    for idx in 0..728 {
         let (min, max, zero_scale, full_scale) = dimens[idx];
         let scale = zero_scale + (full_scale - zero_scale) * reach;
         let next = new_params[idx] + (delta[idx] * scale) as i32;
@@ -684,7 +802,7 @@ pub fn get_position_vector(fname: &str) -> Vec<(Bitboard, f64)> {
         if num_bytes == 0 { break; }
         if buf.len() > 0 {
             // fen winner
-            if idx % 4 != 0 {
+            if idx % 4 != 2 {
                 idx += 1;
                 buf.clear();
                 continue;
