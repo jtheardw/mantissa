@@ -63,17 +63,17 @@ pub static mut PAWN_STORM_VALUE: [[Score; 8]; 2] = [
     [S!(2, -70), S!(16, 22), S!(-398, -195), S!(43, -190), S!(92, -110), S!(8, -154), S!(104, 142), S!(-55, -235)]
 ];
 
-pub static mut QUEEN_KING_DANGER: [Score; 6] = [
-    S!(0, 0), S!(95, 1), S!(314, 64), S!(662, 152), S!(938, 1005), S!(473, 563)
+pub static mut QUEEN_KING_DANGER: [Score; 8] = [
+    S!(0, 0), S!(95, 1), S!(314, 64), S!(662, 152), S!(938, 1005), S!(473, 563), S!(0, 0), S!(0, 0)
 ];
-pub static mut ROOK_KING_DANGER: [Score; 6] = [
-    S!(0, 0), S!(4, 113), S!(167, 48), S!(184, 147), S!(336, 211), S!(652, 668)
+pub static mut ROOK_KING_DANGER: [Score; 8] = [
+    S!(0, 0), S!(4, 113), S!(167, 48), S!(184, 147), S!(336, 211), S!(652, 668), S!(0, 0), S!(0, 0)
 ];
-pub static mut BISHOP_KING_DANGER: [Score; 6] = [
-    S!(0, 0), S!(51, 301), S!(207, 88), S!(235, 34), S!(114, 71), S!(171, 1)
+pub static mut BISHOP_KING_DANGER: [Score; 8] = [
+    S!(0, 0), S!(51, 301), S!(207, 88), S!(235, 34), S!(114, 71), S!(171, 1), S!(0, 0), S!(0, 0)
 ];
-pub static mut KNIGHT_KING_DANGER: [Score; 6] = [
-    S!(0, 0), S!(1, 392), S!(178, 81), S!(332, 1), S!(62, 321), S!(22, 151)
+pub static mut KNIGHT_KING_DANGER: [Score; 8] = [
+    S!(0, 0), S!(1, 392), S!(178, 81), S!(332, 1), S!(62, 321), S!(22, 151), S!(0, 0), S!(0, 0)
 ];
 pub static mut NO_QUEEN_ATTACK_VALUE: Score = S!(-276, -462);
 pub static mut WEAK_SQUARE_VALUE: Score = S!(0, 0);
