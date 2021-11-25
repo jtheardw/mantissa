@@ -229,6 +229,75 @@ impl Bitboard {
         return bitboard;
     }
 
+    pub fn fen(&self) -> String {
+        let mut fen_str = String::new();
+        let mut acc = 0;
+
+        for i in 0..8 {
+            for j in 0..8 {
+                let r = 7 - i;
+                let f = j;
+                let idx = coord_to_idx((f, r));
+
+                // try to find white piece, then black piece
+                let mut piece_byte = self.piece_at_square(idx, Color::White);
+                let piece = if piece_byte != 0 {
+                    (piece_byte as char).to_ascii_uppercase()
+                } else {
+                    piece_byte = self.piece_at_square(idx, Color::Black);
+                    if piece_byte != 0 {
+                        piece_byte as char
+                    } else {
+                        'a'     // :C
+                    }
+                };
+
+                if piece_byte != 0 {
+                    if acc != 0 {
+                        fen_str.push_str(format!("{}", acc).as_str());
+                    }
+                    fen_str.push(piece);
+                    acc = 0;
+                } else {
+                    acc += 1;
+                }
+            }
+            if acc != 0 {
+                fen_str.push_str(format!("{}", acc).as_str());
+            }
+            if i != 7 {
+                fen_str.push('/');
+            }
+            acc = 0;
+        }
+
+        let side_to_move = if self.side_to_move == Color::White { "w" } else { "b" };
+
+        let mut castling_rights = String::new();
+        if self.castling_rights == 0 {
+           castling_rights.push('-');
+        } else {
+            if self.castling_rights & WHITE_KINGSIDE_CR_MASK != 0 { castling_rights.push('K'); }
+            if self.castling_rights & WHITE_QUEENSIDE_CR_MASK != 0 { castling_rights.push('Q'); }
+            if self.castling_rights & BLACK_KINGSIDE_CR_MASK != 0 { castling_rights.push('k'); }
+            if self.castling_rights & BLACK_QUEENSIDE_CR_MASK != 0 { castling_rights.push('q'); }
+        }
+
+        let mut ep = String::new();
+        if self.ep_file == -1 {
+            ep.push('-');
+        } else {
+            ep.push_str(idx_to_str(coord_to_idx((self.ep_file, if self.side_to_move == Color::White { 5 } else { 2 }))).as_str());
+        }
+
+        let move_clock = format!("{}", 1 + (self.history.len() / 2));
+
+        let halfmove_clock = self.halfmove;
+
+        fen_str = format!("{} {} {} {} {} {}", fen_str, side_to_move, castling_rights, ep, halfmove_clock, move_clock);
+        return fen_str;
+    }
+
     pub fn thread_copy(&self) -> Bitboard {
         // make a copy usable by another thread
         // won't include certain things like the capture

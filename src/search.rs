@@ -20,8 +20,8 @@ static mut SEARCH_LIMITS: SearchLimits = SearchLimits::infinite();
 const LB: i32 = -10000000;
 const UB: i32 = 10000000;
 
-static mut TI: Vec<ThreadInfo> = Vec::new();
-static mut SS: Vec<SearchStats> = Vec::new();
+pub static mut TI: Vec<ThreadInfo> = Vec::new();
+pub static mut SS: Vec<SearchStats> = Vec::new();
 
 pub fn get_time_millis() -> u128 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
@@ -131,7 +131,7 @@ fn check_time(search_limits: &SearchLimits) {
 
 fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_num: usize) {
     let mut depth = thread_depth;
-    let mut val = LB;
+    let mut val;
     let mut best_val = LB;
     while depth <= max_depth {
         let mut aspiration_delta_low = 250;
@@ -169,7 +169,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     let mut root_moves: Vec<Move> = Vec::new();
     let mut root_movepicker = MovePicker::perft_new();
     loop {
-        let mut mv = root_movepicker.next(node).0;
+        let mv = root_movepicker.next(node).0;
         if mv.is_null() { break; }
         node.do_move(&mv);
         if !node.is_check(!node.side_to_move) { root_moves.push(mv); }
@@ -755,7 +755,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
     //     }
     // }
 
-    let mut raised_alpha = false;
+    // let mut raised_alpha = false;
     let mut alpha = alpha;
 
     let stand_pat = static_eval(node, &mut ti.pht);
@@ -767,7 +767,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
         if stand_pat >= beta {
             return stand_pat;
         } else if stand_pat > alpha {
-            raised_alpha = true;
+            // raised_alpha = true;
             alpha = stand_pat;
         }
     }
@@ -817,7 +817,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
             best_val = val;
         }
         if val > alpha {
-            raised_alpha = true;
+            // raised_alpha = true;
             alpha = val;
         }
         if val >= beta {

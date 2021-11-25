@@ -385,10 +385,10 @@ fn king_pawns_value(pos: &Bitboard) -> Score {
             for i in 0..7 {
                 let mut mask = 0;
                 if king_file - i >= 0 {
-                    mask |= unsafe{FILE_MASKS[(king_file - i) as usize]};
+                    mask |= FILE_MASKS[(king_file - i) as usize];
                 }
                 if king_file + i < 8 {
-                    mask |= unsafe{FILE_MASKS[(king_file + i) as usize]};
+                    mask |= FILE_MASKS[(king_file + i) as usize];
                 }
                 if mask & pawns != 0 {
                     pawn_distance = i as usize;
@@ -407,7 +407,7 @@ fn king_pawns_value(pos: &Bitboard) -> Score {
         let their_pawns = pos.pawn[them];
 
         for file in bounds.0..bounds.1 {
-            let mask = unsafe{FILE_MASKS[file as usize] & at_or_above_mask};
+            let mask = FILE_MASKS[file as usize] & at_or_above_mask;
             // println!("checking file {}", file);
 
             // closest friendly pawn at or above
