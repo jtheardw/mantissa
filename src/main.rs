@@ -52,13 +52,5 @@ fn init() {
 
 fn main() {
     init();
-    // let mut board = Bitboard::from_position(format!("rnb1qbn1/pppPpppp/2Np4/3N4/1PRQ2QR/1PP5/PPK4P/1BBQ2rk w - - 0 1"));
-    // let board = Bitboard::default_board();
-    // board.fen();
-    // println!("{}", san_to_move(&mut board, format!("dxe8=N")));
-    convert_pgn("../pgns/self-play-data.pgn");
-    // println!("{}", san_to_move(&mut board, format!("Rhd4")));
-    // uci_loop();
-    // let mut v = get_position_vector("eth2.book");
-    // let _ = tune(&mut v);
+    uci_loop();
 }
