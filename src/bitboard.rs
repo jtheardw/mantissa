@@ -486,6 +486,12 @@ impl Bitboard {
         self.ep_stack.push(self.ep_file);
         self.ep_file = -1;
         self.hash ^= null_move_hash();
+
+        if self.side_to_move == Color::White {
+            self.net.white_turn();
+        } else {
+            self.net.black_turn();
+        }
     }
 
     pub fn undo_null_move(&mut self) {
@@ -498,6 +504,12 @@ impl Bitboard {
             Some(p) => p,
             None => panic!("empty ep stack!")
         };
+
+        if self.side_to_move == Color::White {
+            self.net.white_turn();
+        } else {
+            self.net.black_turn();
+        }
     }
 
     pub fn do_move(&mut self, mv: &Move) {

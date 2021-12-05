@@ -48,7 +48,7 @@ fn init() {
 
 fn main() {
     init();
-    let nn = Network::load("epoch-209.nnue").unwrap();
+    let nn = Network::load("/home/jtwright/chess/mantissa/epoch-209.nnue").unwrap();
     set_default_net(&nn);
     uci_loop();
 }

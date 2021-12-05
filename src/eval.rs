@@ -111,7 +111,11 @@ pub const ROOK_ON_OPEN: Score = S!(118, 90);
 
 pub fn static_eval(pos: &mut Bitboard, pht: &mut PHT) -> i32 {
     let score = if pos.net.is_valid() {
-        pos.net.nnue_eval()
+        // if (taper_score(pawn_psqt_value(pos) + nonpawn_psqt_value(pos), pos.get_phase())).abs() < 4000 {
+            pos.net.nnue_eval()
+        // } else {
+            // evaluate_position(pos, pht)
+        // }
     } else {
         evaluate_position(pos, pht)
     };
