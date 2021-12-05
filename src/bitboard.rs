@@ -30,6 +30,7 @@ pub struct Bitboard {
     cap_stack: Vec<u8>,
     castling_rights_stack: Vec<u8>,
     halfmove_stack: Vec<u8>,
+    activation_stack: Vec<Matrix>,
 
     pub halfmove: u8,
 
@@ -76,6 +77,7 @@ impl Bitboard {
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),
             halfmove_stack: Vec::new(),
+            activation_stack: Vec::new(),
 
             halfmove: 0,
             hash: 0,
@@ -224,6 +226,7 @@ impl Bitboard {
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),
             halfmove_stack: Vec::new(),
+            activation_stack: Vec::new(),
 
             halfmove: halfmove,
             hash: 0,            // for the moment, we fill it in late
@@ -341,6 +344,7 @@ impl Bitboard {
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),
             halfmove_stack: Vec::new(),
+            activation_stack: Vec::new(),
 
             halfmove: self.halfmove,
             hash: self.hash,
@@ -487,6 +491,7 @@ impl Bitboard {
         self.ep_file = -1;
         self.hash ^= null_move_hash();
 
+        self.activation_stack.push(self.net.activations[0].copy());
         if self.side_to_move == Color::White {
             self.net.white_turn();
         } else {
@@ -504,12 +509,10 @@ impl Bitboard {
             Some(p) => p,
             None => panic!("empty ep stack!")
         };
-
-        if self.side_to_move == Color::White {
-            self.net.white_turn();
-        } else {
-            self.net.black_turn();
-        }
+        self.net.activations[0] = match self.activation_stack.pop() {
+            Some(p) => p,
+            None => panic!("empty activation stack!")
+        };
     }
 
     pub fn do_move(&mut self, mv: &Move) {
@@ -530,6 +533,7 @@ impl Bitboard {
         self.pawn_history.push(self.pawn_hash);
         self.ep_stack.push(self.ep_file);
         self.castling_rights_stack.push(self.castling_rights);
+        self.activation_stack.push(self.net.activations[0].copy());
 
         let start_point: u64 = idx_to_bb(mv.start);
         let end_point: u64 = idx_to_bb(mv.end);
@@ -719,7 +723,7 @@ impl Bitboard {
 
             // replace enemy pawn
             self.pawn[them] ^= idx_to_bb(actual_pawn_idx);
-            self.net.activate(PAWN, !self.side_to_move, actual_pawn_idx);
+            // self.net.activate(PAWN, !self.side_to_move, actual_pawn_idx);
         } else if captured_piece != 0 {
             let cap_num;
             match captured_piece {
@@ -731,7 +735,7 @@ impl Bitboard {
                 _ => panic!("Captured uncapturable piece {}!", captured_piece)
             };
 
-            self.net.activate(cap_num, !self.side_to_move, mv.end);
+            // self.net.activate(cap_num, !self.side_to_move, mv.end);
         }
 
         // castling
@@ -741,14 +745,14 @@ impl Bitboard {
 
             // move the rook
             let rook_mask = idx_to_bb(old_rook_idx) | idx_to_bb(new_rook_idx);
-            self.net.move_piece(ROOK, self.side_to_move, new_rook_idx, old_rook_idx);
+            // self.net.move_piece(ROOK, self.side_to_move, new_rook_idx, old_rook_idx);
             self.rook[me] ^= rook_mask;
         }
 
         // move piece
         if mv.piece == b'p' && mv.promote_to != 0 {
             self.pawn[me] ^= start_point;
-            self.net.activate(PAWN, self.side_to_move, mv.start);
+            // self.net.activate(PAWN, self.side_to_move, mv.start);
             let promo_num;
             match mv.promote_to {
                 b'q' => { self.queen[me] ^= end_point; promo_num = QUEEN; },
@@ -757,7 +761,7 @@ impl Bitboard {
                 b'n' => { self.knight[me] ^= end_point; promo_num = KNIGHT; },
                 _ => { panic!("illegal promotion on mv {}", mv); }
             }
-            self.net.deactivate(promo_num, self.side_to_move, mv.end);
+            // self.net.deactivate(promo_num, self.side_to_move, mv.end);
         } else {
             let move_mask = start_point | end_point;
             let piece_num;
@@ -770,7 +774,7 @@ impl Bitboard {
                 b'p' => { self.pawn[me] ^= move_mask; piece_num = PAWN; },
                 _ => { panic!("moved nonexistent piece {} in mv {}", mv.piece, mv); }
             }
-            self.net.move_piece(piece_num, self.side_to_move, mv.end, mv.start);
+            // self.net.move_piece(piece_num, self.side_to_move, mv.end, mv.start);
         }
 
         // update composite
@@ -797,11 +801,15 @@ impl Bitboard {
         } else {
             self.halfmove -= 1;
         }
-        if self.side_to_move == Color::White {
-            self.net.white_turn();
-        } else {
-            self.net.black_turn();
-        }
+        // if self.side_to_move == Color::White {
+        //     self.net.white_turn();
+        // } else {
+        //     self.net.black_turn();
+        // }
+        self.net.activations[0] = match self.activation_stack.pop() {
+            Some(p) => p,
+            None => panic!("empty activation stack!")
+        };
     }
 
     pub fn is_repetition(&self) -> bool {
