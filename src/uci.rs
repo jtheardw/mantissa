@@ -5,6 +5,7 @@ use std::thread;
 use crate::bitboard::*;
 use crate::eval::*;
 use crate::moveutil::*;
+use crate::pht::*;
 use crate::search::*;
 use crate::searchutil::*;
 use crate::util::*;
@@ -285,6 +286,11 @@ pub fn uci_loop() {
             uci_go(&mut board, options, &mut params);
         } else if cmd == "stop" {
             abort_search();
+        } else if cmd == "eval" {
+            println!("{}", static_eval(&mut board, &mut PHT::get_pht(1)) / 10);
+        } else if cmd == "nn_eval" {
+            let mut net = board.net.copy();
+            println!("{}", net.full_eval(&board) / 10);
         } else {
             println!("unrecognized command.");
         }

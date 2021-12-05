@@ -115,9 +115,7 @@ impl MovePicker {
         }
 
         // swap
-        let (mv, score) = mvs[highest_i];
-        mvs[highest_i] = mvs[cur_i];
-        mvs[cur_i] = (mv, score);
+        mvs.swap(highest_i, cur_i);
     }
 
     fn score_moves(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u64)> {

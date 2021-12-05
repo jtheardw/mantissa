@@ -12,16 +12,13 @@ mod magic;
 mod movegen;
 mod moveorder;
 mod moveutil;
+mod nnue;
 mod pgn;
 mod pht;
 mod psqt;
-// mod rand;
 mod search;
 mod searchutil;
 mod see;
-// mod tuning;
-// mod tuning_eval;
-// mod tuning_psqt;
 mod time;
 mod tt;
 mod uci;
@@ -32,11 +29,10 @@ use crate::bitboard::*;
 use crate::evalutil::*;
 use crate::magic::*;
 use crate::movegen::*;
-// use crate::perft::*;
+use crate::nnue::*;
 use crate::pgn::*;
 use crate::pht::*;
 use crate::searchutil::*;
-// use crate::tuning::*;
 use crate::tt::*;
 use crate::uci::*;
 use crate::util::*;
@@ -52,5 +48,7 @@ fn init() {
 
 fn main() {
     init();
+    let nn = Network::load("epoch-209.nnue").unwrap();
+    set_default_net(&nn);
     uci_loop();
 }

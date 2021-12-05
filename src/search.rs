@@ -410,7 +410,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         }
     } else if depth >= 8 && !init_node {
         // internal iterative reductions
-        // First place I can find IIR comes from a thread by Rebel and ProDeo author
+        // First place I can find IIR comes from a thread by Ed Schroeder (ProDeo author)
         // wherein they found success simply reducing the depth at unsorted subtrees
         // After hundreds of games of self-play, the idea does bear fruit in Mantissa
         // to the tune of about 20 self-ply Elo
