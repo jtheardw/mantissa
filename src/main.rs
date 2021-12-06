@@ -48,7 +48,17 @@ fn init() {
 
 fn main() {
     init();
-    let nn = Network::load("/home/jtwright/chess/mantissa/epoch-209.nnue").unwrap();
-    set_default_net(&nn);
+    unsafe {
+        let mut nn = Network::load("/home/jtwright/chess/mantissa/epoch-209.nnue").unwrap();
+        let mut slow_nn = SlowNetwork::load("/home/jtwright/chess/mantissa/epoch-209.nnue").unwrap();
+        let b = Bitboard::default_board();
+        // nn.set_activations(&b);
+        // slow_nn.set_activations(&b);
+        // println!("BLAH");
+
+        // nn.nnue_eval();
+        // slow_nn.nnue_eval();
+    }
+    // set_default_net(nn);
     uci_loop();
 }

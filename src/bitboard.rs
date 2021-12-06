@@ -1,3 +1,5 @@
+use std::arch::x86_64::*;
+
 use crate::movegen::*;
 use crate::moveutil::*;
 use crate::nnue::*;
@@ -30,7 +32,7 @@ pub struct Bitboard {
     cap_stack: Vec<u8>,
     castling_rights_stack: Vec<u8>,
     halfmove_stack: Vec<u8>,
-    activation_stack: Vec<Matrix>,
+    activation_stack: Vec<[__m256; 16]>,
 
     pub halfmove: u8,
 
@@ -491,7 +493,7 @@ impl Bitboard {
         self.ep_file = -1;
         self.hash ^= null_move_hash();
 
-        self.activation_stack.push(self.net.activations[0].copy());
+        self.activation_stack.push(self.net.hidden_activations);
         if self.side_to_move == Color::White {
             self.net.white_turn();
         } else {
@@ -509,7 +511,7 @@ impl Bitboard {
             Some(p) => p,
             None => panic!("empty ep stack!")
         };
-        self.net.activations[0] = match self.activation_stack.pop() {
+        self.net.hidden_activations = match self.activation_stack.pop() {
             Some(p) => p,
             None => panic!("empty activation stack!")
         };
@@ -533,7 +535,7 @@ impl Bitboard {
         self.pawn_history.push(self.pawn_hash);
         self.ep_stack.push(self.ep_file);
         self.castling_rights_stack.push(self.castling_rights);
-        self.activation_stack.push(self.net.activations[0].copy());
+        self.activation_stack.push(self.net.hidden_activations);
 
         let start_point: u64 = idx_to_bb(mv.start);
         let end_point: u64 = idx_to_bb(mv.end);
@@ -806,7 +808,7 @@ impl Bitboard {
         // } else {
         //     self.net.black_turn();
         // }
-        self.net.activations[0] = match self.activation_stack.pop() {
+        self.net.hidden_activations = match self.activation_stack.pop() {
             Some(p) => p,
             None => panic!("empty activation stack!")
         };
