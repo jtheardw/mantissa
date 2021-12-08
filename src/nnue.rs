@@ -40,7 +40,8 @@ fn relu(x: f32) -> f32 {
 
 pub fn get_default_net() -> Network {
     unsafe {
-        Network::load("/home/jtwright/chess/mantissa/epoch-209.nnue").unwrap()
+        // Network::load("/home/jtwright/chess/mantissa/epoch-209.nnue").unwrap()
+        Network::load("/home/jtwright/chess/tissa-trainer/nets/epoch-103.nnue").unwrap()
     }
 }
 
@@ -328,7 +329,7 @@ impl Network {
         // network id
         file.read(&mut buf)?;
         let id = u32::from_le_bytes(buf);
-        println!("loading network with id {}", id);
+        // println!("loading network with id {}", id);
 
         // topology information
         file.read(&mut buf)?;
@@ -494,7 +495,7 @@ impl Network {
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(second_half, 3));
 
             // TODO: shuffle
-            return (output * 10.0).floor() as i32;
+            return (output * 8.5).floor() as i32;
         }
     }
 }
