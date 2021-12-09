@@ -1,5 +1,6 @@
 use std::arch::x86_64::*;
 use std::fs::File;
+use std::io::BufWriter;
 use std::io::prelude::*;
 
 use crate::bitboard::Bitboard;
@@ -41,7 +42,7 @@ fn relu(x: f32) -> f32 {
 pub fn get_default_net() -> Network {
     unsafe {
         // Network::load("/home/jtwright/chess/mantissa/epoch-209.nnue").unwrap()
-        Network::load("/home/jtwright/chess/tissa-trainer/nets/epoch-103.nnue").unwrap()
+        Network::load("/home/jtwright/chess/mantissa/epoch-103.nnue").unwrap()
     }
 }
 
@@ -278,6 +279,50 @@ impl SlowNetwork {
     pub fn full_eval(&mut self, pos: &Bitboard) -> i32 {
         self.set_activations(pos);
         return self.nnue_eval();
+    }
+
+    pub fn save_image(&self, file: &str) -> std::io::Result<()> {
+        let ss = 8; // supersampling
+        let border = [0, 0, 0];
+        let width  = (12*8)*ss + 11;
+        let height = 8*128*ss + 127;
+        let mut w = BufWriter::new(File::create(format!("{}.ppm", file))?);
+        writeln!(&mut w, "P6")?;
+        writeln!(&mut w, "{} {}", width, height)?;
+        writeln!(&mut w, "255")?;
+        for n in 0..128 {
+            if n != 0 { for _ in 0..width { w.write(&border)?; } }
+            let mut upper = 0.0;
+            let mut lower = 0.0;
+            for i in 0..768 {
+                upper = self.weights[0].get(n, i).max(upper);
+                lower = self.weights[0].get(n, i).min(lower);
+            }
+            let scale = upper.max(-lower);
+            println!("upper {} lower {} scale {}", upper, lower, scale);
+            for rank in (0..8).rev() {
+                for _ in 0..ss {
+                    for side in [true, false] {
+                        for piece in (0..6).rev() {
+                            if piece != 5 || !side { w.write(&border)?; }
+                            for file in 0..8 {
+                                let idx = coord_to_idx((file, rank));
+                                // let x : usize = piece*64 + rank*8 + file;
+                                let inp = input_number(piece, side, idx as i32);
+                                let normed = ((self.weights[0].get(n, inp) / scale) + 1.0) / 2.0;
+                                // let normed = ((self.w1[n][x] / scale) + 1.0) / 2.0;
+                                debug_assert!(1.0 >= normed && normed >= 0.0, "out of range");
+                                let r = (normed * 255.0).round() as u8;
+                                let g = (normed * 255.0).round() as u8;
+                                let b = (32.0 + normed * 191.0).round() as u8;
+                                for _ in 0..ss { w.write(&[r, g, b])?; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return Ok(());
     }
 }
 

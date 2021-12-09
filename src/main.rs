@@ -50,7 +50,9 @@ fn main() {
     init();
     // unsafe {
     //     // let mut nn = Network::load("/home/jtwright/chess/tissa-trainer/nets/epoch-103.nnue").unwrap();
-    //     // let mut slow_nn = SlowNetwork::load("/home/jtwright/chess/mantissa/epoch-209.nnue").unwrap();
+    //     let mut slow_nn = SlowNetwork::load("/home/jtwright/chess/mantissa/epoch-103.nnue").unwrap();
+    //     slow_nn.save_image("nn-image");
+    // }
     //     // let b = Bitboard::default_board();
     //     // println!("{}", nn.output_bias);
     //     // nn.set_activations(&b);
