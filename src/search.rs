@@ -185,15 +185,8 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         TI = Vec::new();
         for i in 0..num_threads {
             SS.push(new_searchstats());
-            // if i as usize >= TI.len() {
             TI.push(ThreadInfo::new());
             TI[i as usize].root_moves = root_moves.clone();
-            // } else {
-            //     TI[i as usize].killers = [[Move::null_move(); 2]; MAX_PLY];
-            //     TI[i as usize].seldepth = 0;
-            //     TI[i as usize].nodes_searched = 0;
-            //     TI[i as usize].root_moves = root_moves.clone();
-            // }
         }
     }
 
@@ -587,16 +580,8 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             }
 
             if depth < EFP_DEPTH && eval + efp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE {
-                // println!("depth {} eval {} alpha {}", depth, eval, alpha);
                 futile = true;
             }
-
-            // if depth <= 4 && eval <= alpha && alpha < MIN_MATE_SCORE && !is_quiet && mv.promote_to == 0 && score < QUIET_OFFSET {
-            //     // negative see capture
-            //     // println!("mv depth {} see {} piece {} cap {}", depth, -(QUIET_OFFSET as i32 - score as i32), mv.piece, node.get_last_capture());
-            //     // node.undo_move(&mv);
-            //     break;
-            // }
         }
 
         if futile {
@@ -717,7 +702,6 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 return DRAW_SCORE;
             }
         } else {
-            // futility pruning weirdness?
             return alpha;
         }
     }
