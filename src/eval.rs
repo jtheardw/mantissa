@@ -111,15 +111,11 @@ pub const ROOK_ON_OPEN: Score = S!(118, 90);
 
 pub fn static_eval(pos: &mut Bitboard, pht: &mut PHT) -> i32 {
     let score = if pos.net.is_valid() {
-        // if (taper_score(pawn_psqt_value(pos) + nonpawn_psqt_value(pos), pos.get_phase())).abs() < 4000 {
             pos.net.nnue_eval()
-        // } else {
-            // evaluate_position(pos, pht)
-        // }
     } else {
         evaluate_position(pos, pht)
     };
-    // println!("static score {}", score);
+
     return if pos.side_to_move == Color::White {score} else {-score};
 }
 
@@ -196,7 +192,6 @@ fn pawnless_endgame_drawish(pos: &Bitboard) -> bool {
 }
 
 pub fn material_score(pos: &Bitboard) -> Score {
-    // TODO this will probably be handled incrementally
     let mut score: Score = make_score(0, 0);
     if pawnless_endgame_drawish(pos) { return score; }
     let white = Color::White as usize;
