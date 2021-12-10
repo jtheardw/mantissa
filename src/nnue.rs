@@ -4,6 +4,7 @@ use std::io::BufWriter;
 use std::io::prelude::*;
 
 use crate::bitboard::Bitboard;
+use crate::default_nnue::*;
 use crate::util::*;
 
 #[derive(Clone)]
@@ -29,9 +30,6 @@ pub const KING: i32 = 5;
 fn input_number(piece: i32, white: bool, idx: i32) -> usize {
     let piece_num = if white { piece } else { 6 + piece };
     let num = (piece_num * 64 + idx) as i16;
-    // if num > 769 {
-    //     panic!("num too big {}, {} {} {} {}", num, piece, white, rank, file);
-    // }
     return num as usize;
 }
 
@@ -41,8 +39,8 @@ fn relu(x: f32) -> f32 {
 
 pub fn get_default_net() -> Network {
     unsafe {
-        // Network::load("/home/jtwright/chess/mantissa/epoch-209.nnue").unwrap()
-        Network::load("/home/jtwright/chess/mantissa/epoch-103.nnue").unwrap()
+        Network::load_default()
+        // Network::load("/home/jtwright/chess/mantissa/epoch-103.nnue").unwrap()
     }
 }
 
@@ -92,6 +90,54 @@ impl SlowNetwork {
         return self.weights.len() > 0;
     }
 
+    pub fn print(&self) {
+        println!("pub const DEFAULT_NNUE_FEATURE_WEIGHTS: [f32; 98432] = [");
+        for i in 0..769 {
+            for j in 0..16 {
+                print!("\t");
+                for k in 0..8 {
+                    let idx = j * 8 + k;
+                    print!("{}", self.weights[0].get(idx, i));
+                    if i != 768 || j != 15 || k != 7 {
+                        print!(", ");
+                    }
+                }
+                print!("\n");
+            }
+        }
+        println!("];");
+        println!("");
+        println!("pub const DEFAULT_NNUE_HIDDEN_BIAS: [f32; 128] = [");
+        for i in 0..16 {
+            print!("\t");
+            for j in 0..8 {
+                let idx = i * 8 + j;
+                print!("{}", self.biases[0].data[idx]);
+                if i != 15 || j != 7 {
+                    print!(", ");
+                }
+            }
+            print!("\n");
+        }
+        println!("];");
+        println!("");
+        println!("pub const DEFAULT_NNUE_HIDDEN_WEIGHTS: [f32; 128] = [");
+        for i in 0..16 {
+            print!("\t");
+            for j in 0..8 {
+                let idx = i * 8 + j;
+                print!("{}", self.weights[1].data[idx]);
+                if i != 15 || j != 7 {
+                    print!(", ");
+                }
+            }
+            print!("\n");
+        }
+        println!("];");
+        println!("");
+        println!("pub const DEFAULT_NNUE_OUTPUT_BIAS: f32 = {};", self.biases[1].data[0]);
+    }
+
     pub fn load(fname: &str) -> std::io::Result<SlowNetwork> {
         let mut file = File::open(fname)?;
 
@@ -105,7 +151,7 @@ impl SlowNetwork {
 
         // network id
         file.read(&mut buf)?;
-        let id = u32::from_le_bytes(buf);
+        let _id = u32::from_le_bytes(buf);
         // println!("loading network with id {}", id);
 
         // topology information
@@ -360,6 +406,55 @@ impl Network {
 
     pub fn is_valid(&self) -> bool {true}
 
+    pub unsafe fn load_default() -> Network {
+        // inputs
+        let mut feature_weights = vec![[_mm256_setzero_ps(); 16]; 769];
+        let mut weights = vec![[0.0; 128]; 769];
+        for j in 0..769 {
+            for i in 0..128 {
+                weights[j][i] = DEFAULT_NNUE_FEATURE_WEIGHTS[j*128 + i];
+            }
+        }
+
+        for i in 0..769 {
+            for j in 0..16 {
+                let w = weights[i];
+                feature_weights[i][j] = _mm256_load_ps(&w[j*8] as *const f32);
+            }
+        }
+
+        let mut hidden_biases = [_mm256_setzero_ps(); 16];
+        let mut biases = [0.0; 128];
+        for i in 0..128 {
+            biases[i] = DEFAULT_NNUE_HIDDEN_BIAS[i];
+        }
+        for i in 0..16 {
+            hidden_biases[i] = _mm256_load_ps(& biases[i*8] as *const f32);
+
+        }
+
+        let mut hidden_weights = [_mm256_setzero_ps(); 16];
+        let mut weights = [0.0; 128];
+        for i in 0..128 {
+            weights[i] = DEFAULT_NNUE_HIDDEN_WEIGHTS[i];
+        }
+        for i in 0..16 {
+            hidden_weights[i] = _mm256_load_ps(& weights[i*8] as *const f32);
+        }
+
+        let output_bias = DEFAULT_NNUE_OUTPUT_BIAS;
+
+        let network = Network {
+            feature_weights: feature_weights,
+            hidden_weights: hidden_weights,
+            hidden_biases: hidden_biases,
+            hidden_activations: [_mm256_setzero_ps(); 16],
+            output_bias: output_bias
+        };
+
+        return network;
+    }
+
     pub unsafe fn load(fname: &str) -> std::io::Result<Network> {
         let mut file = File::open(fname)?;
 
@@ -373,7 +468,7 @@ impl Network {
 
         // network id
         file.read(&mut buf)?;
-        let id = u32::from_le_bytes(buf);
+        let _id = u32::from_le_bytes(buf);
         // println!("loading network with id {}", id);
 
         // topology information
@@ -430,7 +525,7 @@ impl Network {
         }
 
         file.read(&mut buf)?;
-        let mut output_bias = f32::from_le_bytes(buf);
+        let output_bias = f32::from_le_bytes(buf);
 
         let network = Network {
             feature_weights: feature_weights,
@@ -447,9 +542,7 @@ impl Network {
         unsafe {
             let feature_idx = input_number(piece, color == Color::White, idx as i32);
             for j in 0..16 {
-                unsafe {
-                    self.hidden_activations[j] = _mm256_add_ps(self.hidden_activations[j], self.feature_weights[feature_idx][j]);
-                }
+                self.hidden_activations[j] = _mm256_add_ps(self.hidden_activations[j], self.feature_weights[feature_idx][j]);
             }
         }
     }
@@ -458,9 +551,7 @@ impl Network {
         unsafe {
             let feature_idx = input_number(piece, color == Color::White, idx as i32);
             for j in 0..16 {
-                unsafe {
-                    self.hidden_activations[j] = _mm256_sub_ps(self.hidden_activations[j], self.feature_weights[feature_idx][j]);
-                }
+                self.hidden_activations[j] = _mm256_sub_ps(self.hidden_activations[j], self.feature_weights[feature_idx][j]);
             }
         }
     }
@@ -528,8 +619,8 @@ impl Network {
 
                 total = _mm256_add_ps(total, _mm256_mul_ps(relud, self.hidden_weights[i]));
             }
-            let mut first_half = _mm256_extractf128_ps(total, 0);
-            let mut second_half = _mm256_extractf128_ps(total, 1);
+            let first_half = _mm256_extractf128_ps(total, 0);
+            let second_half = _mm256_extractf128_ps(total, 1);
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(first_half, 0));
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(first_half, 1));
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(first_half, 2));
@@ -539,7 +630,6 @@ impl Network {
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(second_half, 2));
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(second_half, 3));
 
-            // TODO: shuffle
             return (output * 8.5).floor() as i32;
         }
     }

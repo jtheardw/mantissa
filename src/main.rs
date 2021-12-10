@@ -6,6 +6,7 @@
 
 
 mod bitboard;
+mod default_nnue;
 mod eval;
 mod evalutil;
 mod magic;
@@ -49,11 +50,18 @@ fn init() {
 fn main() {
     init();
     // unsafe {
-    //     // let mut nn = Network::load("/home/jtwright/chess/tissa-trainer/nets/epoch-103.nnue").unwrap();
-    //     let mut slow_nn = SlowNetwork::load("/home/jtwright/chess/mantissa/epoch-103.nnue").unwrap();
-    //     slow_nn.save_image("nn-image");
+    //     let mut nn = Network::load("/home/jtwright/chess/mantissa/epoch-103.nnue").unwrap();
+    //     // let mut slow_nn = SlowNetwork::load("/home/jtwright/chess/mantissa/epoch-103.nnue").unwrap();
+    //     // slow_nn.save_image("nn-image");
+    //     // slow_nn.print();
+    //     let mut default_nn = Network::load_default();
+    //     let b = Bitboard::default_board();
+
+    //     nn.set_activations(&b);
+    //     default_nn.set_activations(&b);
+    //     println!("{} {}", nn.nnue_eval(), default_nn.nnue_eval());
+
     // }
-    //     // let b = Bitboard::default_board();
     //     // println!("{}", nn.output_bias);
     //     // nn.set_activations(&b);
     //     // slow_nn.set_activations(&b);

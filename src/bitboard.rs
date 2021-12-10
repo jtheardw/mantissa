@@ -727,17 +727,14 @@ impl Bitboard {
             self.pawn[them] ^= idx_to_bb(actual_pawn_idx);
             // self.net.activate(PAWN, !self.side_to_move, actual_pawn_idx);
         } else if captured_piece != 0 {
-            let cap_num;
             match captured_piece {
-                b'p' => { self.pawn[them] ^= end_point; cap_num = PAWN; },
-                b'n' => { self.knight[them] ^= end_point; cap_num = KNIGHT; },
-                b'b' => { self.bishop[them] ^= end_point; cap_num = BISHOP; },
-                b'r' => { self.rook[them] ^= end_point; cap_num = ROOK; },
-                b'q' => { self.queen[them] ^= end_point; cap_num = QUEEN; },
+                b'p' => { self.pawn[them] ^= end_point; },
+                b'n' => { self.knight[them] ^= end_point; },
+                b'b' => { self.bishop[them] ^= end_point; },
+                b'r' => { self.rook[them] ^= end_point; },
+                b'q' => { self.queen[them] ^= end_point; },
                 _ => panic!("Captured uncapturable piece {}!", captured_piece)
             };
-
-            // self.net.activate(cap_num, !self.side_to_move, mv.end);
         }
 
         // castling
@@ -747,36 +744,30 @@ impl Bitboard {
 
             // move the rook
             let rook_mask = idx_to_bb(old_rook_idx) | idx_to_bb(new_rook_idx);
-            // self.net.move_piece(ROOK, self.side_to_move, new_rook_idx, old_rook_idx);
             self.rook[me] ^= rook_mask;
         }
 
         // move piece
         if mv.piece == b'p' && mv.promote_to != 0 {
             self.pawn[me] ^= start_point;
-            // self.net.activate(PAWN, self.side_to_move, mv.start);
-            let promo_num;
             match mv.promote_to {
-                b'q' => { self.queen[me] ^= end_point; promo_num = QUEEN; },
-                b'r' => { self.rook[me] ^= end_point; promo_num = ROOK; },
-                b'b' => { self.bishop[me] ^= end_point; promo_num = BISHOP; },
-                b'n' => { self.knight[me] ^= end_point; promo_num = KNIGHT; },
+                b'q' => { self.queen[me] ^= end_point; },
+                b'r' => { self.rook[me] ^= end_point; },
+                b'b' => { self.bishop[me] ^= end_point; },
+                b'n' => { self.knight[me] ^= end_point; },
                 _ => { panic!("illegal promotion on mv {}", mv); }
             }
-            // self.net.deactivate(promo_num, self.side_to_move, mv.end);
         } else {
             let move_mask = start_point | end_point;
-            let piece_num;
             match mv.piece {
-                b'k' => { self.king[me] ^= move_mask; piece_num = KING; },
-                b'q' => { self.queen[me] ^= move_mask; piece_num = QUEEN; },
-                b'r' => { self.rook[me] ^= move_mask; piece_num = ROOK; },
-                b'b' => { self.bishop[me] ^= move_mask; piece_num = BISHOP; },
-                b'n' => { self.knight[me] ^= move_mask; piece_num = KNIGHT; },
-                b'p' => { self.pawn[me] ^= move_mask; piece_num = PAWN; },
+                b'k' => { self.king[me] ^= move_mask; },
+                b'q' => { self.queen[me] ^= move_mask; },
+                b'r' => { self.rook[me] ^= move_mask; },
+                b'b' => { self.bishop[me] ^= move_mask; },
+                b'n' => { self.knight[me] ^= move_mask; },
+                b'p' => { self.pawn[me] ^= move_mask; },
                 _ => { panic!("moved nonexistent piece {} in mv {}", mv.piece, mv); }
             }
-            // self.net.move_piece(piece_num, self.side_to_move, mv.end, mv.start);
         }
 
         // update composite
