@@ -40,7 +40,6 @@ fn relu(x: f32) -> f32 {
 pub fn get_default_net() -> Network {
     unsafe {
         Network::load_default()
-        // Network::load("/home/jtwright/chess/mantissa/epoch-103.nnue").unwrap()
     }
 }
 
