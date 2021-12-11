@@ -86,10 +86,6 @@ In terms of search, Mantissa uses some form of the following ideas:
 
 In order to build Mantissa, you'll need rust installed.  From there, you can use whatever build method is easiest for you.  Typically, this is navigating to the directory of the project (in this case, Mantissa), and running `RUSTFLAGS='-C target-cpu=native' cargo build --release`.
 
-I also provide some build scripts located in the main directory.  They attempt to build with certain optimizations, most notably using the `popcnt` instruction if available.  At the moment, all the build scripts were written with a unix-like shell in mind (including the `build_windows` script, which I use for cross-compiling), but I'll be adding windows cmd line compatible ones soon.
-
-NOTE: If you're having trouble installing the Windows build using the `build_windows` script, because you don't have the `popcnt` instruction or any other reason, use the `build_portable` script instead.  I encourage you to use the normal windows build if possible though, as the difference in playing strength is noticeable
-
 ## Credit
 
 ### Engine Design
