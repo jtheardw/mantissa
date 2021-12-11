@@ -288,6 +288,9 @@ pub fn uci_loop() {
             abort_search();
         } else if cmd == "eval" {
             println!("{}", static_eval(&mut board, &mut PHT::get_pht(1)) / 10);
+        } else if cmd == "nnue" {
+            let b = board.thread_copy();
+            board.net.print_eval(&b);
         } else {
             println!("unrecognized command.");
         }

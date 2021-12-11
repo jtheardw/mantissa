@@ -632,4 +632,66 @@ impl Network {
             return (output * 8.5).floor() as i32;
         }
     }
+
+    pub fn print_eval(&mut self, board: &Bitboard) {
+        let base_score = self.nnue_eval() as f32 / 1000.0;
+
+        eprint!("\x1B[0m");
+        for _ in 0..24 { eprint!("\n"); }
+        eprint!("\x1B[24A");
+        for rank in (0..8).rev() {
+            for file in 0..8 {
+                let idx = rank*8 + file;
+
+                let parity = (rank + file) % 2 == 0;
+                let bg = if parity { (181, 135, 99) } else { (212, 190, 154) };
+                eprint!("\x1B[48;2;{};{};{}m", bg.0, bg.1, bg.2);
+                eprint!("       \x1B[7D\x1B[B");
+
+                let mut piece = board.piece_at_square(idx, Color::White);
+                let mut color = Color::White;
+                if piece == 0 {
+                    piece = board.piece_at_square(idx, Color::Black);
+                    color = Color::Black;
+                }
+                if piece == 0 {
+                    eprint!("       \x1B[7D\x1B[B");
+                    eprint!("       \x1B[7D");
+                    eprint!("\x1B[2A\x1B[7C");
+                    continue;
+                }
+
+                match color {
+                    Color::White => eprint!("\x1B[97m"),
+                    Color::Black => eprint!("\x1B[30m")
+                };
+                eprint!("   {}   \x1B[7D\x1B[B", (piece - 32) as char);
+                if piece == b'k' {
+                    eprint!("       \x1B[7D");
+                } else {
+                    let piece_num = match piece {
+                        b'p' => PAWN,
+                        b'n' => KNIGHT,
+                        b'b' => BISHOP,
+                        b'r' => ROOK,
+                        b'q' => QUEEN,
+                        _ => {panic!("there is no piece here")}
+                    };
+                    self.deactivate(piece_num, color, idx);
+                    let hypothetical_score = self.nnue_eval() as f32 / 1000.0;
+                    let ofs = base_score - hypothetical_score;
+                    self.activate(piece_num, color, idx);
+                    if ofs.abs() >= 10.0 {
+                        eprint!(" {:+5.1} \x1B[7D", ofs);
+                    }
+                    else {
+                        eprint!(" {:+5.2} \x1B[7D", ofs);
+                    }
+                }
+                eprint!("\x1B[2A\x1B[7C");
+            }
+            eprint!("\x1B[0m\r\x1B[3B");
+        }
+        eprintln!("NNUE evaluation (White View): {:+.2}", base_score);
+    }
 }
