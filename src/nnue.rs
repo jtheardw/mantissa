@@ -371,7 +371,7 @@ impl SlowNetwork {
     }
 }
 
-
+#[cfg(target_feature = "avx")]
 pub struct Network {
     pub feature_weights: Vec<[__m256; 16]>,
     pub hidden_weights: [__m256; 16],
@@ -380,6 +380,7 @@ pub struct Network {
     pub output_bias: f32,
 }
 
+#[cfg(target_feature = "avx")]
 impl Network {
     pub fn empty_net() -> Network {
         unsafe {
@@ -628,6 +629,328 @@ impl Network {
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(second_half, 1));
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(second_half, 2));
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(second_half, 3));
+
+            return (output * 8.5).floor() as i32;
+        }
+    }
+
+    pub fn print_eval(&mut self, board: &Bitboard) {
+        let base_score = self.nnue_eval() as f32 / 1000.0;
+
+        eprint!("\x1B[0m");
+        for _ in 0..24 { eprint!("\n"); }
+        eprint!("\x1B[24A");
+        for rank in (0..8).rev() {
+            for file in 0..8 {
+                let idx = rank*8 + file;
+
+                let parity = (rank + file) % 2 == 0;
+                let bg = if parity { (181, 135, 99) } else { (212, 190, 154) };
+                eprint!("\x1B[48;2;{};{};{}m", bg.0, bg.1, bg.2);
+                eprint!("       \x1B[7D\x1B[B");
+
+                let mut piece = board.piece_at_square(idx, Color::White);
+                let mut color = Color::White;
+                if piece == 0 {
+                    piece = board.piece_at_square(idx, Color::Black);
+                    color = Color::Black;
+                }
+                if piece == 0 {
+                    eprint!("       \x1B[7D\x1B[B");
+                    eprint!("       \x1B[7D");
+                    eprint!("\x1B[2A\x1B[7C");
+                    continue;
+                }
+
+                match color {
+                    Color::White => eprint!("\x1B[97m"),
+                    Color::Black => eprint!("\x1B[30m")
+                };
+                eprint!("   {}   \x1B[7D\x1B[B", (piece - 32) as char);
+                if piece == b'k' {
+                    eprint!("       \x1B[7D");
+                } else {
+                    let piece_num = match piece {
+                        b'p' => PAWN,
+                        b'n' => KNIGHT,
+                        b'b' => BISHOP,
+                        b'r' => ROOK,
+                        b'q' => QUEEN,
+                        _ => {panic!("there is no piece here")}
+                    };
+                    self.deactivate(piece_num, color, idx);
+                    let hypothetical_score = self.nnue_eval() as f32 / 1000.0;
+                    let ofs = base_score - hypothetical_score;
+                    self.activate(piece_num, color, idx);
+                    if ofs.abs() >= 10.0 {
+                        eprint!(" {:+5.1} \x1B[7D", ofs);
+                    }
+                    else {
+                        eprint!(" {:+5.2} \x1B[7D", ofs);
+                    }
+                }
+                eprint!("\x1B[2A\x1B[7C");
+            }
+            eprint!("\x1B[0m\r\x1B[3B");
+        }
+        eprintln!("NNUE evaluation (White View): {:+.2}", base_score);
+    }
+}
+
+
+// Slower net for SSE3 only machines
+#[cfg(not(target_feature = "avx"))]
+pub struct Network {
+    pub feature_weights: Vec<[__m128; 32]>,
+    pub hidden_weights: [__m128; 32],
+    pub hidden_biases: [__m128; 32],
+    pub hidden_activations: [__m128; 32],
+    pub output_bias: f32,
+}
+
+#[cfg(not(target_feature = "avx"))]
+impl Network {
+    pub fn empty_net() -> Network {
+        unsafe {
+            Network {
+                feature_weights: vec![[_mm_setzero_ps(); 32]; 769],
+                hidden_weights: [_mm_setzero_ps(); 32],
+                hidden_biases: [_mm_setzero_ps(); 32],
+                hidden_activations: [_mm_setzero_ps(); 32],
+                output_bias: 0.0
+            }
+        }
+    }
+
+    pub fn copy(&self) -> Network {
+        Network {
+            feature_weights: self.feature_weights.to_vec(),
+            hidden_weights: self.hidden_weights,
+            hidden_biases: self.hidden_biases,
+            hidden_activations: self.hidden_activations,
+            output_bias: self.output_bias
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {true}
+
+    pub unsafe fn load_default() -> Network {
+        // inputs
+        let mut feature_weights = vec![[_mm_setzero_ps(); 32]; 769];
+        let mut weights = vec![[0.0; 128]; 769];
+        for j in 0..769 {
+            for i in 0..128 {
+                weights[j][i] = DEFAULT_NNUE_FEATURE_WEIGHTS[j*128 + i];
+            }
+        }
+
+        for i in 0..769 {
+            for j in 0..32 {
+                let w = weights[i];
+                feature_weights[i][j] = _mm_loadu_ps(&w[j*4] as *const f32);
+            }
+        }
+
+        let mut hidden_biases = [_mm_setzero_ps(); 32];
+        let mut biases = [0.0; 128];
+        for i in 0..128 {
+            biases[i] = DEFAULT_NNUE_HIDDEN_BIAS[i];
+        }
+        for i in 0..32 {
+            hidden_biases[i] = _mm_loadu_ps(& biases[i*4] as *const f32);
+
+        }
+
+        let mut hidden_weights = [_mm_setzero_ps(); 32];
+        let mut weights = [0.0; 128];
+        for i in 0..128 {
+            weights[i] = DEFAULT_NNUE_HIDDEN_WEIGHTS[i];
+        }
+        for i in 0..32 {
+            hidden_weights[i] = _mm_loadu_ps(& weights[i*4] as *const f32);
+        }
+
+        let output_bias = DEFAULT_NNUE_OUTPUT_BIAS;
+
+        let network = Network {
+            feature_weights: feature_weights,
+            hidden_weights: hidden_weights,
+            hidden_biases: hidden_biases,
+            hidden_activations: [_mm_setzero_ps(); 32],
+            output_bias: output_bias
+        };
+
+        return network;
+    }
+
+    pub unsafe fn load(fname: &str) -> std::io::Result<Network> {
+        let mut file = File::open(fname)?;
+
+        // We'll read one 4-byte "word" at a time
+        let mut buf: [u8; 4] = [0; 4];
+
+        // magic number
+        file.read(&mut buf)?;
+        if buf[0..2] != [66, 90] { panic!("Magic word does not match expected 'BZ'"); }
+        if buf[2..4] != [2, 0] { panic!("SlowNetwork binary format version is not supported."); }
+
+        // network id
+        file.read(&mut buf)?;
+        let _id = u32::from_le_bytes(buf);
+        // println!("loading network with id {}", id);
+
+        // topology information
+        file.read(&mut buf)?;
+        let _inputs = u32::from_le_bytes(buf);
+        file.read(&mut buf)?;
+        let _outputs = u32::from_le_bytes(buf);
+        file.read(&mut buf)?;
+        let layers = u32::from_le_bytes(buf);
+
+        // hidden neuron counts in layers
+        let mut hidden: Vec<u32> = Vec::new();
+        for _ in 0..layers {
+            file.read(&mut buf)?;
+            hidden.push(u32::from_le_bytes(buf));
+        }
+
+        // inputs
+        let mut feature_weights = vec![[_mm_setzero_ps(); 32]; 769];
+        let mut weights = vec![[0.0; 128]; 769];
+        for j in 0..769 {
+            for i in 0..128 {
+                file.read(&mut buf)?;
+                weights[j][i] = f32::from_le_bytes(buf);
+            }
+        }
+
+        for i in 0..769 {
+            for j in 0..32 {
+                let w = weights[i];
+                feature_weights[i][j] = _mm_load_ps(&w[j*4] as *const f32);
+            }
+        }
+
+        let mut hidden_biases = [_mm_setzero_ps(); 32];
+        let mut biases = [0.0; 128];
+        for i in 0..128 {
+            file.read(&mut buf)?;
+            biases[i] = f32::from_le_bytes(buf);
+        }
+        for i in 0..32 {
+            hidden_biases[i] = _mm_load_ps(& biases[i*4] as *const f32);
+
+        }
+
+        let mut hidden_weights = [_mm_setzero_ps(); 32];
+        let mut weights = [0.0; 128];
+        for i in 0..128 {
+            file.read(&mut buf)?;
+            weights[i] = f32::from_le_bytes(buf);
+        }
+        for i in 0..32 {
+            hidden_weights[i] = _mm_load_ps(& weights[i*4] as *const f32);
+        }
+
+        file.read(&mut buf)?;
+        let output_bias = f32::from_le_bytes(buf);
+
+        let network = Network {
+            feature_weights: feature_weights,
+            hidden_weights: hidden_weights,
+            hidden_biases: hidden_biases,
+            hidden_activations: [_mm_setzero_ps(); 32],
+            output_bias: output_bias
+        };
+
+        return Ok(network);
+    }
+
+    pub fn activate(&mut self, piece: i32, color: Color, idx: i8) {
+        unsafe {
+            let feature_idx = input_number(piece, color == Color::White, idx as i32);
+            for j in 0..32 {
+                self.hidden_activations[j] = _mm_add_ps(self.hidden_activations[j], self.feature_weights[feature_idx][j]);
+            }
+        }
+    }
+
+    pub fn deactivate(&mut self, piece: i32, color: Color, idx: i8) {
+        unsafe {
+            let feature_idx = input_number(piece, color == Color::White, idx as i32);
+            for j in 0..32 {
+                self.hidden_activations[j] = _mm_sub_ps(self.hidden_activations[j], self.feature_weights[feature_idx][j]);
+            }
+        }
+    }
+
+    pub fn move_piece(&mut self, piece: i32, color: Color, start: i8, end: i8) {
+        self.deactivate(piece, color, start);
+        self.activate(piece, color, end);
+    }
+
+    pub fn black_turn(&mut self) {
+        for j in 0..32 {
+            unsafe {
+                self.hidden_activations[j] = _mm_sub_ps(self.hidden_activations[j], self.feature_weights[768][j]);
+            }
+        }
+    }
+
+    pub fn white_turn(&mut self) {
+        for j in 0..32 {
+            unsafe {
+                self.hidden_activations[j] = _mm_add_ps(self.hidden_activations[j], self.feature_weights[768][j]);
+            }
+        }
+    }
+
+    fn set_bb_activations(&mut self, bb: u64, piece_num: i32, is_white: bool) {
+        let mut bb = bb;
+        while bb != 0 {
+            let idx = bb.trailing_zeros() as i8;
+            bb &= bb - 1;
+            self.activate(piece_num, if is_white {Color::White} else {Color::Black}, idx);
+        }
+    }
+
+    pub fn set_activations(&mut self, pos: &Bitboard) {
+        for i in 0..32 {
+            self.hidden_activations[i] = self.hidden_biases[i];
+        }
+
+        for side in [Color::White, Color::Black] {
+            let is_white = side == Color::White;
+            let me = side as usize;
+
+            self.set_bb_activations(pos.pawn[me], PAWN, is_white);
+            self.set_bb_activations(pos.knight[me], KNIGHT, is_white);
+            self.set_bb_activations(pos.bishop[me], BISHOP, is_white);
+            self.set_bb_activations(pos.rook[me], ROOK, is_white);
+            self.set_bb_activations(pos.queen[me], QUEEN, is_white);
+            self.set_bb_activations(pos.king[me], KING, is_white);
+        }
+
+        if pos.side_to_move == Color::White {
+            self.white_turn();
+        }
+    }
+
+    pub fn nnue_eval(&mut self) -> i32 {
+        unsafe {
+            // assumes that inputs already updated and so on
+            let mut output = self.output_bias;
+            let mut total = _mm_setzero_ps();
+            for i in 0..32 {
+                // relu
+                let relud = _mm_max_ps(self.hidden_activations[i], _mm_setzero_ps());
+
+                total = _mm_add_ps(total, _mm_mul_ps(relud, self.hidden_weights[i]));
+            }
+            output += std::mem::transmute::<i32, f32>(_mm_extract_ps(total, 0));
+            output += std::mem::transmute::<i32, f32>(_mm_extract_ps(total, 1));
+            output += std::mem::transmute::<i32, f32>(_mm_extract_ps(total, 2));
+            output += std::mem::transmute::<i32, f32>(_mm_extract_ps(total, 3));
 
             return (output * 8.5).floor() as i32;
         }

@@ -32,7 +32,10 @@ pub struct Bitboard {
     cap_stack: Vec<u8>,
     castling_rights_stack: Vec<u8>,
     halfmove_stack: Vec<u8>,
+    #[cfg(target_feature = "avx")]
     activation_stack: Vec<[__m256; 16]>,
+    #[cfg(not(target_feature = "avx"))]
+    activation_stack: Vec<[__m128; 32]>,
 
     pub halfmove: u8,
 
