@@ -33,6 +33,20 @@ fn input_number(piece: i32, white: bool, idx: i32) -> usize {
     return num as usize;
 }
 
+fn flip_input(input: i16) -> i16 {
+    // need to flip "color" and "rank"
+    // flip square
+    if input == 768 { return 768; }
+    let idx = (input % 64) ^ 56;
+    let orig_piece_num = input / 64;
+    let piece_type = orig_piece_num % 6;
+    // >= 6 meant it was black, so we need to undo that and vice versa
+    let piece_color = orig_piece_num >= 6;
+    let piece_num = if piece_color {piece_type} else {6 + piece_type};
+
+    return piece_num * 64 + idx;
+}
+
 fn relu(x: f32) -> f32 {
     x.max(0.0)
 }
@@ -40,7 +54,7 @@ fn relu(x: f32) -> f32 {
 pub fn get_default_net() -> Network {
     unsafe {
         // Network::load_default()
-        Network::load("/home/jtwright/chess/mantissa/large-net-epoch-137.nnue").unwrap()
+        Network::load("/home/jtwright/chess/tissa-trainer2/nets/epoch-39.nnue").unwrap()
     }
 }
 
@@ -379,6 +393,7 @@ pub struct Network {
     pub hidden_biases: [__m256; 32],
     pub hidden_activations: [__m256; 32],
     pub output_bias: f32,
+    pub flip: bool
 }
 
 #[cfg(target_feature = "avx")]
@@ -390,7 +405,8 @@ impl Network {
                 hidden_weights: [_mm256_setzero_ps(); 32],
                 hidden_biases: [_mm256_setzero_ps(); 32],
                 hidden_activations: [_mm256_setzero_ps(); 32],
-                output_bias: 0.0
+                output_bias: 0.0,
+                flip: false
             }
         }
     }
@@ -401,7 +417,8 @@ impl Network {
             hidden_weights: self.hidden_weights,
             hidden_biases: self.hidden_biases,
             hidden_activations: self.hidden_activations,
-            output_bias: self.output_bias
+            output_bias: self.output_bias,
+            flip: self.flip
         }
     }
 
@@ -450,7 +467,8 @@ impl Network {
             hidden_weights: hidden_weights,
             hidden_biases: hidden_biases,
             hidden_activations: [_mm256_setzero_ps(); 32],
-            output_bias: output_bias
+            output_bias: output_bias,
+            flip: false
         };
 
         return network;
@@ -493,7 +511,10 @@ impl Network {
         for j in 0..769 {
             for i in 0..256 {
                 file.read(&mut buf)?;
-                weights[j][i] = f32::from_le_bytes(buf);
+                if i < 128 {
+                    weights[j][i] = f32::from_le_bytes(buf);
+                    weights[flip_input(j as i16) as usize][i + 128] = f32::from_le_bytes(buf);
+                }
             }
         }
 
@@ -508,7 +529,10 @@ impl Network {
         let mut biases = [0.0; 256];
         for i in 0..256 {
             file.read(&mut buf)?;
-            biases[i] = f32::from_le_bytes(buf);
+            if i < 128 {
+                biases[i] = f32::from_le_bytes(buf);
+                biases[i+128] = f32::from_le_bytes(buf);
+            }
         }
         for i in 0..32 {
             hidden_biases[i] = _mm256_load_ps(& biases[i*8] as *const f32);
@@ -533,7 +557,8 @@ impl Network {
             hidden_weights: hidden_weights,
             hidden_biases: hidden_biases,
             hidden_activations: [_mm256_setzero_ps(); 32],
-            output_bias: output_bias
+            output_bias: output_bias,
+            flip: false
         };
 
         return Ok(network);
@@ -563,19 +588,21 @@ impl Network {
     }
 
     pub fn black_turn(&mut self) {
-        for j in 0..32 {
-            unsafe {
-                self.hidden_activations[j] = _mm256_sub_ps(self.hidden_activations[j], self.feature_weights[768][j]);
-            }
-        }
+        self.flip = true;
+        // for j in 0..32 {
+        //     unsafe {
+        //         self.hidden_activations[j] = _mm256_sub_ps(self.hidden_activations[j], self.feature_weights[768][j]);
+        //     }
+        // }
     }
 
     pub fn white_turn(&mut self) {
-        for j in 0..32 {
-            unsafe {
-                self.hidden_activations[j] = _mm256_add_ps(self.hidden_activations[j], self.feature_weights[768][j]);
-            }
-        }
+        self.flip = false;
+        // for j in 0..32 {
+        //     unsafe {
+        //         self.hidden_activations[j] = _mm256_add_ps(self.hidden_activations[j], self.feature_weights[768][j]);
+        //     }
+        // }
     }
 
     fn set_bb_activations(&mut self, bb: u64, piece_num: i32, is_white: bool) {
@@ -606,6 +633,8 @@ impl Network {
 
         if pos.side_to_move == Color::White {
             self.white_turn();
+        } else {
+            self.black_turn();
         }
     }
 
@@ -615,8 +644,9 @@ impl Network {
             let mut output = self.output_bias;
             let mut total = _mm256_setzero_ps();
             for i in 0..32 {
+                let idx = if self.flip { i ^ 16 } else { i };
                 // relu
-                let relud = _mm256_max_ps(self.hidden_activations[i], _mm256_setzero_ps());
+                let relud = _mm256_max_ps(self.hidden_activations[idx], _mm256_setzero_ps());
 
                 total = _mm256_add_ps(total, _mm256_mul_ps(relud, self.hidden_weights[i]));
             }
@@ -631,6 +661,7 @@ impl Network {
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(second_half, 2));
             output += std::mem::transmute::<i32, f32>(_mm_extract_ps(second_half, 3));
 
+            if self.flip {output *= -1.0;}
             return (output * 7.5).floor() as i32;
         }
     }
