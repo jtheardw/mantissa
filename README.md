@@ -23,11 +23,15 @@ As of this writing, Mantissa is currently between 2150 and 2450 lichess ELO in m
 
 ### CCRL
 
-Mantissa currently holds a blitz ELO rating of 2686 on CCRL (as of version 2.1.1).  This score may fluctuate in the future, as this is its first entry on the list.
+Mantissa currently holds a blitz ELO rating of 2999 on CCRL (as of version 3.0.0).  This score may fluctuate in the future, as this is its first entry on the list.
 
 ### CEDR
 
-Mantissa-3.0.0 has 2933 Rating points on the CEDR (Chess Engines Diary) System.
+Mantissa 3.0.0 has 2933 Rating points on the CEDR (Chess Engines Diary) System.
+
+### CEGT
+
+Mantissa 3.0.0 has a 2877 rating on CEGT Blitz.
 
 ## Features
 
