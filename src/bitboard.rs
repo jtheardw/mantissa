@@ -35,7 +35,7 @@ pub struct Bitboard {
     #[cfg(target_feature = "avx")]
     activation_stack: Vec<[__m256; 32]>,
     #[cfg(not(target_feature = "avx"))]
-    activation_stack: Vec<[__m128; 32]>,
+    activation_stack: Vec<[__m128; 64]>,
 
     pub halfmove: u8,
 
