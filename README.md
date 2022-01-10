@@ -61,7 +61,7 @@ In terms of search, Mantissa uses some form of the following ideas:
 - Tapered Evaluation
 
 ### NNUE
-- 769 -> 128 -> 1 Simple architecture trained on Mantissa self-play games
+- 768 -> 128 x 2 -> 1 Simple architecture trained on Mantissa self-play games based on a combination of Zahak and Koivisto topologies
 
 ### Search Basics
 - Negamax search with alpha-beta pruning
@@ -90,7 +90,7 @@ In terms of search, Mantissa uses some form of the following ideas:
 
 ## Build
 
-**For the current version (3.0.0), Mantissa is only compatible with `x86_64` hardware.  This is my first experience working with NNUE so my ability to have it be efficient is fairly limited.  I'll be researching ways to increase portability while keeping strength as I become more familiar.  For now, if you're trying to run Mantissa on non `x86_64` hardware, consider the 2.5.0 release.  I apologize for any inconvenience**
+**For the current version (3.3.0), Mantissa is only compatible with `x86_64` hardware.  This is my first experience working with NNUE so my ability to have it be efficient is fairly limited.  I'll be researching ways to increase portability while keeping strength as I become more familiar.  For now, if you're trying to run Mantissa on non `x86_64` hardware, consider the 2.5.0 release.  I apologize for any inconvenience**
 
 In order to build Mantissa, you'll need rust installed.  From there, you can use whatever build method is easiest for you.  Typically, this is navigating to the directory of the project (in this case, Mantissa), and running `RUSTFLAGS='-C target-cpu=native' cargo build --release`.
 
@@ -114,6 +114,7 @@ I am not very good at chess and am still relatively new to chess programming, so
 ### NNUE
 
 - Amanj was incredibly helpful in getting me started with NNUE.  `tissa-trainer`, which is the program I wrote to be able to train Mantissa nets, is basically a port of `zahak-trainer` to rust with some slight modifications.  He also helped explain a lot of the resources and information needed to understand the process.
+- Koivisto's authors, as I found a way to improve my NNUE topology from what I found in Koivisto's source.
 - Kade Phillips for net visualization code and the NNUE-derived piece value display
 
 ### Other

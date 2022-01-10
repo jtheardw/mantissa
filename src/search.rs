@@ -467,7 +467,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         && eval >= beta
         && !ss[(ply - 1) as usize].searching_null_move
         && (ply < 2 || !ss[(ply - 2) as usize].searching_null_move)
-        && node.has_non_pawn_material()
+        && node.stm_has_non_pawn_material()
     {
         let r = null_move_r(eval, beta, depth);
 

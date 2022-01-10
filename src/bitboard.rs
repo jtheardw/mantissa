@@ -882,6 +882,12 @@ impl Bitboard {
         return false;
     }
 
+    pub fn stm_has_non_pawn_material(&self) -> bool {
+        let stm = self.side_to_move as usize;
+        if (self.pawn[stm] | self.king[stm]) != self.composite[stm] { return true; }
+        return false;
+    }
+
     pub fn get_last_capture(&self) -> u8 {
         return self.cap_stack[self.cap_stack.len() - 1];
     }
