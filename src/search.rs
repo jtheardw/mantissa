@@ -243,8 +243,10 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
         let elapsed_time;
         unsafe {
-            SEARCH_LIMITS.maximum_time = max_time;
-            search_limits.maximum_time = max_time;
+            if depth > 4 {
+                SEARCH_LIMITS.maximum_time = max_time;
+                search_limits.maximum_time = max_time;
+            }
             pv = &SS[0][0].pv;
             let mv = pv[0];
             if mv != best_move {
@@ -279,7 +281,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         }
 
         // it's less obvious that we have
-        if search_limits.use_variable_time {
+        if depth > 4 && search_limits.use_variable_time {
             if elapsed_time >= search_limits.optimum_time {
                 // general idea here, inspired by some combination of SF and Ethereal
                 // but then simplified by my laziness and then made sloppy
@@ -338,7 +340,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     let init_node = ply == 0;
 
-    sse.pv = Vec::new();
+    sse.pv.clear();
     sse.current_move = Move::null_move();
 
     if ply > ti.seldepth {
@@ -363,7 +365,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     let mut depth = depth;
     if depth <= 0 {
-        sse.pv = Vec::new();
+        sse.pv.clear();
         return qsearch(node, alpha, beta, thread_num);
     }
 
@@ -607,10 +609,12 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         let mut val = LB;
         if moves_searched == 1 {
             val = -search(node, -beta, -alpha, if sing_extend {depth} else {depth - 1}, ply + 1, is_pv, thread_num);
-            unsafe {
-                let child_ss = &mut SS[thread_num][(ply + 1) as usize];
-                sse.pv = vec![mv];
-                sse.pv.append(&mut child_ss.pv);
+            if is_pv {
+                unsafe {
+                    let child_ss = &mut SS[thread_num][(ply + 1) as usize];
+                    sse.pv.push(mv);
+                    sse.pv.append(&mut child_ss.pv);
+                }
             }
         } else {
             let mut do_full_zw_search = true;
@@ -649,7 +653,8 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 val = -search(node, -beta, -alpha, depth - 1, ply + 1, true, thread_num);
                 unsafe {
                     let child_ss = &mut SS[thread_num][(ply + 1) as usize];
-                    sse.pv = vec![mv];
+                    sse.pv.clear();
+                    sse.pv.push(mv);//= vec![mv];
                     sse.pv.append(&mut child_ss.pv);
                 }
                 // if init_node {
