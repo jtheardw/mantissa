@@ -1,4 +1,5 @@
 use std::arch::x86_64::*;
+use std::simd::*;
 
 use crate::movegen::*;
 use crate::moveutil::*;
@@ -32,10 +33,7 @@ pub struct Bitboard {
     cap_stack: Vec<u8>,
     castling_rights_stack: Vec<u8>,
     halfmove_stack: Vec<u8>,
-    #[cfg(target_feature = "avx")]
-    activation_stack: Vec<[__m256; 32]>,
-    #[cfg(not(target_feature = "avx"))]
-    activation_stack: Vec<[__m128; 64]>,
+    activation_stack: Vec<[f32x8; 32]>,
 
     pub halfmove: u8,
 
