@@ -203,7 +203,7 @@ fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
                         Ok(num) => num,
                         Err(_) => {println!("ERR: invalid value provided for Hash"); return;}
                     };
-                    if hash_size > 65535 || hash_size < 1 {
+                    if hash_size > 65536 || hash_size < 1 {
                         println!("ERR: invalid value provided for Hash");
                         return;
                     }
@@ -267,7 +267,7 @@ pub fn uci_loop() {
         } else if cmd == "uci" {
             println!("id name Mantissa v3.3.0-tcec-0");
             println!("id author jtwright");
-            println!("option name Hash type spin default 64 min 1 max 65535");
+            println!("option name Hash type spin default 64 min 1 max 65536");
             println!("option name Threads type spin default 1 min 1 max 256");
             println!("option name Move Overhead type spin default 10 min 1 max 1000");
             println!("uciok");
