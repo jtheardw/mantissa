@@ -191,6 +191,113 @@ fn pawnless_endgame_drawish(pos: &Bitboard) -> bool {
     return false;
 }
 
+pub fn print_eval(board: &mut Bitboard) {
+    let base_score = evaluate_position(board, &mut PHT::get_pht(1)) as f32 / 1000.0;
+
+    eprint!("\x1B[0m");
+    for _ in 0..24 { eprint!("\n"); }
+    eprint!("\x1B[24A");
+    for rank in (0..8).rev() {
+        for file in 0..8 {
+            let idx = rank*8 + file;
+
+            let parity = (rank + file) % 2 == 0;
+            let bg = if parity { (181, 135, 99) } else { (212, 190, 154) };
+            eprint!("\x1B[48;2;{};{};{}m", bg.0, bg.1, bg.2);
+            eprint!("       \x1B[7D\x1B[B");
+
+            let mut piece = board.piece_at_square(idx, Color::White);
+            let mut color = Color::White;
+            if piece == 0 {
+                piece = board.piece_at_square(idx, Color::Black);
+                color = Color::Black;
+            }
+            if piece == 0 {
+                eprint!("       \x1B[7D\x1B[B");
+                eprint!("       \x1B[7D");
+                eprint!("\x1B[2A\x1B[7C");
+                continue;
+            }
+
+            match color {
+                Color::White => eprint!("\x1B[97m"),
+                Color::Black => eprint!("\x1B[30m")
+            };
+            eprint!("   {}   \x1B[7D\x1B[B", (piece - 32) as char);
+            if piece == b'k' {
+                eprint!("       \x1B[7D");
+            } else {
+                let side = color as usize;
+                board.composite[side] ^= idx_to_bb(idx);
+                match piece {
+                    b'p' => {board.pawn[side] ^= idx_to_bb(idx);},
+                    b'n' => {board.knight[side] ^= idx_to_bb(idx);},
+                    b'b' => {board.bishop[side] ^= idx_to_bb(idx);},
+                    b'r' => {board.rook[side] ^= idx_to_bb(idx);},
+                    b'q' => {board.queen[side] ^= idx_to_bb(idx);},
+                    _ => {panic!("there is no piece here")}
+                }
+
+                // self.deactivate(piece_num, color, idx);
+                let hypothetical_score = evaluate_position(board, &mut PHT::get_pht(1)) as f32 / 1000.0;
+                let ofs = base_score - hypothetical_score;
+
+                board.composite[side] ^= idx_to_bb(idx);
+                match piece {
+                    b'p' => {board.pawn[side] ^= idx_to_bb(idx);},
+                    b'n' => {board.knight[side] ^= idx_to_bb(idx);},
+                    b'b' => {board.bishop[side] ^= idx_to_bb(idx);},
+                    b'r' => {board.rook[side] ^= idx_to_bb(idx);},
+                    b'q' => {board.queen[side] ^= idx_to_bb(idx);},
+                    _ => {panic!("there is no piece here")}
+                }
+
+                if ofs.abs() >= 10.0 {
+                    eprint!(" {:+5.1} \x1B[7D", ofs);
+                }
+                else {
+                    eprint!(" {:+5.2} \x1B[7D", ofs);
+                }
+            }
+            eprint!("\x1B[2A\x1B[7C");
+        }
+        eprint!("\x1B[0m\r\x1B[3B");
+    }
+    eprintln!("Classical evaluation (White View): {:+.2}", base_score);
+}
+// fn king_distance(k1: i8, k2: i8) -> i32 {
+//     let (k1f, k1r) = idx_to_coord(k1);
+//     let (k2f, k2r) = idx_to_coord(k2);
+//     return cmp::max((k1f - k2f).abs(), (k1r - k2f).abs()) as i32;
+// }
+
+// fn edge_distance(idx: i8) -> i32 {
+//     let (f, r) = idx_to_coord(idx);
+//     return cmp::min(7 - f, f, 7 - r, r) as i32;
+// }
+
+// fn corner_manhattan_distance(idx: i8) -> i32 {
+//     let (f, r) = idx_to_coord(idx);
+//     let f_dist = cmp::min(7 - f, f);
+//     let r_dist = cmp::min(7 - r, r);
+//     return (f_dist + r_dist) as i32;
+// }
+
+// fn corner_distance(idx: i8) -> i32 {
+//     let (f, r) = idx_to_coord(idx);
+//     let f_dist = cmp::min(7 - f, f);
+//     let r_dist = cmp::min(7 - r, r);
+//     return cmp::max(f_dist, r_dist) as i32;
+// }
+
+// pub fn is_known_win_endgame(pos: &Bitboard) -> i32 {
+//     // for now, we'll only add KX v K endgames
+// }
+
+// pub fn known_win_endgame(pos: &Bitboard) -> i32 {
+
+// }
+
 pub fn material_score(pos: &Bitboard) -> Score {
     let mut score: Score = make_score(0, 0);
     if pawnless_endgame_drawish(pos) { return score; }
@@ -631,20 +738,21 @@ fn double_bishop_bonus(pos: &Bitboard) -> Score {
 }
 
 pub fn print_value(pos: &Bitboard) {
-    println!("material: {}", taper_score(material_score(pos), pos.get_phase()));
-    println!("mobility and king_danger: {}", taper_score(mobility_and_king_danger(pos), pos.get_phase()));
-    println!("passed_pawns: {}", taper_score(passed_pawns_value(pos), pos.get_phase()));
-    println!("center_pawns: {}", taper_score(center_pawns_value(pos), pos.get_phase()));
-    println!("isolated_pawns: {}", taper_score(isolated_pawns_value(pos), pos.get_phase()));
-    println!("doubled_pawns: {}", taper_score(doubled_pawns_value(pos), pos.get_phase()));
-    println!("backwards_pawns: {}", taper_score(backwards_pawns_value(pos), pos.get_phase()));
-    println!("connected_pawns: {}", taper_score(connected_pawns_value(pos), pos.get_phase()));
-    println!("space: {}", taper_score(space_control_value(pos), pos.get_phase()));
-    println!("rook on 7th: {}", taper_score(rook_on_seventh_value(pos), pos.get_phase()));
-    println!("rook on open: {}", taper_score(rook_on_open_value(pos), pos.get_phase()));
-    println!("double_bishop_bonus: {}", taper_score(double_bishop_bonus(pos), pos.get_phase()));
-    println!("bishop_color: {}", taper_score(bishop_color_value(pos), pos.get_phase()));
-    println!("psqt: {}", taper_score(nonpawn_psqt_value(pos) + pawn_psqt_value(pos), pos.get_phase()));
+    eprintln!("HCE Score Breakdown:");
+    eprintln!("material: {}", taper_score(material_score(pos), pos.get_phase()));
+    eprintln!("mobility and king_danger: {}", taper_score(mobility_and_king_danger(pos), pos.get_phase()));
+    eprintln!("passed_pawns: {}", taper_score(passed_pawns_value(pos), pos.get_phase()));
+    eprintln!("center_pawns: {}", taper_score(center_pawns_value(pos), pos.get_phase()));
+    eprintln!("isolated_pawns: {}", taper_score(isolated_pawns_value(pos), pos.get_phase()));
+    eprintln!("doubled_pawns: {}", taper_score(doubled_pawns_value(pos), pos.get_phase()));
+    eprintln!("backwards_pawns: {}", taper_score(backwards_pawns_value(pos), pos.get_phase()));
+    eprintln!("connected_pawns: {}", taper_score(connected_pawns_value(pos), pos.get_phase()));
+    eprintln!("space: {}", taper_score(space_control_value(pos), pos.get_phase()));
+    eprintln!("rook on 7th: {}", taper_score(rook_on_seventh_value(pos), pos.get_phase()));
+    eprintln!("rook on open: {}", taper_score(rook_on_open_value(pos), pos.get_phase()));
+    eprintln!("double_bishop_bonus: {}", taper_score(double_bishop_bonus(pos), pos.get_phase()));
+    eprintln!("bishop_color: {}", taper_score(bishop_color_value(pos), pos.get_phase()));
+    eprintln!("psqt: {}", taper_score(nonpawn_psqt_value(pos) + pawn_psqt_value(pos), pos.get_phase()));
 }
 
 fn pawn_value(pos: &Bitboard, pht: &mut PHT) -> Score {

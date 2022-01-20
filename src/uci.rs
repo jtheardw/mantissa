@@ -292,7 +292,12 @@ pub fn uci_loop() {
             let b = board.thread_copy();
             board.net.print_eval(&b);
             println!("Classical Eval (White View): {:+.2}", evaluate_position(&mut board, &mut PHT::get_pht(1)) as f32 / 1000.0);
-        } else {
+        } else if cmd == "hce" {
+            let mut b = board.thread_copy();
+            print_eval(&mut b);
+            println!("NNUE Eval (White View): {:+.2}", board.net.nnue_eval() as f32 / 1000.0)
+        }
+        else {
             println!("unrecognized command.");
         }
     }

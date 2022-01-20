@@ -167,14 +167,14 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     search_limits.maximum_time = 10000;
 
     let mut root_moves: Vec<Move> = Vec::new();
-    let mut root_movepicker = MovePicker::perft_new();
-    loop {
-        let mv = root_movepicker.next(node).0;
-        if mv.is_null() { break; }
-        node.do_move(&mv);
-        if !node.is_check(!node.side_to_move) { root_moves.push(mv); }
-        node.undo_move(&mv);
-    }
+    // let mut root_movepicker = MovePicker::perft_new();
+    // loop {
+    //     let mv = root_movepicker.next(node).0;
+    //     if mv.is_null() { break; }
+    //     node.do_move(&mv);
+    //     if !node.is_check(!node.side_to_move) { root_moves.push(mv); }
+    //     node.undo_move(&mv);
+    // }
     unsafe {
         SEARCH_IN_PROGRESS = true;
         ABORT = false;
@@ -454,6 +454,14 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         }
     }
 
+    // // Razoring
+    // // if we're adjacent to a leaf and behind alpha by a lot, just drop into quiescence search
+    // if depth < 2 && pruning_safe {
+    //     if (eval + 4000) < alpha {
+    //         return qsearch(node, alpha, beta, thread_num);
+    //     }
+    // }
+
     // Null Move Pruning
     // Similar idea to RFP above, but more nuanced.
     // If we have a position that seems to be above beta, we check if the position is in fact so good
@@ -531,14 +539,14 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     // i.e. a counter. When a quiet move causes a fail high
     // we may consider that move a potential "counter" to the move
     // that preceded it, so we give it a bonus in move ordering
-    let countermove = if prev_mv.is_null() {
-        Move::null_move()
-    } else {
-        let piece_num = get_piece_num(prev_mv.piece, !node.side_to_move);
-        ti.countermove_table[piece_num][prev_mv.end as usize]
-    };
+    // let countermove = if prev_mv.is_null() {
+    //     Move::null_move()
+    // } else {
+    //     let piece_num = get_piece_num(prev_mv.piece, !node.side_to_move);
+    //     ti.countermove_table[piece_num][prev_mv.end as usize]
+    // };
 
-    let mut movepicker = MovePicker::new(sse.tt_move, ti.killers[ply as usize], ti.move_history, countermove, false);
+    let mut movepicker = MovePicker::new(sse.tt_move, ply, thread_num, false);
 
     // Futility Pruning.  The 'futile' flag signals
     // to skip quiet moves.  Different conditions in the search
@@ -584,6 +592,10 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             if depth < EFP_DEPTH && eval + efp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE {
                 futile = true;
             }
+
+            // if depth < 4 && !is_quiet && eval <= alpha && score < QUIET_OFFSET && alpha.abs() < MIN_MATE_SCORE {
+            //     continue;
+            // }
         }
 
         if futile {
@@ -684,6 +696,8 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                         ti.update_killers(mv, ply);
                         ti.update_move_history(mv, node.side_to_move, depth, &searched_moves);
                         ti.update_countermove(prev_mv, mv, !node.side_to_move);
+                        ti.update_followup(prev_mv, mv, node.side_to_move, depth, &searched_moves);
+                        ti.update_countermove_history(prev_mv, mv, node.side_to_move, depth, &searched_moves);
                     }
                     unsafe {
                         TT.set(node.hash, best_move, TTEntry::make_tt_score(val, ply), CUT_NODE, depth, node.history.len() as i32);

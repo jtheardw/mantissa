@@ -4,6 +4,7 @@ use crate::bitboard::*;
 use crate::movegen::*;
 use crate::moveutil::*;
 use crate::see::*;
+use crate::search::*;
 use crate::util::*;
 
 const TT_MOVE: u8 = 0;
@@ -42,8 +43,9 @@ pub struct MovePicker {
     noisy_moves_only: bool,
     pub move_stage: u8,
     tt_move: Move,
+    thread_num: usize,
+    ply: i32,
     killers: [Move; 2],
-    history: [[i32; 64]; 12],
     countermove: Move,
     scored_noisy_moves: Vec<(Move, u64)>,
     scored_quiet_moves: Vec<(Move, u64)>,
@@ -52,15 +54,17 @@ pub struct MovePicker {
 }
 
 impl MovePicker {
-    pub fn new(tt_move: Move, killers: [Move; 2], history: [[i32; 64]; 12], countermove: Move, q_moves_only: bool) -> MovePicker {
+    pub fn new(tt_move: Move, ply: i32, thread_num: usize, q_moves_only: bool) -> MovePicker {
         let stage = if tt_move.is_null() {GEN_NOISY} else {TT_MOVE};
+
         MovePicker {
             noisy_moves_only: q_moves_only,
             move_stage: stage,
             tt_move: tt_move,
-            killers: killers,
-            history: history,
-            countermove: countermove,
+            ply: ply,
+            thread_num: thread_num as usize,
+            killers: [Move::null_move(); 2],
+            countermove: Move::null_move(),
             scored_noisy_moves: Vec::new(),
             scored_quiet_moves: Vec::new(),
             noisy_i: 0,
@@ -73,8 +77,10 @@ impl MovePicker {
             noisy_moves_only: true,
             move_stage: GEN_NOISY,
             tt_move: Move::null_move(),
+            ply: 0,
+            thread_num: 0,
             killers: [Move::null_move(); 2],
-            history: [[0; 64]; 12],
+            // history: [[0; 64]; 12],
             countermove: Move::null_move(),
             scored_noisy_moves: Vec::new(),
             scored_quiet_moves: Vec::new(),
@@ -88,8 +94,10 @@ impl MovePicker {
             noisy_moves_only: false,
             move_stage: GEN_NOISY,
             tt_move: Move::null_move(),
+            ply: 0,
+            thread_num: 0,
             killers: [Move::null_move(); 2],
-            history: [[0; 64]; 12],
+            // history: [[0; 64]; 12],
             countermove: Move::null_move(),
             scored_noisy_moves: Vec::new(),
             scored_quiet_moves: Vec::new(),
@@ -138,7 +146,26 @@ impl MovePicker {
                 } else {
                     let piece_num = get_piece_num(mv.piece, pos.side_to_move);
                     // mv_score = QUIET_OFFSET + (self.history[piece_num][mv.end as usize] + self.followup[piece_num][mv.end as usize]) as u64;
-                    mv_score = QUIET_OFFSET + self.history[piece_num][mv.end as usize] as u64;
+                    let mut history_score = 0;
+                    unsafe {
+                        history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
+                        if self.ply > 0 {
+                            let piece_num = get_piece_num(mv.piece, pos.side_to_move);
+                            let prev_mv = SS[self.thread_num][(self.ply - 1) as usize].current_move;
+                            if !prev_mv.is_null() {
+                                let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
+                                history_score += TI[self.thread_num].countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                            }
+                            if self.ply > 1 {
+                                let prev_mv = SS[self.thread_num][(self.ply - 2) as usize].current_move;
+                                if !prev_mv.is_null() {
+                                    let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
+                                    history_score += TI[self.thread_num].followup_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                                }
+                            }
+                        }
+                    }
+                    mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u64;
                 }
             } else if mv.promote_to == 0 {
                 let score = see(pos, mv.end, captured, mv.start, mv.piece);
@@ -223,6 +250,9 @@ impl MovePicker {
             }
         }
         if self.move_stage == KILLER_MOVE_1 {
+            unsafe {
+                self.killers = TI[self.thread_num].killers[self.ply as usize];
+            }
             self.move_stage = KILLER_MOVE_2;
             if self.killers[0] != self.tt_move && pos.is_pseudolegal(&self.killers[0]) {
                 return (self.killers[0], KILLER_OFFSET);
@@ -235,6 +265,15 @@ impl MovePicker {
             }
         }
         if self.move_stage == COUNTER_MOVE {
+            unsafe {
+                if self.ply != 0 {
+                    let prev_mv = SS[self.thread_num][(self.ply - 1) as usize].current_move;
+                    if !prev_mv.is_null() {
+                        let piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
+                        self.countermove = TI[self.thread_num].countermove_table[piece_num][prev_mv.end as usize];
+                    }
+                }
+            }
             self.move_stage = GEN_QUIET;
             if self.countermove != self.killers[0] &&
                 self.countermove != self.killers[1] &&

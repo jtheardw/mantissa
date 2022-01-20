@@ -142,6 +142,7 @@ pub struct ThreadInfo {
     pub move_history: [[i32; 64]; 12],
     pub capture_history: [[[i32; 6]; 64]; 12],
     pub countermove_table: [[Move; 64]; 12],
+    pub countermove_history: Vec<[[[i32; 64]; 12]; 64]>,
     pub followup_history: Vec<[[[i32; 64]; 12]; 64]>,
     pub pht: PHT,
     pub root_moves: Vec<Move>
@@ -154,6 +155,7 @@ impl ThreadInfo {
         let capture_history = [[[0; 6]; 64]; 12];
         let countermove_table = [[Move::null_move(); 64]; 12];
         let followup_history = vec![[[[0; 64]; 12]; 64]; 12];
+        let countermove_history = vec![[[[0; 64]; 12]; 64]; 12];
         let pht = PHT::get_pht(14);
         ThreadInfo {
             nodes_searched: 0,
@@ -162,6 +164,7 @@ impl ThreadInfo {
             move_history: move_history,
             capture_history: capture_history,
             countermove_table: countermove_table,
+            countermove_history: countermove_history,
             followup_history: followup_history,
             pht: pht,
             root_moves: Vec::new()
@@ -177,6 +180,7 @@ self.move_history = [[0; 64]; 12];
         self.capture_history = [[[0; 6]; 64]; 12];
         self.countermove_table = [[Move::null_move(); 64]; 12];
         self.followup_history = vec![[[[0; 64]; 12]; 64]; 12];
+        self.countermove_history = vec![[[[0; 64]; 12]; 64]; 12];
         self.root_moves = Vec::new();
     }
 
@@ -225,6 +229,28 @@ self.move_history = [[0; 64]; 12];
         if prev_mv.is_null() || mv.is_null() { return; }
         let piece_num = get_piece_num(prev_mv.piece, side);
         self.countermove_table[piece_num][prev_mv.end as usize] = mv;
+    }
+
+    pub fn update_countermove_history(&mut self, prev_mv: Move, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
+        if prev_mv.is_null() || mv.is_null() { return; }
+        let prev_piece_num = get_piece_num(prev_mv.piece, !side);
+        let prev_end = prev_mv.end as usize;
+        for s_mv in searched_moves {
+            if *s_mv == mv {
+                continue;
+            }
+            let piece_num = get_piece_num(s_mv.piece, side);
+            let end = s_mv.end as usize;
+
+            let cur = self.countermove_history[prev_piece_num][prev_end][piece_num][end];
+            self.countermove_history[prev_piece_num][prev_end][piece_num][end] = self.decay_update(cur, -depth * depth);
+        }
+
+        let piece_num = get_piece_num(mv.piece, side);
+        let end = mv.end as usize;
+
+        let cur = self.countermove_history[prev_piece_num][prev_end][piece_num][end];
+        self.countermove_history[prev_piece_num][prev_end][piece_num][end] = self.decay_update(cur, -depth * depth);
     }
 
     pub fn update_followup(&mut self, prev_mv: Move, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
