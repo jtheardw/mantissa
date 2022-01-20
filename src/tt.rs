@@ -92,7 +92,7 @@ impl TT {
         }
 
         let mut locks: Vec<Mutex<u64>> = Vec::new();
-        for _ in 0..1024 {
+        for _ in 0..2048 {
             locks.push(Mutex::new(0));
         }
         TT {
@@ -104,7 +104,7 @@ impl TT {
     }
 
     pub fn get(&self, hash: u64) -> TTEntry {
-        let mut l = self.locks[(hash % 1024) as usize].lock().unwrap();
+        let mut l = self.locks[(hash % 2048) as usize].lock().unwrap();
         let idx: usize = (hash & self.mask) as usize;
         let (e1, e2) = self.tt[idx];
         *l = hash | e1.hash | e2.hash;
@@ -121,7 +121,7 @@ impl TT {
         let idx: usize = (hash & self.mask) as usize;
         let depth = depth as i8;
         let ply = ply as i8;
-        let mut l = self.locks[(hash % 1024) as usize].lock().unwrap();
+        let mut l = self.locks[(hash % 2048) as usize].lock().unwrap();
         let (e1, e2) = self.tt[idx];
         let to_insert;
 

@@ -338,7 +338,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     let init_node = ply == 0;
 
-    sse.pv = Vec::new();
+    sse.pv.clear();
     sse.current_move = Move::null_move();
 
     if ply > ti.seldepth {
@@ -363,7 +363,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     let mut depth = depth;
     if depth <= 0 {
-        sse.pv = Vec::new();
+        sse.pv.clear();
         return qsearch(node, alpha, beta, thread_num);
     }
 
@@ -607,10 +607,12 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         let mut val = LB;
         if moves_searched == 1 {
             val = -search(node, -beta, -alpha, if sing_extend {depth} else {depth - 1}, ply + 1, is_pv, thread_num);
-            unsafe {
-                let child_ss = &mut SS[thread_num][(ply + 1) as usize];
-                sse.pv = vec![mv];
-                sse.pv.append(&mut child_ss.pv);
+            if is_pv {
+                unsafe {
+                    let child_ss = &mut SS[thread_num][(ply + 1) as usize];
+                    sse.pv = vec![mv];
+                    sse.pv.append(&mut child_ss.pv);
+                }
             }
         } else {
             let mut do_full_zw_search = true;
@@ -695,7 +697,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         }
         if !found_legal_move {
             // some sort of mate
-            sse.pv = Vec::new();
+            sse.pv.clear();
             if is_check {
                 return -MATE_SCORE + ply;
             } else {

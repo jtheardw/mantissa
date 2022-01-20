@@ -1,2 +1,2 @@
-RUSTFLAGS='-C target-feature=+popcnt,+avx,+sse3' cargo rustc --target=x86_64-unknown-linux-gnu
-RUSTFLAGS='-C target-feature=+popcnt,+avx,+sse3' cargo rustc --release --target=x86_64-unknown-linux-gnu
+RUSTFLAGS='-C target-feature=+popcnt,+avx2' cargo rustc --target=x86_64-unknown-linux-gnu
+RUSTFLAGS='-C target-feature=+popcnt,+avx2' cargo rustc --release --target=x86_64-unknown-linux-gnu
