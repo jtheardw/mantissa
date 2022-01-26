@@ -24,7 +24,7 @@ pub fn efp_margin(depth: i32) -> i32 {
 }
 
 pub fn fp_margin(depth: i32) -> i32 {
-    return 1500 + depth * 1000;
+    return 1000 + depth * 600;
 }
 
 pub fn rfp_margin(depth: i32) -> i32 {
@@ -250,7 +250,7 @@ self.move_history = [[0; 64]; 12];
         let end = mv.end as usize;
 
         let cur = self.countermove_history[prev_piece_num][prev_end][piece_num][end];
-        self.countermove_history[prev_piece_num][prev_end][piece_num][end] = self.decay_update(cur, -depth * depth);
+        self.countermove_history[prev_piece_num][prev_end][piece_num][end] = self.decay_update(cur, depth * depth);
     }
 
     pub fn update_followup(&mut self, prev_mv: Move, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
@@ -272,7 +272,7 @@ self.move_history = [[0; 64]; 12];
         let end = mv.end as usize;
 
         let cur = self.followup_history[prev_piece_num][prev_end][piece_num][end];
-        self.followup_history[prev_piece_num][prev_end][piece_num][end] = self.decay_update(cur, -depth * depth);
+        self.followup_history[prev_piece_num][prev_end][piece_num][end] = self.decay_update(cur, depth * depth);
     }
 }
 

@@ -7,15 +7,15 @@ use crate::see::*;
 use crate::search::*;
 use crate::util::*;
 
-const TT_MOVE: u8 = 0;
-const GEN_NOISY: u8 = 1;
-const OK_NOISY: u8 = 2;
-const KILLER_MOVE_1: u8 = 3;
-const KILLER_MOVE_2: u8 = 4;
-const COUNTER_MOVE: u8 = 5;
-const GEN_QUIET: u8 = 6;
-const QUIET_MOVES: u8 = 7;
-const BAD_NOISY: u8 = 8;
+pub const TT_MOVE: u8 = 0;
+pub const GEN_NOISY: u8 = 1;
+pub const OK_NOISY: u8 = 2;
+pub const KILLER_MOVE_1: u8 = 3;
+pub const KILLER_MOVE_2: u8 = 4;
+pub const COUNTER_MOVE: u8 = 5;
+pub const GEN_QUIET: u8 = 6;
+pub const QUIET_MOVES: u8 = 7;
+pub const BAD_NOISY: u8 = 8;
 
 // TODO more stages to come later.  For now
 // let's stay basic
@@ -127,6 +127,12 @@ impl MovePicker {
 
     fn score_moves(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u64)> {
         let mut scored_moves: Vec<(Move, u64)> = Vec::new();
+        let mut prev_mv = Move::null_move();
+        let mut my_prev_mv = Move::null_move();
+        let mut prev_piece_num = 0;
+        let mut my_prev_piece_num = 0;
+        let mut seen_quiet = false;
+
         for mv in movelist {
             let mv_score: u64;
             let captured = pos.piece_at_square(mv.end, !pos.side_to_move);
@@ -148,21 +154,27 @@ impl MovePicker {
                     // mv_score = QUIET_OFFSET + (self.history[piece_num][mv.end as usize] + self.followup[piece_num][mv.end as usize]) as u64;
                     let mut history_score = 0;
                     unsafe {
-                        history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
-                        if self.ply > 0 {
-                            let piece_num = get_piece_num(mv.piece, pos.side_to_move);
-                            let prev_mv = SS[self.thread_num][(self.ply - 1) as usize].current_move;
-                            if !prev_mv.is_null() {
-                                let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
-                                history_score += TI[self.thread_num].countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
-                            }
-                            if self.ply > 1 {
-                                let prev_mv = SS[self.thread_num][(self.ply - 2) as usize].current_move;
+                        if !seen_quiet {
+                            if self.ply > 0 {
+                                prev_mv = SS[self.thread_num][(self.ply - 1) as usize].current_move;
                                 if !prev_mv.is_null() {
-                                    let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
-                                    history_score += TI[self.thread_num].followup_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                                    prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
                                 }
                             }
+                            if self.ply > 1 {
+                                my_prev_mv = SS[self.thread_num][(self.ply - 2) as usize].current_move;
+                                if !my_prev_mv.is_null() {
+                                    my_prev_piece_num = get_piece_num(my_prev_mv.piece, pos.side_to_move);
+                                }
+                            }
+                            seen_quiet = true;
+                        }
+                        history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
+                        if !prev_mv.is_null() {
+                            history_score += TI[self.thread_num].countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                        }
+                        if !my_prev_mv.is_null() {
+                            history_score += TI[self.thread_num].followup_history[my_prev_piece_num][my_prev_mv.end as usize][piece_num][mv.end as usize];
                         }
                     }
                     mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u64;
@@ -255,13 +267,57 @@ impl MovePicker {
             }
             self.move_stage = KILLER_MOVE_2;
             if self.killers[0] != self.tt_move && pos.is_pseudolegal(&self.killers[0]) {
-                return (self.killers[0], KILLER_OFFSET);
+                let mv = self.killers[0];
+                let piece_num = get_piece_num(mv.piece, pos.side_to_move);
+                let mut history_score = 0;
+                unsafe {
+                    history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
+                    if self.ply > 0 {
+                        let piece_num = get_piece_num(mv.piece, pos.side_to_move);
+                        let prev_mv = SS[self.thread_num][(self.ply - 1) as usize].current_move;
+                        if !prev_mv.is_null() {
+                            let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
+                            history_score += TI[self.thread_num].countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                        }
+                        if self.ply > 1 {
+                            let prev_mv = SS[self.thread_num][(self.ply - 2) as usize].current_move;
+                            if !prev_mv.is_null() {
+                                let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
+                                history_score += TI[self.thread_num].followup_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                            }
+                        }
+                    }
+                }
+                let mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u64;
+                return (self.killers[0], mv_score);
             }
         }
         if self.move_stage == KILLER_MOVE_2 {
             self.move_stage = COUNTER_MOVE;
             if self.killers[1] != self.tt_move && pos.is_pseudolegal(&self.killers[1]) {
-                return (self.killers[1], KILLER_OFFSET);
+                let mv = self.killers[1];
+                let piece_num = get_piece_num(mv.piece, pos.side_to_move);
+                let mut history_score = 0;
+                unsafe {
+                    history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
+                    if self.ply > 0 {
+                        let piece_num = get_piece_num(mv.piece, pos.side_to_move);
+                        let prev_mv = SS[self.thread_num][(self.ply - 1) as usize].current_move;
+                        if !prev_mv.is_null() {
+                            let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
+                            history_score += TI[self.thread_num].countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                        }
+                        if self.ply > 1 {
+                            let prev_mv = SS[self.thread_num][(self.ply - 2) as usize].current_move;
+                            if !prev_mv.is_null() {
+                                let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
+                                history_score += TI[self.thread_num].followup_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                            }
+                        }
+                    }
+                }
+                let mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u64;
+                return (self.killers[1], mv_score);
             }
         }
         if self.move_stage == COUNTER_MOVE {
@@ -279,7 +335,29 @@ impl MovePicker {
                 self.countermove != self.killers[1] &&
                 self.countermove != self.tt_move &&
                 pos.is_pseudolegal(&self.countermove) {
-                    return (self.countermove, COUNTER_OFFSET);
+                    let mv = self.countermove;
+                    let piece_num = get_piece_num(mv.piece, pos.side_to_move);
+                    let mut history_score = 0;
+                    unsafe {
+                        history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
+                        if self.ply > 0 {
+                            let piece_num = get_piece_num(mv.piece, pos.side_to_move);
+                            let prev_mv = SS[self.thread_num][(self.ply - 1) as usize].current_move;
+                            if !prev_mv.is_null() {
+                                let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
+                                history_score += TI[self.thread_num].countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                            }
+                            if self.ply > 1 {
+                                let prev_mv = SS[self.thread_num][(self.ply - 2) as usize].current_move;
+                                if !prev_mv.is_null() {
+                                    let prev_piece_num = get_piece_num(prev_mv.piece, !pos.side_to_move);
+                                    history_score += TI[self.thread_num].followup_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                                }
+                            }
+                        }
+                    }
+                    let mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u64;
+                    return (self.countermove, mv_score);
             }
         }
         if self.move_stage == GEN_QUIET {

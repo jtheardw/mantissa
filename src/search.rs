@@ -403,7 +403,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 return tt_val;
             }
         }
-    } else if depth >= 8 && !init_node {
+    } else if depth >= 6 && !init_node {
         // internal iterative reductions
         // First place I can find IIR comes from a thread by Ed Schroeder (ProDeo author)
         // wherein they found success simply reducing the depth at unsorted subtrees
@@ -432,7 +432,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     // - there is an excluded move
     // - we are in check
     // - we are in a pv node search
-    let pruning_safe = !is_check && !is_pv && !init_node && (ply + depth > 3);
+    let pruning_safe = !is_check && !is_pv && !init_node && (ply + depth > 3) && sse.excluded_move.is_null();
 
     // Reverse Futility Pruning
     // AKA if our position is really really good
@@ -447,7 +447,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     // If we are way, way below alpha (generally an amount that is considered unsalvageable)
     // just stop here.  You're not going to make back up being 25 pawns below alpha in the
-    // remaining 8 or 9 ply of the search.
+    // remaining few ply of the search.
     if depth < AFP_DEPTH && pruning_safe {
         if (eval + afp_margin(depth)) <= alpha {
             return eval;
@@ -456,11 +456,19 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     // // Razoring
     // // if we're adjacent to a leaf and behind alpha by a lot, just drop into quiescence search
-    // if depth < 2 && pruning_safe {
-    //     if (eval + 4000) < alpha {
-    //         return qsearch(node, alpha, beta, thread_num);
-    //     }
-    // }
+    if depth < 3 && pruning_safe {
+        if (eval + 2500 * depth) < alpha {
+            let val = qsearch(node, alpha, beta, thread_num);
+            if val <= alpha {
+                return val;
+            }
+        }
+    }
+
+    // reset killers for the next ply
+    if ply < (MAX_PLY - 1) as i32 {
+        ti.killers[(ply + 1) as usize] = [Move::null_move(); 2];
+    }
 
     // Null Move Pruning
     // Similar idea to RFP above, but more nuanced.
@@ -533,6 +541,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     let mut best_val = LB;
     let mut moves_searched: i32 = 0;
     let prev_mv = if !init_node {ss[(ply - 1) as usize].current_move} else {Move::null_move()};
+    let my_prev_mv = if ply >= 2 {ss[(ply - 2) as usize].current_move} else {Move::null_move()};
 
     // Countermove Heuristic
     // The idea here is that many moves have a natural response
@@ -584,23 +593,47 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         let is_quiet = is_quiet_move(&mv, node);
 
         if !is_check && (depth + ply > 3) && !init_node && best_val > -MIN_MATE_SCORE && !futile {
+            let lmr_depth = depth - 1 - lmr_reduction(depth, moves_searched);
+
             // Basic form of late move pruning
             if depth <= 8 && moves_searched >= lmp_count(improving, depth) {
                 futile = true;
             }
 
-            if depth < EFP_DEPTH && eval + efp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE {
+            if depth < EFP_DEPTH && eval + efp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE && !futile {
                 futile = true;
             }
 
-            // if depth < 4 && !is_quiet && eval <= alpha && score < QUIET_OFFSET && alpha.abs() < MIN_MATE_SCORE {
-            //     continue;
-            // }
+            if lmr_depth <= 6 && is_quiet && eval + fp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE && movepicker.move_stage > GEN_QUIET && !futile {
+                let hist = (score as i32) - QUIET_OFFSET as i32;
+                if hist < 6000 {
+                    futile = true
+                }
+            }
+
+            if lmr_depth < 4 && movepicker.move_stage > GEN_QUIET && is_quiet && !futile {
+                // let mut move_hist = 0;
+                let mut countermove_hist = 0;
+                let mut followup_hist = 0;
+
+                let piece_num = get_piece_num(mv.piece, node.side_to_move);
+                // move_hist = ti.move_history[piece_num][mv.end as usize];
+                if !prev_mv.is_null() {
+                    let prev_piece_num = get_piece_num(prev_mv.piece, !node.side_to_move);
+                    countermove_hist = ti.countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                    if countermove_hist <= -700 * lmr_depth { continue; }
+                }
+                if !my_prev_mv.is_null() {
+                    let prev_piece_num = get_piece_num(my_prev_mv.piece, node.side_to_move);
+                    followup_hist = ti.followup_history[prev_piece_num][my_prev_mv.end as usize][piece_num][mv.end as usize];
+                    if followup_hist <= -1500 * lmr_depth { continue; }
+                }
+            }
         }
 
         if futile {
             // found_legal_move = true;
-            if !is_tactical && score < COUNTER_OFFSET {
+            if !is_tactical && movepicker.move_stage > GEN_QUIET {
                 // node.undo_move(&mv);
                 continue;
             }
@@ -641,14 +674,13 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 if is_check { r -= 1; }
                 if !improving { r += 1; }
                 if is_pv { r -= 1; }
-                if score >= COUNTER_OFFSET { r -= 1; }
+                // if score >= COUNTER_OFFSET { r -= 1; }
+                if movepicker.move_stage <= GEN_QUIET { r -= 1; }
 
                 // adjust r based on history of other quiet moves
-                if score < COUNTER_OFFSET {
-                    // let quiet_score = (score as i32) - QUIET_OFFSET as i32;
-                    let hist = ti.move_history[get_piece_num(mv.piece, !node.side_to_move)][mv.end as usize];
-                    r -= cmp::max(-2, cmp::min(2, hist / 5000));
-                }
+                let hist = (score as i32) - QUIET_OFFSET as i32;
+                // let hist = move_hist + countermove_hist + followup_hist;
+                r -= cmp::max(-2, cmp::min(2, hist / 8000));
 
                 let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);
                 val = -search(node, -alpha - 1, -alpha, lmr_depth, ply + 1, false, thread_num);
@@ -696,7 +728,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                         ti.update_killers(mv, ply);
                         ti.update_move_history(mv, node.side_to_move, depth, &searched_moves);
                         ti.update_countermove(prev_mv, mv, !node.side_to_move);
-                        ti.update_followup(prev_mv, mv, node.side_to_move, depth, &searched_moves);
+                        ti.update_followup(my_prev_mv, mv, node.side_to_move, depth, &searched_moves);
                         ti.update_countermove_history(prev_mv, mv, node.side_to_move, depth, &searched_moves);
                     }
                     unsafe {

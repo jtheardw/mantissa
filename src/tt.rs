@@ -104,10 +104,10 @@ impl TT {
     }
 
     pub fn get(&self, hash: u64) -> TTEntry {
-        let mut l = self.locks[(hash % 1024) as usize].lock().unwrap();
+        // let mut l = self.locks[(hash % 1024) as usize].lock().unwrap();
         let idx: usize = (hash & self.mask) as usize;
         let (e1, e2) = self.tt[idx];
-        *l = hash | e1.hash | e2.hash;
+        // *l = hash | e1.hash | e2.hash;
         if e1.valid() && e1.hash == hash {
             return e1;
         }
@@ -121,7 +121,7 @@ impl TT {
         let idx: usize = (hash & self.mask) as usize;
         let depth = depth as i8;
         let ply = ply as i8;
-        let mut l = self.locks[(hash % 1024) as usize].lock().unwrap();
+        // let mut l = self.locks[(hash % 1024) as usize].lock().unwrap();
         let (e1, e2) = self.tt[idx];
         let to_insert;
 
@@ -146,7 +146,7 @@ impl TT {
             to_insert = (e1, entry);
         }
         self.tt[idx] = to_insert;
-        *l = hash | to_insert.0.hash | to_insert.1.hash;
+        // *l = hash | to_insert.0.hash | to_insert.1.hash;
     }
 
     pub fn clear(&mut self) {
