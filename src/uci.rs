@@ -259,13 +259,13 @@ pub fn uci_loop() {
         let mut params = inp.trim().split_whitespace();
         let cmd = match params.next() {
             Some(p) => p,
-            None => {continue;}
+            None => {break;}
         };
 
         if cmd == "quit" {
             break;
         } else if cmd == "uci" {
-            println!("id name Mantissa v3.3.0-tcec-1");
+            println!("id name Mantissa v3.3.0");
             println!("id author jtwright");
             println!("option name Hash type spin default 64 min 1 max 65536");
             println!("option name Threads type spin default 1 min 1 max 256");
