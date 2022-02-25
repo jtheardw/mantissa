@@ -19,19 +19,19 @@ She accepts challenges from humans and bots in any time format except ultrabulle
 ## Strength
 
 ### Lichess
-As of this writing, Mantissa is currently between 2150 and 2450 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however.
+As of this writing, Mantissa is currently between 2200 and 2450 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however.
 
 ### CCRL
 
-Mantissa currently holds a blitz ELO rating of 2999 on CCRL (as of version 3.0.0).  This score may fluctuate in the future, as this is its first entry on the list.
+Mantissa 3.3.0 currently holds a blitz ELO rating of 3119 on CCRL 40/4 and 3099 on CCRL 40/15.
 
 ### CEDR
 
-Mantissa 3.0.0 has 2933 Rating points on the CEDR (Chess Engines Diary) System.
+Mantissa 3.3.0 has 3125 Rating points on the CEDR (Chess Engines Diary) System.
 
 ### CEGT
 
-Mantissa 3.0.0 has a 2877 rating on CEGT Blitz.
+Mantissa 3.3.0 has a 3025 rating on CEGT 40/20.
 
 ## Features
 
@@ -115,8 +115,8 @@ I am not very good at chess and am still relatively new to chess programming, so
 
 - Amanj was incredibly helpful in getting me started with NNUE.  `tissa-trainer`, which is the program I wrote to be able to train Mantissa nets, is basically a port of `zahak-trainer` to rust with some slight modifications.  He also helped explain a lot of the resources and information needed to understand the process.
 - Koivisto's authors, as I found a way to improve my NNUE topology from what I found in Koivisto's source.
-- Kade Phillips for net visualization code and the NNUE-derived piece value display
+- Kade for net visualization code and the NNUE-derived piece value display
 
 ### Other
 
-- Kade Phillips for his work on Mantissa's logos.
+- Kade for his work on Mantissa's logos.
