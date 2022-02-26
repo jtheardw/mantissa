@@ -109,7 +109,7 @@ I am not very good at chess and am still relatively new to chess programming, so
 ### Data
 
 - Andrew Grant for some of the positions used in the tuning process for Mantissa's handwritten evaluator.
-- Kade Phillips and Thomas Ahle for their two analyses of data to model moves remaining in a game.
+- Kade and Thomas Ahle for their two analyses of data to model moves remaining in a game.
 
 ### NNUE
 
