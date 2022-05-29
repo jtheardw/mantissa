@@ -1,3 +1,4 @@
+use core::arch::x86_64;
 use std::cmp;
 use std::time::SystemTime;
 use std::thread;
@@ -16,6 +17,7 @@ static mut ABORT: bool = false;
 static mut STOP_THREAD: bool = false;
 static mut START_TIME: u128 = 0;
 static mut SEARCH_LIMITS: SearchLimits = SearchLimits::infinite();
+static mut LAST_BESTMOVE: Move = Move::null_move();
 
 const LB: i32 = -10000000;
 const UB: i32 = 10000000;
@@ -27,6 +29,13 @@ pub fn get_time_millis() -> u128 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_millis(),
         Err(_) => panic!("SystemTime failed!"),
+    }
+}
+
+pub fn emit_last_bestmove() {
+    unsafe {
+        // println!("{}", LAST_INFO);
+        println!("bestmove {}", LAST_BESTMOVE)
     }
 }
 
@@ -68,9 +77,16 @@ fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, n
     let pv_str = get_pv_str(pv);
     let val_str = get_val_str(val);
     let nps = (nodes * 1000) as u128 / time;
-    println!("info depth {} seldepth {} score {} time {} nodes {} nps {} pv {}",
+    // unsafe {
+    //     LAST_INFO = fmt!("info depth {} seldepth {} score {} time {} nodes {} nps {} pv {} multipv 1",
+    //          depth, seldepth, val_str, time, nodes, nps, pv_str).to_str();
+    // }
+    println!("info depth {} seldepth {} score {} time {} nodes {} nps {} multipv 1 pv {}",
              depth, seldepth, val_str, time, nodes, nps, pv_str
     );
+    // eprintln!("info depth {} seldepth {} score {} time {} nodes {} nps {} multipv 1 pv {}",
+    //          depth, seldepth, val_str, time, nodes, nps, pv_str
+    // );
 }
 
 pub fn abort_search() {
@@ -160,14 +176,16 @@ fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_
     }
 }
 
-pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLimits) {
+const OFF: u8 = 0;
+const BRAIN: u8 = 1;
+const HAND: u8 = 2;
+
+pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLimits, bh_mode: u8, bh_piece: i8) {
     let start_time = get_time_millis();
     let mut search_limits = search_limits;
     let max_time = search_limits.maximum_time;
     search_limits.maximum_time = 10000;
 
-    let mut root_moves: Vec<Move> = Vec::new();
-    // let mut root_movepicker = MovePicker::perft_new();
     // loop {
     //     let mv = root_movepicker.next(node).0;
     //     if mv.is_null() { break; }
@@ -186,7 +204,37 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         for i in 0..num_threads {
             SS.push(new_searchstats());
             TI.push(ThreadInfo::new());
-            TI[i as usize].root_moves = root_moves.clone();
+            // TI[i as usize].root_moves = root_moves.clone();
+            TI[i as usize].bh_piece = bh_piece;
+        }
+    }
+
+    if bh_mode == HAND {
+        if bh_piece == -1 {
+            println!("You didn't tell me which piece to move!");
+            unsafe {
+                SEARCH_IN_PROGRESS = false;
+            }
+            return;
+        }
+        let mut root_movepicker = MovePicker::perft_new();
+        loop {
+            let mv = root_movepicker.next(node).0;
+            if mv.is_null() {
+                unsafe {
+                    SEARCH_IN_PROGRESS = false;
+                }
+                println!("There are no moves for that piece!");
+                return;
+            }
+            if mv.start == bh_piece {
+                node.do_move(&mv);
+                let is_legal = !node.is_check(!node.side_to_move);
+                node.undo_move(&mv);
+                if is_legal {
+                    break;
+                }
+            }
         }
     }
 
@@ -265,7 +313,11 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
                 nodes_searched += TI[t_num as usize].nodes_searched;
             }
 
-            print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
+            if bh_mode == OFF {
+                print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
+            } else {
+                println!("Thinking... depth {}", depth);
+            }
             // for i in 0..MAX_PLY {
             //     SS[0][i].pv = Vec::new();
             // }
@@ -275,7 +327,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         if search_limits.movetime > 0 && elapsed_time > search_limits.movetime {
             abort_search();
             break;
-        } else if search_limits.maximum_time > 0 && elapsed_time > search_limits.maximum_time - 10 {
+        } else if search_limits.maximum_time > 0 && elapsed_time > search_limits.maximum_time * 2 / 3 {
             abort_search();
             break;
         }
@@ -313,8 +365,51 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         }
     }
 
-    println!("bestmove {}", best_move);
+    let emoji = if best_val <= -MIN_MATE_SCORE {
+        "XO"
+    } else if best_val <= -10000 {
+        "X("
+    } else if best_val <= -4000 {
+        ">:C"
+    } else if best_val <= -1000 {
+        ":("
+    } else if best_val < 0 {
+        ":I"
+    } else if best_val < 1000 {
+        ":|"
+    } else if best_val < 4000 {
+        ":)"
+    } else if best_val < 10000 {
+        ":D"
+    } else if best_val < MIN_MATE_SCORE {
+        ":3"
+    } else {
+        ">:3"
+    };
+
+    if bh_mode == BRAIN {
+        let piece = match best_move.piece {
+            b'k' => {"king"},
+            b'q' => {"queen"},
+            b'r' => {"rook"},
+            b'b' => {"bishop"},
+            b'n' => {"knight"},
+            b'p' => {"pawn"},
+            _ => {"???"}
+        };
+        println!("bestpiece {}", idx_to_str(best_move.start));
+        // >:C :( :| :) :D
+        // -4  -1  0  1  4
+        eprintln!("Hey, you should move the {} on {} {}", piece, idx_to_str(best_move.start), emoji);
+    } else {
+        if bh_mode != OFF {
+            println!("bestmove {} {}", best_move, emoji);
+        } else {
+            println!("bestmove {}", best_move);
+        }
+    }
     unsafe {
+        LAST_BESTMOVE = best_move;
         SEARCH_IN_PROGRESS = false;
     }
 }
@@ -328,6 +423,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     let ss: &SearchStats;
     let mut sse: &mut SearchStatsEntry;
     unsafe {
+        // x86_64::_mm_prefetch(TT.get_ptr(node.hash), x86_64::_MM_HINT_T0);
         ti = &mut TI[thread_num];
         ss = &SS[thread_num];
         sse = &mut SS[thread_num][ply as usize];
@@ -511,6 +607,10 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     // On the other hand, if we have a move that already gives a outcome that's
     // better than beta, and even when excluding that move we can still beat beta
     // (at least, in a reduced search), then this node is probably a cut-node.
+
+    // This takes an approach very similar to the one found in Stockfish, where
+    // singular extensions and multi-cut are handled via the same search.  Though SF
+    // takes it one step further
     let mut sing_extend = false;
     if !init_node
         && depth >= 8
@@ -521,7 +621,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         && (sse.tt_node_type & CUT_NODE) != 0
         && sse.tt_depth >= depth - 3
     {
-        let margin = 30 * depth;
+        let margin = 37 * depth;
         let depth_to_search = (depth - 1) / 2;
         let target = sse.tt_val - margin;
 
@@ -580,9 +680,16 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             }
         };
         sse.current_move = mv;
+
         if mv.is_null() {
             // exhausted all moves
             break;
+        }
+
+        if init_node && ti.bh_piece >= 0 {
+            if mv.start != ti.bh_piece {
+                continue;
+            }
         }
 
         if mv == sse.excluded_move {
@@ -604,6 +711,9 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 futile = true;
             }
 
+            // History-leaf pruning
+            // Slightly more lenient on eval margin than futility pruning
+            // but won't kick in until we've tried all moves with good history scores
             if lmr_depth <= 6 && is_quiet && eval + fp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE && movepicker.move_stage > GEN_QUIET && !futile {
                 let hist = (score as i32) - QUIET_OFFSET as i32;
                 if hist < 6000 {
@@ -618,6 +728,12 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
                 let piece_num = get_piece_num(mv.piece, node.side_to_move);
                 // move_hist = ti.move_history[piece_num][mv.end as usize];
+
+                // Continuation history pruning
+                // As we near the leaves, quiet moves which have particularly bad
+                // counter or followup histories are pruned.  Ethereal does something
+                // similar here, but instead of basing the threshold on 'improving'
+                // I instead make it depth-based.
                 if !prev_mv.is_null() {
                     let prev_piece_num = get_piece_num(prev_mv.piece, !node.side_to_move);
                     countermove_hist = ti.countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
@@ -644,6 +760,9 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             // Illegal
             node.undo_move(&mv);
             continue;
+        }
+        if depth > 1 {
+            unsafe {x86_64::_mm_prefetch(TT.get_ptr(node.hash), x86_64::_MM_HINT_T0);}
         }
 
         found_legal_move = true;
@@ -674,7 +793,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 if is_check { r -= 1; }
                 if !improving { r += 1; }
                 if is_pv { r -= 1; }
-                // if score >= COUNTER_OFFSET { r -= 1; }
+                // give a bit of leeway to killers and countermove
                 if movepicker.move_stage <= GEN_QUIET { r -= 1; }
 
                 // adjust r based on history of other quiet moves

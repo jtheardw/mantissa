@@ -145,7 +145,8 @@ pub struct ThreadInfo {
     pub countermove_history: Vec<[[[i32; 64]; 12]; 64]>,
     pub followup_history: Vec<[[[i32; 64]; 12]; 64]>,
     pub pht: PHT,
-    pub root_moves: Vec<Move>
+    pub root_moves: Vec<Move>,
+    pub bh_piece: i8
 }
 
 impl ThreadInfo {
@@ -167,7 +168,8 @@ impl ThreadInfo {
             countermove_history: countermove_history,
             followup_history: followup_history,
             pht: pht,
-            root_moves: Vec::new()
+            root_moves: Vec::new(),
+            bh_piece: -1
         }
     }
 
@@ -182,9 +184,11 @@ self.move_history = [[0; 64]; 12];
         self.followup_history = vec![[[[0; 64]; 12]; 64]; 12];
         self.countermove_history = vec![[[[0; 64]; 12]; 64]; 12];
         self.root_moves = Vec::new();
+        self.bh_piece = -1;
     }
 
     pub fn update_move_history(&mut self, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
+        if depth < 3 { return; }
         for s_mv in searched_moves {
             if *s_mv == mv {continue;}
             let piece_num = get_piece_num(s_mv.piece, side);
@@ -197,24 +201,16 @@ self.move_history = [[0; 64]; 12];
     }
 
     fn decay_update(&self, cur: i32, delta: i32) -> i32 {
-        return cur - (cur * delta.abs()) / 512 + delta * 32;
-    }
+        // I've seen this formula on the talkchess forums, but I would guess
+        // the first place it comes from is Ethereal.  Some other top engines use similar
+        // formulae or even the same one.
+        // Though others like Cheng have a different pattern for decay
+        // In any case, I've tried the naive implementation, this formula, cheng-style
+        // and a bayes rule inspired update, but this style seemed to be most effective in Mantissa
 
-    pub fn update_capture_history(&mut self, mv: Move, captured_piece: u8, side: Color, depth: i32, searched_moves: &Vec<(Move, u8)>) {
-        for s_mv in searched_moves {
-            let s_mv = *s_mv;
-            if s_mv.0 == mv {continue;}
-            let piece_num = get_piece_num(s_mv.0.piece, side);
-            let cap_piece_num = get_piece_num(s_mv.1, side) % 6;
-            let cur = self.capture_history[piece_num][s_mv.0.end as usize][cap_piece_num];
-            self.capture_history[piece_num][s_mv.0.end as usize][cap_piece_num] = self.decay_update(cur, -depth * depth);
-        }
-        let piece_num = get_piece_num(mv.piece, side);
-        if captured_piece != 0 {
-            let cap_piece_num = get_piece_num(captured_piece, side) % 6;
-            let cur = self.capture_history[piece_num][mv.end as usize][cap_piece_num as usize];
-            self.capture_history[piece_num][mv.end as usize][cap_piece_num as usize] = self.decay_update(cur, depth * depth);
-        }
+        // see here: http://www.talkchess.com/forum3/viewtopic.php?f=7&t=76540
+        // for more explanation
+        return cur - (cur * delta.abs()) / 512 + delta * 32;
     }
 
     pub fn update_killers(&mut self, mv: Move, ply: i32) {
@@ -232,6 +228,7 @@ self.move_history = [[0; 64]; 12];
     }
 
     pub fn update_countermove_history(&mut self, prev_mv: Move, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
+        if depth < 3 { return; }
         if prev_mv.is_null() || mv.is_null() { return; }
         let prev_piece_num = get_piece_num(prev_mv.piece, !side);
         let prev_end = prev_mv.end as usize;
@@ -254,6 +251,7 @@ self.move_history = [[0; 64]; 12];
     }
 
     pub fn update_followup(&mut self, prev_mv: Move, mv: Move, side: Color, depth: i32, searched_moves: &Vec<Move>) {
+        if depth < 3 { return; }
         if prev_mv.is_null() || mv.is_null() { return; }
         let prev_piece_num = get_piece_num(prev_mv.piece, side);
         let prev_end = prev_mv.end as usize;

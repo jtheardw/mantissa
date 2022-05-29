@@ -322,6 +322,29 @@ pub fn material_score(pos: &Bitboard) -> Score {
     return score;
 }
 
+pub fn simple_material_score(pos: &Bitboard) -> Score {
+    let mut score = 0;
+    let white = Color::White as usize;
+    let black = Color::Black as usize;
+
+    score += 9000 * pos.queen[white].count_ones() as Score;
+    score -= 9000 * pos.queen[black].count_ones() as Score;
+
+    score += 5000 * pos.rook[white].count_ones() as Score;
+    score -= 5000 * pos.rook[black].count_ones() as Score;
+
+    score += 3000 * pos.bishop[white].count_ones() as Score;
+    score -= 3000 * pos.bishop[black].count_ones() as Score;
+
+    score += 3000 * pos.knight[white].count_ones() as Score;
+    score -= 3000 * pos.knight[black].count_ones() as Score;
+
+    score += 1000 * pos.pawn[white].count_ones() as Score;
+    score -= 1000 * pos.pawn[black].count_ones() as Score;
+
+    return score;
+}
+
 fn pawn_attacks(pawn_bb: u64, side_to_move: Color) -> u64 {
     if side_to_move == Color::White {
         ((pawn_bb & !FILE_MASKS[0]) << 7) | ((pawn_bb & !FILE_MASKS[7]) << 9)

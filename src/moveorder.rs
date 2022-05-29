@@ -21,23 +21,23 @@ pub const BAD_NOISY: u8 = 8;
 // let's stay basic
 
 
-const TT_MOVE_SCORE: u64 = 0xFFFFFFFFFFFFFFFF;
+const TT_MOVE_SCORE: u32 = 0xFFFFFFFF;
 // offsets for scores
 // winning and equal captures
-// const QUEEN_CAPTURE_OFFSET: u64 = 1 << 60;
-// const ROOK_CAPTURE_OFFSET: u64 = 1 << 59;
-// const BISHOP_CAPTURE_OFFSET: u64 = 1 << 58;
-// const KNIGHT_CAPTURE_OFFSET: u64 = 1 << 57;
-// const PAWN_CAPTURE_OFFSET: u64 = 1 << 56;
-pub const OK_CAPTURE_OFFSET: u64 = 1 << 60;
+// const QUEEN_CAPTURE_OFFSET: u32 = 1 << 60;
+// const ROOK_CAPTURE_OFFSET: u32 = 1 << 59;
+// const BISHOP_CAPTURE_OFFSET: u32 = 1 << 58;
+// const KNIGHT_CAPTURE_OFFSET: u32 = 1 << 57;
+// const PAWN_CAPTURE_OFFSET: u32 = 1 << 56;
+pub const OK_CAPTURE_OFFSET: u32 = 1 << 25;
 
 // quiet moves
-pub const KILLER_OFFSET: u64 = 1 << 50;
-pub const COUNTER_OFFSET: u64 = 1 << 49;
-pub const QUIET_OFFSET: u64 = 1 << 20;
+// pub const KILLER_OFFSET: u32 = 1 << 50;
+// pub const COUNTER_OFFSET: u32 = 1 << 49;
+pub const QUIET_OFFSET: u32 = 1 << 24;
 
 // losing captures
-pub const BAD_CAPTURE_OFFSET: u64 = 0;
+pub const BAD_CAPTURE_OFFSET: u32 = 0;
 
 pub struct MovePicker {
     noisy_moves_only: bool,
@@ -47,8 +47,8 @@ pub struct MovePicker {
     ply: i32,
     killers: [Move; 2],
     countermove: Move,
-    scored_noisy_moves: Vec<(Move, u64)>,
-    scored_quiet_moves: Vec<(Move, u64)>,
+    scored_noisy_moves: Vec<(Move, u32)>,
+    scored_quiet_moves: Vec<(Move, u32)>,
     noisy_i: usize,
     quiet_i: usize
 }
@@ -106,7 +106,7 @@ impl MovePicker {
         }
     }
 
-    fn sort_next_move(mvs: &mut Vec<(Move, u64)>, cur_i: usize) {
+    fn sort_next_move(mvs: &mut Vec<(Move, u32)>, cur_i: usize) {
         let mut highest_i = cur_i;
         let mut highest = mvs[highest_i].1;
         let mut i = cur_i + 1;
@@ -125,8 +125,8 @@ impl MovePicker {
         mvs.swap(highest_i, cur_i);
     }
 
-    fn score_moves(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u64)> {
-        let mut scored_moves: Vec<(Move, u64)> = Vec::new();
+    fn score_moves(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u32)> {
+        let mut scored_moves: Vec<(Move, u32)> = Vec::new();
         let mut prev_mv = Move::null_move();
         let mut my_prev_mv = Move::null_move();
         let mut prev_piece_num = 0;
@@ -134,7 +134,7 @@ impl MovePicker {
         let mut seen_quiet = false;
 
         for mv in movelist {
-            let mv_score: u64;
+            let mv_score: u32;
             let captured = pos.piece_at_square(mv.end, !pos.side_to_move);
             if mv == self.tt_move {
                 continue;
@@ -177,7 +177,7 @@ impl MovePicker {
                             history_score += TI[self.thread_num].followup_history[my_prev_piece_num][my_prev_mv.end as usize][piece_num][mv.end as usize];
                         }
                     }
-                    mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u64;
+                    mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u32;
                 }
             } else if mv.promote_to == 0 {
                 let score = see(pos, mv.end, captured, mv.start, mv.piece);
@@ -207,9 +207,9 @@ impl MovePicker {
                     //     mv_score = OK_CAPTURE_OFFSET + (victim_val << 4) + atk_val;//(score as u64);
                     //     // mv_score = (OK_CAPTURE_OFFSET as i64 + (victim_val as i32 * 1000 + self.capture_history[piece_num][mv.end as usize][cap_piece_num]) as i64) as u64;
                     // }
-                    mv_score = OK_CAPTURE_OFFSET + score as u64;
+                    mv_score = OK_CAPTURE_OFFSET + score as u32;
                 } else {
-                    mv_score = QUIET_OFFSET - cmp::min(score.abs() as u64, QUIET_OFFSET);
+                    mv_score = QUIET_OFFSET - cmp::min(score.abs() as u32, QUIET_OFFSET);
                 }
             } else {
                 let score = match mv.promote_to {
@@ -226,7 +226,7 @@ impl MovePicker {
         return scored_moves;
     }
 
-    pub fn next(&mut self, pos: &Bitboard) -> (Move, u64) {
+    pub fn next(&mut self, pos: &Bitboard) -> (Move, u32) {
         if self.move_stage == TT_MOVE {
             self.move_stage = GEN_NOISY;
             if pos.is_pseudolegal(&self.tt_move) {
@@ -288,7 +288,7 @@ impl MovePicker {
                         }
                     }
                 }
-                let mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u64;
+                let mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u32;
                 return (self.killers[0], mv_score);
             }
         }
@@ -316,7 +316,7 @@ impl MovePicker {
                         }
                     }
                 }
-                let mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u64;
+                let mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u32;
                 return (self.killers[1], mv_score);
             }
         }
@@ -356,7 +356,7 @@ impl MovePicker {
                             }
                         }
                     }
-                    let mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u64;
+                    let mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u32;
                     return (self.countermove, mv_score);
             }
         }

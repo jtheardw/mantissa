@@ -516,6 +516,12 @@ impl Bitboard {
             Some(p) => p,
             None => panic!("empty activation stack!")
         };
+
+        if self.side_to_move == Color::White {
+            self.net.white_turn();
+        } else {
+            self.net.black_turn();
+        }
     }
 
     pub fn do_move(&mut self, mv: &Move) {
@@ -533,7 +539,6 @@ impl Bitboard {
         // flip turn
 
         self.history.push(self.hash);
-        self.pawn_history.push(self.pawn_hash);
         self.ep_stack.push(self.ep_file);
         self.castling_rights_stack.push(self.castling_rights);
         self.activation_stack.push(self.net.hidden_activations);
@@ -660,15 +665,6 @@ impl Bitboard {
             self.side_to_move
         );
 
-        self.pawn_hash ^= update_pawn_hash(
-            mv.piece,
-            mv.start,
-            mv.end,
-            captured_piece,
-            mv.promote_to,
-            self.side_to_move
-        );
-
         // update ep_file
         self.ep_file = mv.ep_file();
 
@@ -782,10 +778,6 @@ impl Bitboard {
             Some(p) => p,
             None => panic!("History stack empty!")
         };
-        self.pawn_hash = match self.pawn_history.pop() {
-            Some(p) => p,
-            None => panic!("Pawn History stack empty!")
-        };
 
         if mv.piece == b'p' || captured_piece != 0 {
             self.halfmove = match self.halfmove_stack.pop() {
@@ -795,11 +787,13 @@ impl Bitboard {
         } else {
             self.halfmove -= 1;
         }
-        // if self.side_to_move == Color::White {
-        //     self.net.white_turn();
-        // } else {
-        //     self.net.black_turn();
-        // }
+
+        if self.side_to_move == Color::White {
+            self.net.white_turn();
+        } else {
+            self.net.black_turn();
+        }
+
         self.net.hidden_activations = match self.activation_stack.pop() {
             Some(p) => p,
             None => panic!("empty activation stack!")

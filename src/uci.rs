@@ -1,6 +1,7 @@
 use std::io;
 use std::str::SplitWhitespace;
 use std::thread;
+use std::time;
 
 use crate::bitboard::*;
 use crate::eval::*;
@@ -15,7 +16,8 @@ use crate::tt::*;
 struct UCIOptions {
     pub num_threads: u16,
     pub move_overhead: i32,
-    pub hash: i32
+    pub hash: i32,
+    pub bh_mode: u8
 }
 
 fn uci_go(board: &Bitboard, options: UCIOptions, params: &mut SplitWhitespace) {
@@ -33,6 +35,8 @@ fn uci_go(board: &Bitboard, options: UCIOptions, params: &mut SplitWhitespace) {
     let mut depth = -1;
 
     let mut infinite = false;
+
+    let mut bh_piece = -1;
 
     loop {
         let p = match params.next() {
@@ -81,6 +85,11 @@ fn uci_go(board: &Bitboard, options: UCIOptions, params: &mut SplitWhitespace) {
             };
         } else if p == "infinite" {
             infinite = true;
+        } else if p == "piece" {
+            bh_piece = match params.next() {
+                Some(p) => { str_to_idx(p.trim().to_string()) },
+                None => panic!("empty piece!")
+            };
         }
     }
 
@@ -91,7 +100,7 @@ fn uci_go(board: &Bitboard, options: UCIOptions, params: &mut SplitWhitespace) {
         search_limit = SearchLimits::movetime(movetime);
     } else if clock_time > 0 {
         let ply = board.history.len() as i32;
-        let mat = mg_score(material_score(board)) / 1000;
+        let mat = mg_score(simple_material_score(board)) / 1000;
         search_limit = SearchLimits::clock_with_inc(clock_time, inc, options.move_overhead, ply, mat);
     } else if depth > 0 {
         search_limit = SearchLimits::depth(depth);
@@ -101,7 +110,7 @@ fn uci_go(board: &Bitboard, options: UCIOptions, params: &mut SplitWhitespace) {
 
     let mut thread_board = board.thread_copy();
     thread::spawn(move || {
-        best_move(&mut thread_board, options.num_threads, search_limit);
+        best_move(&mut thread_board, options.num_threads, search_limit, options.bh_mode, bh_piece);
     });
 }
 
@@ -135,6 +144,18 @@ fn apply_uci_move(board: &mut Bitboard, move_str: String) {
     }
 
     board.do_move(&mv);
+}
+
+fn stop() {
+    if !ongoing_search() {
+        std::thread::sleep(time::Duration::from_millis(100));
+    }
+    abort_search();
+    while ongoing_search() {
+        std::thread::sleep(time::Duration::from_millis(10));
+        abort_search();
+    }
+    // emit_last_bestmove();
 }
 
 fn set_position(params: &mut SplitWhitespace) -> Bitboard {
@@ -246,9 +267,13 @@ fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
     };
 }
 
+const OFF: u8 = 0;
+const BRAIN: u8 = 1;
+const HAND: u8 = 2;
+
 pub fn uci_loop() {
     let mut board = Bitboard::default_board();
-    let mut options = UCIOptions {num_threads: 1, move_overhead: 10, hash: 64};
+    let mut options = UCIOptions {num_threads: 1, move_overhead: 10, hash: 64, bh_mode: OFF};
 
     loop {
         let mut inp: String = String::new();
@@ -261,7 +286,6 @@ pub fn uci_loop() {
             Some(p) => p,
             None => {continue;}
         };
-
         if cmd == "quit" {
             break;
         } else if cmd == "uci" {
@@ -285,9 +309,26 @@ pub fn uci_loop() {
         } else if cmd == "go" {
             uci_go(&mut board, options, &mut params);
         } else if cmd == "stop" {
-            abort_search();
+            stop();
         } else if cmd == "eval" {
             println!("{}", static_eval(&mut board, &mut PHT::get_pht(1)) / 10);
+        } else if cmd == "bhmode" || cmd == "bh_mode" || cmd == "bh" {
+            let mode = match params.next() {
+                Some(p) => p,
+                None => {println!("You didn't say a mode"); continue;}
+            };
+            if mode == "brain" {
+                println!("Alright, I can be take the reins.");
+                options.bh_mode = BRAIN;
+            } else if mode == "hand" {
+                println!("Okay... I'll try to trust you.");
+                options.bh_mode = HAND;
+            } else if mode == "off" {
+                println!("Alright, I'll do this myself.");
+                options.bh_mode = OFF;
+            } else {
+                println!("What kind of mode is {}?", mode);
+            }
         } else if cmd == "nnue" {
             let b = board.thread_copy();
             board.net.print_eval(&b);
