@@ -1,5 +1,5 @@
-use core::arch::x86_64;
 use std::cmp;
+use std::time;
 use std::time::SystemTime;
 use std::thread;
 
@@ -24,6 +24,10 @@ const UB: i32 = 10000000;
 
 pub static mut TI: Vec<ThreadInfo> = Vec::new();
 pub static mut SS: Vec<SearchStats> = Vec::new();
+
+pub static mut TT_VALID: u64 = 0;
+pub static mut STATIC_EVALS: u64 = 0;
+pub static mut MAIN_SEARCH_NODES: u64 = 0;
 
 pub fn get_time_millis() -> u128 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
@@ -199,6 +203,9 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         STOP_THREAD = false;
         START_TIME = start_time;
         SEARCH_LIMITS = search_limits;
+        STATIC_EVALS = 0;
+        MAIN_SEARCH_NODES = 0;
+        TT_VALID = 0;
         SS = Vec::new();
         TI = Vec::new();
         for i in 0..num_threads {
@@ -356,7 +363,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
         depth += 1;
     }
-    abort_search();
+    stop_threads();
     for t in threads {
         let res = t.join();
         match res {
@@ -387,6 +394,13 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         ">:3"
     };
 
+    if search_limits.infinite {
+        unsafe {
+            while !ABORT {
+                std::thread::sleep(time::Duration::from_millis(50));
+            }
+        }
+    }
     if bh_mode == BRAIN {
         let piece = match best_move.piece {
             b'k' => {"king"},
@@ -405,6 +419,9 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         if bh_mode != OFF {
             println!("bestmove {} {}", best_move, emoji);
         } else {
+            // unsafe {
+            //     println!("MS NODES {} MAIN SEARCH EVALS {} TT_VALID {}", MAIN_SEARCH_NODES, STATIC_EVALS, TT_VALID);
+            // }
             println!("bestmove {}", best_move);
         }
     }
@@ -515,6 +532,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         sse.static_eval = MATE_SCORE + 1;
     } else if sse.excluded_move.is_null() {
         sse.static_eval = static_eval(node, &mut ti.pht);
+        unsafe {STATIC_EVALS += 1; TT_VALID += if sse.tt_hit {1} else {0};}
     }
     let eval = sse.static_eval;
 
@@ -762,7 +780,8 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             continue;
         }
         if depth > 1 {
-            unsafe {x86_64::_mm_prefetch(TT.get_ptr(node.hash), x86_64::_MM_HINT_T0);}
+            // unsafe {x86_64::_mm_prefetch(TT.get_ptr(node.hash), x86_64::_MM_HINT_T0);}
+            unsafe {TT.prefetch(node.hash);}
         }
 
         found_legal_move = true;
@@ -892,7 +911,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
         ti = &mut TI[thread_num];
     }
     ti.nodes_searched += 1;
-
+    // unsafe {STATIC_EVALS += 1;}
     if node.is_quiet() { return static_eval(node, &mut ti.pht); }
     // unsafe {
     //     let tt_entry = TT.get(node.hash);

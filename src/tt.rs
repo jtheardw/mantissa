@@ -1,3 +1,5 @@
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64;
 use std::mem;
 use std::sync::Mutex;
 
@@ -171,6 +173,11 @@ impl TT {
         // }
         // self.tt[idx] = to_insert;
         // *l = hash | to_insert.0.hash | to_insert.1.hash;
+    }
+
+    pub fn prefetch(&self, hash: u64) {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {x86_64::_mm_prefetch(self.get_ptr(hash), x86_64::_MM_HINT_T0);}
     }
 
     pub fn clear(&mut self) {
