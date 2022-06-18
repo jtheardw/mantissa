@@ -152,7 +152,7 @@ impl MovePicker {
                 } else {
                     let piece_num = get_piece_num(mv.piece, pos.side_to_move);
                     // mv_score = QUIET_OFFSET + (self.history[piece_num][mv.end as usize] + self.followup[piece_num][mv.end as usize]) as u64;
-                    let mut history_score = 0;
+                    let mut history_score;
                     unsafe {
                         if !seen_quiet {
                             if self.ply > 0 {
@@ -269,7 +269,7 @@ impl MovePicker {
             if self.killers[0] != self.tt_move && pos.is_pseudolegal(&self.killers[0]) {
                 let mv = self.killers[0];
                 let piece_num = get_piece_num(mv.piece, pos.side_to_move);
-                let mut history_score = 0;
+                let mut history_score;
                 unsafe {
                     history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
                     if self.ply > 0 {
@@ -297,7 +297,7 @@ impl MovePicker {
             if self.killers[1] != self.tt_move && pos.is_pseudolegal(&self.killers[1]) {
                 let mv = self.killers[1];
                 let piece_num = get_piece_num(mv.piece, pos.side_to_move);
-                let mut history_score = 0;
+                let mut history_score;
                 unsafe {
                     history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
                     if self.ply > 0 {
@@ -337,7 +337,7 @@ impl MovePicker {
                 pos.is_pseudolegal(&self.countermove) {
                     let mv = self.countermove;
                     let piece_num = get_piece_num(mv.piece, pos.side_to_move);
-                    let mut history_score = 0;
+                    let mut history_score;
                     unsafe {
                         history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
                         if self.ply > 0 {

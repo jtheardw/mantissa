@@ -633,7 +633,7 @@ impl Network {
 
             total += relud * self.hidden_weights[i];
         }
-        output += total.horizontal_sum();
+        output += total.reduce_sum();
 
         if self.flip {output *= -1.0;}
         return (output * 9.0).floor() as i32;

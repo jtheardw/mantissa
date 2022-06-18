@@ -246,14 +246,16 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     }
 
     let mut depth: i32 = 1;
-    let mut current_time: u128;
+    let mut current_time: u128 = 0;
 
     let mut best_move_changes = 0;
     let mut last_best_move_change = 0;
     let mut best_move: Move = Move::null_move();
     let mut val: i32;
     let mut best_val: i32 = LB;
-    let mut pv: &Vec<Move>;
+    let mut pv: &Vec<Move> = &vec![Move::null_move()];
+    let mut nodes_searched = 0;
+
 
     allow_threads();
     let mut threads = Vec::new();
@@ -297,6 +299,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         best_val = val;
 
         let elapsed_time;
+        nodes_searched = 0;
         unsafe {
             if depth > 4 {
                 SEARCH_LIMITS.maximum_time = max_time;
@@ -315,7 +318,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             current_time = cmp::max(get_time_millis(), start_time + 1);
             elapsed_time = current_time - start_time;
 
-            let mut nodes_searched = 0;
             for t_num in 0..num_threads {
                 nodes_searched += TI[t_num as usize].nodes_searched;
             }
@@ -422,6 +424,9 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             // unsafe {
             //     println!("MS NODES {} MAIN SEARCH EVALS {} TT_VALID {}", MAIN_SEARCH_NODES, STATIC_EVALS, TT_VALID);
             // }
+            unsafe {
+                print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
+            }
             println!("bestmove {}", best_move);
         }
     }
@@ -477,15 +482,16 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     }
 
     let mut depth = depth;
+    let is_check = node.is_check(node.side_to_move);
+
+    // EXPERIMENT: check extensions *before* qsearch
+    if is_check {
+        depth += 1
+    }
+
     if depth <= 0 {
         sse.pv.clear();
         return qsearch(node, alpha, beta, thread_num);
-    }
-
-    let is_check = node.is_check(node.side_to_move);
-    // check extensions
-    if is_check {
-        depth += 1
     }
 
     if sse.excluded_move.is_null() {
@@ -741,8 +747,8 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
             if lmr_depth < 4 && movepicker.move_stage > GEN_QUIET && is_quiet && !futile {
                 // let mut move_hist = 0;
-                let mut countermove_hist = 0;
-                let mut followup_hist = 0;
+                let countermove_hist;
+                let followup_hist;
 
                 let piece_num = get_piece_num(mv.piece, node.side_to_move);
                 // move_hist = ti.move_history[piece_num][mv.end as usize];
