@@ -424,9 +424,9 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             // unsafe {
             //     println!("MS NODES {} MAIN SEARCH EVALS {} TT_VALID {}", MAIN_SEARCH_NODES, STATIC_EVALS, TT_VALID);
             // }
-            unsafe {
-                print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
-            }
+            // unsafe {
+            //     print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
+            // }
             println!("bestmove {}", best_move);
         }
     }
@@ -617,6 +617,17 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
         if val >= beta {
             return beta;
+            // if depth < 14 {
+            //     return val;
+            // } else {
+            //     // super duper jank verification jank hack adventure
+            //     sse.searching_null_move = true;
+            //     let verification_val = search(node, beta-1, beta, cmp::max(depth / 2, depth - r - 2), ply, false, thread_num);
+            //     sse.searching_null_move = false;
+            //     if verification_val >= beta {
+            //         return val;
+            //     }
+            // }
         }
     }
 

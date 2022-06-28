@@ -345,18 +345,22 @@ impl SlowNetwork {
         let ss = 8; // supersampling
         let border = [0, 0, 0];
         let width  = (12*8)*ss + 11;
-        let height = 8*128*ss + 127;
+        let neurons = self.activations[0].size();
+        let height = 8*neurons*ss + neurons-1;
+        println!("neurons {}", neurons);
         let mut w = BufWriter::new(File::create(format!("{}.ppm", file))?);
         writeln!(&mut w, "P6")?;
         writeln!(&mut w, "{} {}", width, height)?;
         writeln!(&mut w, "255")?;
-        for n in 0..128 {
+        // for n in 0..128 {
+        for n in 0..neurons {
             if n != 0 { for _ in 0..width { w.write(&border)?; } }
             let mut upper = 0.0;
             let mut lower = 0.0;
             for i in 0..768 {
-                upper = self.weights[0].get(n, i).max(upper);
-                lower = self.weights[0].get(n, i).min(lower);
+                let nn = if n > neurons / 2 { n - neurons / 2 } else {n};
+                upper = self.weights[0].get(nn, i).max(upper);
+                lower = self.weights[0].get(nn, i).min(lower);
             }
             let scale = upper.max(-lower);
             println!("upper {} lower {} scale {}", upper, lower, scale);
@@ -368,8 +372,15 @@ impl SlowNetwork {
                             for file in 0..8 {
                                 let idx = coord_to_idx((file, rank));
                                 // let x : usize = piece*64 + rank*8 + file;
-                                let inp = input_number(piece, side, idx as i32);
-                                let normed = ((self.weights[0].get(n, inp) / scale) + 1.0) / 2.0;
+                                let inp;
+                                let normed;
+                                if n < neurons / 2 {
+                                    inp = input_number(piece, side, idx as i32);
+                                    normed = ((self.weights[0].get(n, inp) / scale) + 1.0) / 2.0;
+                                } else {
+                                    inp = flip_input(input_number(piece, side, idx as i32) as i16) as usize;
+                                    normed = ((self.weights[0].get(n-(neurons / 2), inp) / scale) + 1.0) / 2.0;
+                                }
                                 // let normed = ((self.w1[n][x] / scale) + 1.0) / 2.0;
                                 debug_assert!(1.0 >= normed && normed >= 0.0, "out of range");
                                 let r = (normed * 255.0).round() as u8;
