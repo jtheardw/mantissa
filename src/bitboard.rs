@@ -33,7 +33,7 @@ pub struct Bitboard {
     cap_stack: Vec<u8>,
     castling_rights_stack: Vec<u8>,
     halfmove_stack: Vec<u8>,
-    activation_stack: Vec<[f32x8; 32]>,
+    activation_stack: Vec<[f32x8; 64]>,
 
     pub halfmove: u8,
 

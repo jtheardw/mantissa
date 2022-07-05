@@ -336,7 +336,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         if search_limits.movetime > 0 && elapsed_time > search_limits.movetime {
             abort_search();
             break;
-        } else if search_limits.maximum_time > 0 && elapsed_time > search_limits.maximum_time * 2 / 3 {
+        } else if search_limits.maximum_time > 0 && elapsed_time > search_limits.maximum_time * 3 / 4 {
             abort_search();
             break;
         }
@@ -464,12 +464,12 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     if ply > ti.seldepth {
         ti.seldepth = ply;
     }
-    ti.nodes_searched += 1;
 
     let mut alpha = alpha;
     let mut beta = beta;
     if !init_node {
         if node.is_repetition() || node.is_fifty_move() || node.insufficient_material() {
+            ti.nodes_searched += 1;
             return DRAW_SCORE;
         }
 
@@ -477,6 +477,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         alpha = cmp::max(alpha, -MATE_SCORE + ply);
         beta = cmp::min(beta, MATE_SCORE - (ply + 1));
         if alpha >= beta {
+            ti.nodes_searched += 1;
             return alpha;
         }
     }
@@ -493,7 +494,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         sse.pv.clear();
         return qsearch(node, alpha, beta, thread_num);
     }
-
+    ti.nodes_searched += 1;
     if sse.excluded_move.is_null() {
         unsafe {
             let tt_entry = TT.get(node.hash);
