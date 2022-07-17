@@ -51,5 +51,7 @@ fn init() {
 
 fn main() {
     init();
+    // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
+    // n.print();
     uci_loop();
 }
