@@ -38,7 +38,7 @@ pub fn afp_margin(_depth: i32) -> i32 {
 }
 
 pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
-    let mut r = (NULL_MOVE_R_BASE + NULL_MOVE_R_FACTOR * (depth as f32)).floor() as i32;
+    let mut r = (NULL_MOVE_R_BASE + NULL_MOVE_R_FACTOR * (depth as f64)).floor() as i32;
     // let mut r = 4 + (depth / 6);
     r += cmp::min(3, (static_eval - beta) / NULL_MOVE_R_DENOM) as i32;
     return r;
@@ -64,10 +64,10 @@ pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
 
 pub fn lmp_count(improving: bool, depth: i32) -> i32 {
     if improving {
-        LMP_IMPROVING_BASE + ((depth * depth) as f32) * LMP_IMPROVING_FACTOR
+        LMP_IMPROVING_BASE + ((depth * depth) as f64) * LMP_IMPROVING_FACTOR
         // 4 + depth * depth
     } else {
-        LMP_NONIMPROVING_BASE + ((depth * depth) as f32) * LMP_NONIMPROVING_FACTOR
+        LMP_NONIMPROVING_BASE + ((depth * depth) as f64) * LMP_NONIMPROVING_FACTOR
         // 2 + depth * depth / 2
     }.floor() as i32
 }
@@ -216,9 +216,9 @@ self.move_history = [[0; 64]; 12];
 
         // see here: http://www.talkchess.com/forum3/viewtopic.php?f=7&t=76540
         // for more explanation
-        let c = cur as f32;
-        let d = delta as f32;
-        return (c - (c * d.abs()) * HISTORY_DECAY_FACTOR + d * HISTORY_DELTA_FACTOR).floor() as i32;
+        let c = cur as f64;
+        let d = delta as f64;
+        return (c - ((c * d.abs()) * HISTORY_DECAY_FACTOR).floor() + d * HISTORY_DELTA_FACTOR).floor() as i32;
         // return cur - (cur * delta.abs()) / 512 + delta * 32;
     }
 
