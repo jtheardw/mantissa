@@ -19,6 +19,7 @@ mod pgn;
 mod pht;
 mod psqt;
 mod search;
+mod searchparams;
 mod searchutil;
 mod see;
 mod time;

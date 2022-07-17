@@ -7,6 +7,7 @@ use crate::bitboard::*;
 use crate::eval::*;
 use crate::moveorder::*;
 use crate::moveutil::*;
+use crate::searchparams::*;
 use crate::searchutil::*;
 use crate::see::*;
 use crate::tt::*;
@@ -189,7 +190,8 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     let mut search_limits = search_limits;
     let max_time = search_limits.maximum_time;
     search_limits.maximum_time = 10000;
-
+    // println!("key {}", node.hash);
+    // println!("position repetition {}", (node.history.iter().filter(|&n| *n == node.hash).count() + 1));
     // loop {
     //     let mv = root_movepicker.next(node).0;
     //     if mv.is_null() { break; }
@@ -577,7 +579,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     // // Razoring
     // // if we're adjacent to a leaf and behind alpha by a lot, just drop into quiescence search
     if depth < 3 && pruning_safe {
-        if (eval + 2500 * depth) < alpha {
+        if (eval + RAZORING_MARGIN * depth) < alpha {
             let val = qsearch(node, alpha, beta, thread_num);
             if val <= alpha {
                 return val;
@@ -656,7 +658,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         && (sse.tt_node_type & CUT_NODE) != 0
         && sse.tt_depth >= depth - 3
     {
-        let margin = 37 * depth;
+        let margin = SINGULAR_MARGIN_FACTOR * depth;
         let depth_to_search = (depth - 1) / 2;
         let target = sse.tt_val - margin;
 
@@ -751,7 +753,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             // but won't kick in until we've tried all moves with good history scores
             if lmr_depth <= 6 && is_quiet && eval + fp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE && movepicker.move_stage > GEN_QUIET && !futile {
                 let hist = (score as i32) - QUIET_OFFSET as i32;
-                if hist < 6000 {
+                if hist < HISTORY_LEAF_PRUNING_MARGIN {
                     futile = true
                 }
             }
@@ -772,12 +774,12 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 if !prev_mv.is_null() {
                     let prev_piece_num = get_piece_num(prev_mv.piece, !node.side_to_move);
                     countermove_hist = ti.countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
-                    if countermove_hist <= -700 * lmr_depth { continue; }
+                    if countermove_hist <= COUNTERMOVE_PRUNING_FACTOR * lmr_depth { continue; }
                 }
                 if !my_prev_mv.is_null() {
                     let prev_piece_num = get_piece_num(my_prev_mv.piece, node.side_to_move);
                     followup_hist = ti.followup_history[prev_piece_num][my_prev_mv.end as usize][piece_num][mv.end as usize];
-                    if followup_hist <= -1500 * lmr_depth { continue; }
+                    if followup_hist <= FOLLOWUP_PRUNING_FACTOR * lmr_depth { continue; }
                 }
             }
         }
@@ -835,7 +837,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 // adjust r based on history of other quiet moves
                 let hist = (score as i32) - QUIET_OFFSET as i32;
                 // let hist = move_hist + countermove_hist + followup_hist;
-                r -= cmp::max(-2, cmp::min(2, hist / 8000));
+                r -= cmp::max(-2, cmp::min(2, hist / LMR_HISTORY_DENOMINATOR));
 
                 let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);
                 val = -search(node, -alpha - 1, -alpha, lmr_depth, ply + 1, false, thread_num);

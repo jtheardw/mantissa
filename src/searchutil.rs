@@ -1,6 +1,7 @@
 use std::cmp;
 
 use crate::moveutil::*;
+use crate::searchparams::*;
 use crate::pht::*;
 use crate::time::*;
 use crate::tt::*;
@@ -17,34 +18,37 @@ static mut LMR_TABLE: [[i32; 64]; 64] = [[0; 64]; 64];
 
 pub fn efp_margin(depth: i32) -> i32 {
     if depth <= 0 { return 0; }
-    // if depth > 3 { return 1000 + 2000 * depth}
-    // return [0, 3200, 5000, 7300][depth as usize];
-    return 1000 + 1200 * depth;
-    // return base + 1000 * (depth - 1);
+    // return 1000 + 1200 * depth;
+    return EFP_MARGIN_BASE + EFP_MARGIN_FACTOR * depth;
 }
 
 pub fn fp_margin(depth: i32) -> i32 {
-    return 1000 + depth * 600;
+    return FP_MARGIN_BASE + FP_MARGIN_FACTOR * depth;
+    // return 1000 + depth * 600;
 }
 
 pub fn rfp_margin(depth: i32) -> i32 {
-    return 1200 * depth;
+    return RFP_MARGIN_BASE + RFP_MARGIN_FACTOR * depth;
+    // return 1200 * depth;
 }
 
 pub fn afp_margin(_depth: i32) -> i32 {
-    return 30000;
+    return AFP_MARGIN;
+    // return 30000;
 }
 
 pub fn null_move_r(static_eval: i32, beta: i32, depth: i32) -> i32 {
-    let mut r = 4 + (depth / 6);
-    r += cmp::min(3, (static_eval - beta) / 3000) as i32;
+    let mut r = (NULL_MOVE_R_BASE + NULL_MOVE_R_FACTOR * (depth as f32)).floor() as i32;
+    // let mut r = 4 + (depth / 6);
+    r += cmp::min(3, (static_eval - beta) / NULL_MOVE_R_DENOM) as i32;
     return r;
 }
 
 pub fn lmr_table_gen() {
     for d in 1..64 {
         for m in 1..64 {
-            let r = (0.8 + ((d as f64).ln() * (m as f64).ln()) / 2.25).floor() as i32;
+            let r = (LMR_BASE + ((d as f64).ln() * (m as f64).ln()) * LMR_FACTOR).floor() as i32;
+            // let r = (0.8 + ((d as f64).ln() * (m as f64).ln()) / 2.25).floor() as i32;
             unsafe {LMR_TABLE[d as usize][m as usize] = r;}
         }
     }
@@ -60,10 +64,12 @@ pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
 
 pub fn lmp_count(improving: bool, depth: i32) -> i32 {
     if improving {
-        4 + depth * depth
+        LMP_IMPROVING_BASE + ((depth * depth) as f32) * LMP_IMPROVING_FACTOR
+        // 4 + depth * depth
     } else {
-        2 + depth * depth / 2
-    }
+        LMP_NONIMPROVING_BASE + ((depth * depth) as f32) * LMP_NONIMPROVING_FACTOR
+        // 2 + depth * depth / 2
+    }.floor() as i32
 }
 
 #[derive(Copy, Clone)]
@@ -210,7 +216,10 @@ self.move_history = [[0; 64]; 12];
 
         // see here: http://www.talkchess.com/forum3/viewtopic.php?f=7&t=76540
         // for more explanation
-        return cur - (cur * delta.abs()) / 512 + delta * 32;
+        let c = cur as f32;
+        let d = delta as f32;
+        return (c - (c * d.abs()) * HISTORY_DECAY_FACTOR + d * HISTORY_DELTA_FACTOR).floor() as i32;
+        // return cur - (cur * delta.abs()) / 512 + delta * 32;
     }
 
     pub fn update_killers(&mut self, mv: Move, ply: i32) {
