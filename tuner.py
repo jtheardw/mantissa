@@ -107,7 +107,7 @@ pub const SINGULAR_MARGIN_FACTOR: i32 = {singular_margin_factor};
 
 
 NUM_STEP_GAMES = 2
-NUM_VERIFICATION_GAMES = 1024
+NUM_VERIFICATION_GAMES = 512
 
 class Params(dict):
     def __add__(self, other):
@@ -230,7 +230,7 @@ def normalize_params(params):
 
 
 def run_step_games():
-    cmd = ["cutechess-cli", "-tournament", "gauntlet", "-concurrency", "48", "-engine", "conf=mantissa-plus", "tc=10+0.1", "-engine", "conf=mantissa-minus", "tc=10+0.1", "-ratinginterval", "1", "-recover", "-event", "TISSA_TUNING", "-resultformat", "per-color", "-each", "book=/home/jtwright/chess/books/gm2001.bin", "bookdepth=10", "proto=uci", "option.Hash=32", "option.Threads=1", "-games", str(NUM_STEP_GAMES)]
+    cmd = ["cutechess-cli", "-tournament", "gauntlet", "-concurrency", "12", "-engine", "conf=mantissa-plus", "tc=10+0.1", "-resign", "movecount=5", "score=800", "-draw", "movenumber=40", "movecount=8", "score=20", "-engine", "conf=mantissa-minus", "tc=10+0.1", "-ratinginterval", "1", "-recover", "-event", "TISSA_TUNING", "-resultformat", "per-color", "-each", "book=/home/jtwright/chess/books/gm2001.bin", "bookdepth=10", "proto=uci", "option.Hash=32", "option.Threads=1", "-games", str(NUM_STEP_GAMES)]
     result = subprocess.run(cmd, capture_output=True)
     log = result.stdout.decode('utf-8')
     idx = log.rfind("Score of ")
@@ -239,15 +239,16 @@ def run_step_games():
     end = tail.find("[")
 
     score_section = tail[start+1:end].strip()
-    wins, draws, losses = [int(n.strip()) for n in score_section.split(" - ")]
+    wins, losses, draws = [int(n.strip()) for n in score_section.split(" - ")]
 
-    return wins - losses
+    return (wins - losses) / (NUM_STEP_GAMES / 2)
 
 
-def _run_verification_games():
-    cmd = ["cutechess-cli", "-tournament", "gauntlet", "-repeat", "-concurrency", "48", "-engine", "conf=mantissa-plus", "tc='10+0.1'", "-engine", "conf=mantissa-minus", "tc='30+0.3'", "-ratinginterval", "1", "-recover", "-event", "TISSA_TUNING", "-resultformat", "per-color", "-each", "book=/home/jtwright/books/gm2001.bin", "bookdepth=10", "proto=uci", "option.Hash=256", "option.Threads=1", "-games", str(NUM_VERIFICATION_GAMES)]
+def run_verification_games():
+    cmd = ["cutechess-cli", "-tournament", "gauntlet", "-repeat", "-concurrency", "12", "-engine", "conf=mantissa-inter", "tc=30+0.3", "-engine", "conf=mantissa-reference", "tc=30+0.3", "-ratinginterval", "1", "-recover", "-event", "TISSA_TUNING", "-resultformat", "per-color", "-each", "book=/home/jtwright/books/gm2001.bin", "bookdepth=10", "proto=uci", "option.Hash=256", "option.Threads=1", "-games", str(NUM_VERIFICATION_GAMES)]
     result = subprocess.run(cmd, capture_output=True)
-    log = result.stdout
+    log = result.stdout.decode('utf-8')
+
     idx = log.rfind("Elo difference: ")
     tail = log[idx:]
     start = tail.find(":")
@@ -262,7 +263,6 @@ def compile_engine(params):
         f.write(PARAMS_FILE_TEMPLATE.format(**params))
     os.chdir(MANTISSA_DIR)
     result = subprocess.run(os.path.join(MANTISSA_DIR, "build"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    assert result.returncode == 0
 
 
 def setup_engines_for_step(params, delta):
@@ -358,5 +358,8 @@ GRADIENT:
         param_history.append(params)
         write_params_history(param_history)
 
+        if (n+1) % 500 == 0:
+            verify_engine_strength(normalize_params(params), n)
+
 if __name__ == "__main__":
-    tune(num_games=10000)
+    tune(num_games=50000)
