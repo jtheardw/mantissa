@@ -105,14 +105,14 @@ impl SlowNetwork {
     }
 
     pub fn print(&self) {
-        println!("pub const DEFAULT_NNUE_FEATURE_WEIGHTS: [f32; 98432] = [");
+        println!("pub const DEFAULT_NNUE_FEATURE_WEIGHTS: [f32; 196864] = [");
         for i in 0..769 {
-            for j in 0..16 {
+            for j in 0..32 {
                 print!("\t");
                 for k in 0..8 {
                     let idx = j * 8 + k;
                     print!("{}", self.weights[0].get(idx, i));
-                    if i != 768 || j != 15 || k != 7 {
+                    if i != 768 || j != 31 || k != 7 {
                         print!(", ");
                     }
                 }
@@ -121,13 +121,13 @@ impl SlowNetwork {
         }
         println!("];");
         println!("");
-        println!("pub const DEFAULT_NNUE_HIDDEN_BIAS: [f32; 128] = [");
-        for i in 0..16 {
+        println!("pub const DEFAULT_NNUE_HIDDEN_BIAS: [f32; 256] = [");
+        for i in 0..32 {
             print!("\t");
             for j in 0..8 {
                 let idx = i * 8 + j;
                 print!("{}", self.biases[0].data[idx]);
-                if i != 15 || j != 7 {
+                if i != 31 || j != 7 {
                     print!(", ");
                 }
             }
@@ -135,13 +135,13 @@ impl SlowNetwork {
         }
         println!("];");
         println!("");
-        println!("pub const DEFAULT_NNUE_HIDDEN_WEIGHTS: [f32; 256] = [");
-        for i in 0..32 {
+        println!("pub const DEFAULT_NNUE_HIDDEN_WEIGHTS: [f32; 512] = [");
+        for i in 0..64 {
             print!("\t");
             for j in 0..8 {
                 let idx = i * 8 + j;
                 print!("{}", self.weights[1].data[idx]);
-                if i != 31 || j != 7 {
+                if i != 63 || j != 7 {
                     print!(", ");
                 }
             }
@@ -398,10 +398,10 @@ impl SlowNetwork {
 }
 
 pub struct Network {
-    pub feature_weights: Vec<[f32x8; 32]>,
-    pub hidden_weights: [f32x8; 32],
-    pub hidden_biases: [f32x8; 32],
-    pub hidden_activations: [f32x8; 32],
+    pub feature_weights: Vec<[f32x8; 64]>,
+    pub hidden_weights: [f32x8; 64],
+    pub hidden_biases: [f32x8; 64],
+    pub hidden_activations: [f32x8; 64],
     pub output_bias: f32,
     pub flip: bool
 }
@@ -413,10 +413,10 @@ fn all_zeros() -> f32x8 {
 impl Network {
     pub fn empty_net() -> Network {
         Network {
-            feature_weights: vec![[all_zeros(); 32]; 769],
-            hidden_weights: [all_zeros(); 32],
-            hidden_biases: [all_zeros(); 32],
-            hidden_activations: [all_zeros(); 32],
+            feature_weights: vec![[all_zeros(); 64]; 769],
+            hidden_weights: [all_zeros(); 64],
+            hidden_biases: [all_zeros(); 64],
+            hidden_activations: [all_zeros(); 64],
             output_bias: 0.0,
             flip: false
         }
@@ -437,37 +437,37 @@ impl Network {
 
     pub unsafe fn load_default() -> Network {
         // inputs
-        let mut feature_weights = vec![[all_zeros(); 32]; 769];
-        let mut weights: Vec<[f32; 256]> = vec![[0.0; 256]; 769];
+        let mut feature_weights = vec![[all_zeros(); 64]; 769];
+        let mut weights: Vec<[f32; 512]> = vec![[0.0; 512]; 769];
         for j in 0..769 {
-            for i in 0..128 {
-                let weight = DEFAULT_NNUE_FEATURE_WEIGHTS[j*128 + i] as f32;
+            for i in 0..256 {
+                let weight = DEFAULT_NNUE_FEATURE_WEIGHTS[j*256 + i] as f32;
                 weights[j][i] = weight;
-                weights[flip_input(j as i16) as usize][i + 128] = weight;
+                weights[flip_input(j as i16) as usize][i + 256] = weight;
             }
         }
 
         for i in 0..769 {
-            for j in 0..32 {
+            for j in 0..64 {
                 feature_weights[i][j] = f32x8::from_slice(&weights[i][j*8..j*8+8]);
             }
         }
 
-        let mut hidden_biases = [all_zeros(); 32];
-        let mut biases = [0.0; 256];
-        for i in 0..256 {
-            biases[i] = DEFAULT_NNUE_HIDDEN_BIAS[i % 128];
+        let mut hidden_biases = [all_zeros(); 64];
+        let mut biases = [0.0; 512];
+        for i in 0..512 {
+            biases[i] = DEFAULT_NNUE_HIDDEN_BIAS[i % 256];
         }
-        for i in 0..32 {
+        for i in 0..64 {
             hidden_biases[i] = f32x8::from_slice(&biases[i*8..i*8+8]);
         }
 
-        let mut hidden_weights = [all_zeros(); 32];
-        let mut weights = [0.0; 256];
-        for i in 0..256 {
+        let mut hidden_weights = [all_zeros(); 64];
+        let mut weights = [0.0; 512];
+        for i in 0..512 {
             weights[i] = DEFAULT_NNUE_HIDDEN_WEIGHTS[i];
         }
-        for i in 0..32 {
+        for i in 0..64 {
             hidden_weights[i] = f32x8::from_slice(&weights[i*8..i*8+8]);
         }
 
@@ -477,7 +477,7 @@ impl Network {
             feature_weights: feature_weights,
             hidden_weights: hidden_weights,
             hidden_biases: hidden_biases,
-            hidden_activations: [all_zeros(); 32],
+            hidden_activations: [all_zeros(); 64],
             output_bias: output_bias,
             flip: false
         };
@@ -517,44 +517,44 @@ impl Network {
         }
 
         // inputs
-        let mut feature_weights = vec![[all_zeros(); 32]; 769];
+        let mut feature_weights = vec![[all_zeros(); 64]; 769];
         let mut weights = vec![[0.0; 256]; 769];
         for j in 0..769 {
-            for i in 0..256 {
+            for i in 0..512 {
                 file.read(&mut buf)?;
-                if i < 128 {
+                if i < 256 {
                     weights[j][i] = f32::from_le_bytes(buf);
-                    weights[flip_input(j as i16) as usize][i + 128] = f32::from_le_bytes(buf);
+                    weights[flip_input(j as i16) as usize][i + 256] = f32::from_le_bytes(buf);
                 }
             }
         }
 
         for i in 0..769 {
-            for j in 0..32 {
+            for j in 0..64 {
                 feature_weights[i][j] = f32x8::from_slice(&weights[i][j*8..j*8+8]);
             }
         }
 
-        let mut hidden_biases = [all_zeros(); 32];
-        let mut biases = [0.0; 256];
-        for i in 0..256 {
+        let mut hidden_biases = [all_zeros(); 64];
+        let mut biases = [0.0; 512];
+        for i in 0..512 {
             file.read(&mut buf)?;
-            if i < 128 {
+            if i < 256 {
                 biases[i] = f32::from_le_bytes(buf);
-                biases[i+128] = f32::from_le_bytes(buf);
+                biases[i+256] = f32::from_le_bytes(buf);
             }
         }
-        for i in 0..32 {
+        for i in 0..64 {
             hidden_biases[i] = f32x8::from_slice(&biases[i*8..i*8+8]);
         }
 
-        let mut hidden_weights = [all_zeros(); 32];
-        let mut weights = [0.0; 256];
-        for i in 0..256 {
+        let mut hidden_weights = [all_zeros(); 64];
+        let mut weights = [0.0; 512];
+        for i in 0..512 {
             file.read(&mut buf)?;
             weights[i] = f32::from_le_bytes(buf);
         }
-        for i in 0..32 {
+        for i in 0..64 {
             hidden_weights[i] = f32x8::from_slice(&weights[i*8..i*8+8]);
         }
 
@@ -565,7 +565,7 @@ impl Network {
             feature_weights: feature_weights,
             hidden_weights: hidden_weights,
             hidden_biases: hidden_biases,
-            hidden_activations: [all_zeros(); 32],
+            hidden_activations: [all_zeros(); 64],
             output_bias: output_bias,
             flip: false
         };
@@ -575,14 +575,14 @@ impl Network {
 
     pub fn activate(&mut self, piece: i32, color: Color, idx: i8) {
         let feature_idx = input_number(piece, color == Color::White, idx as i32);
-        for j in 0..32 {
+        for j in 0..64 {
             self.hidden_activations[j] += self.feature_weights[feature_idx][j];
         }
     }
 
     pub fn deactivate(&mut self, piece: i32, color: Color, idx: i8) {
         let feature_idx = input_number(piece, color == Color::White, idx as i32);
-        for j in 0..32 {
+        for j in 0..64 {
             self.hidden_activations[j] -= self.feature_weights[feature_idx][j];
         }
     }
@@ -610,7 +610,7 @@ impl Network {
     }
 
     pub fn set_activations(&mut self, pos: &Bitboard) {
-        for i in 0..32 {
+        for i in 0..64 {
             self.hidden_activations[i] = self.hidden_biases[i];
         }
 
@@ -638,8 +638,8 @@ impl Network {
         let mut output = self.output_bias;
         let mut total = all_zeros();
         let relu_zeros = all_zeros();
-        for i in 0..32 {
-            let idx = if self.flip { i ^ 16 } else { i };
+        for i in 0..64 {
+            let idx = if self.flip { i ^ 32 } else { i };
             let relud = self.hidden_activations[idx].max(relu_zeros);
 
             total += relud * self.hidden_weights[i];

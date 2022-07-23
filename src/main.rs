@@ -54,4 +54,9 @@ fn main() {
     // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
     // n.print();
     uci_loop();
+    // let n = SlowNetwork::load("/home/jtwright/chess/zahak/default.nn").unwrap();
+    // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
+    // let n = SlowNetwork::load("/home/jtwright/nets_wide/epoch-300.nnue").unwrap();
+    // n.print();
+    // n.save_image("mantissa");
 }
