@@ -32,40 +32,40 @@ INTEGER_PARAMS = {
 
 PARAM_MODS = {
     # initial, min, max, step
-    "efp_margin_base": (1000, 0, 4000, 100),
-    "efp_margin_factor": (1200, 0, 4000, 100),
+    "efp_margin_base": (936, 0, 4000, 100),
+    "efp_margin_factor": (1204, 0, 4000, 100),
 
-    "fp_margin_base": (1000, 0, 4000, 100),
-    "fp_margin_factor": (600, 0, 4000, 100),
+    "fp_margin_base": (1145, 0, 4000, 100),
+    "fp_margin_factor": (680, 0, 4000, 100),
 
-    "rfp_margin_base": (500, 0, 4000, 100),
-    "rfp_margin_factor": (1200, 0, 4000, 100),
+    "rfp_margin_base": (-9, 0, 4000, 0),
+    "rfp_margin_factor": (699, 0, 4000, 0),
 
-    "afp_margin": (30000, 10000, 50000, 3000),
+    "afp_margin": (28826, 10000, 50000, 3000),
 
-    "null_move_r_base": (4.0, 0.0, 8.0, 0.2),
-    "null_move_r_factor": (1./6., 0.0, 0.5, 1./30),
-    "null_move_r_denom": (3000, 1000, 15000, 200),
+    "null_move_r_base": (4.47, 0.0, 8.0, 0.0),
+    "null_move_r_factor": (0.126911611, 0.0, 0.5, 0.0),
+    "null_move_r_denom": (2458, 1000, 15000, 0),
 
-    "razoring_margin": (2500, 1000, 5000, 100),
+    "razoring_margin": (2569, 1000, 5000, 100),
 
-    "lmr_base": (0.8, 0.0, 2.0, 0.1),
-    "lmr_factor": (1./2.25, 1./4, 1.0, 0.07),
-    "lmr_history_denominator": (8000, 2000, 16000, 250),
+    "lmr_base": (0.585, 0.0, 2.0, 0.0),
+    "lmr_factor": (0.5036, 1./4, 1.0, 0.0),
+    "lmr_history_denominator": (7780, 2000, 16000, 250),
 
-    "lmp_improving_base": (4.0, 0.0, 10.0, 0.3),
-    "lmp_improving_factor": (1.0, 0.1, 2.0, 0.07),
-    "lmp_nonimproving_base": (2.0, 0.0, 10.0, 0.3),
-    "lmp_nonimproving_factor": (0.5, 0.1, 2.0, 0.07),
+    "lmp_improving_base": (4.23555, 0.0, 10.0, 0.3),
+    "lmp_improving_factor": (1.02456, 0.1, 2.0, 0.07),
+    "lmp_nonimproving_base": (2.126, 0.0, 10.0, 0.3),
+    "lmp_nonimproving_factor": (0.54349, 0.1, 2.0, 0.07),
 
-    "history_decay_factor": (1.0 / 512.0, 1.0 / 1024.0, 1.0 / 100.0, 0.0001),
-    "history_delta_factor": (32.0, 10.0, 50.0, 1.0),
+    "history_decay_factor": (0.0018623, 1.0 / 1024.0, 1.0 / 100.0, 0.0001),
+    "history_delta_factor": (31.952, 10.0, 50.0, 1.0),
 
-    "history_leaf_pruning_margin": (6000, 0, 30000, 500),
-    "countermove_pruning_factor": (-700, -4000, 0, 100),
-    "followup_pruning_factor": (-1500, -5000, 0, 175),
+    "history_leaf_pruning_margin": (5444, 0, 30000, 0),
+    "countermove_pruning_factor": (-799, -4000, 0, 50),
+    "followup_pruning_factor": (-1753, -5000, 0, 100),
 
-    "singular_margin_factor": (37, 10, 100, 5)
+    "singular_margin_factor": (35, 10, 100, 5)
 }
 
 PARAMS_FILE_TEMPLATE = """
@@ -107,7 +107,7 @@ pub const SINGULAR_MARGIN_FACTOR: i32 = {singular_margin_factor};
 
 
 NUM_STEP_GAMES = 2
-NUM_VERIFICATION_GAMES = 1024
+NUM_VERIFICATION_GAMES = 512
 
 class Params(dict):
     def __add__(self, other):
@@ -130,13 +130,13 @@ class Params(dict):
         return Params(**{k: self[k] / other for k in self})
 
     def normalize(self):
-        return Params(**{k: self[k] / PARAM_MODS[k][3] for k in self})
+        return Params(**{k: self[k] / (PARAM_MODS[k][3] or 1) for k in self})
 
     def denormalize(self):
         return Params(**{k: self[k] * PARAM_MODS[k][3] for k in self})
 
     def invert(self):
-        return Params(**{k: 1 / self[k] for k in self})
+        return Params(**{k: 1 / (self[k] or 1) for k in self})
 
     def __str__(self):
         return "\n".join([f'{key}: {value}' for key, value in self.items()])
@@ -230,7 +230,7 @@ def normalize_params(params):
 
 
 def run_step_games():
-    cmd = ["cutechess-cli", "-tournament", "gauntlet", "-concurrency", "48", "-engine", "conf=mantissa-plus", "tc=10+0.1", "-engine", "conf=mantissa-minus", "tc=10+0.1", "-ratinginterval", "1", "-recover", "-event", "TISSA_TUNING", "-resultformat", "per-color", "-each", "book=/home/jtwright/chess/books/gm2001.bin", "bookdepth=10", "proto=uci", "option.Hash=32", "option.Threads=1", "-games", str(NUM_STEP_GAMES)]
+    cmd = ["cutechess-cli", "-tournament", "gauntlet", "-concurrency", "12", "-engine", "conf=mantissa-plus", "tc=10+0.1", "-resign", "movecount=5", "score=800", "-draw", "movenumber=40", "movecount=8", "score=20", "-engine", "conf=mantissa-minus", "tc=10+0.1", "-ratinginterval", "1", "-recover", "-event", "TISSA_TUNING", "-resultformat", "per-color", "-each", "book=/home/jtwright/chess/books/gm2001.bin", "bookdepth=10", "proto=uci", "option.Hash=32", "option.Threads=1", "-games", str(NUM_STEP_GAMES)]
     result = subprocess.run(cmd, capture_output=True)
     log = result.stdout.decode('utf-8')
     idx = log.rfind("Score of ")
@@ -239,15 +239,16 @@ def run_step_games():
     end = tail.find("[")
 
     score_section = tail[start+1:end].strip()
-    wins, draws, losses = [int(n.strip()) for n in score_section.split(" - ")]
+    wins, losses, draws = [int(n.strip()) for n in score_section.split(" - ")]
 
-    return wins - losses
+    return (wins - losses) / (NUM_STEP_GAMES / 2)
 
 
-def _run_verification_games():
-    cmd = ["cutechess-cli", "-tournament", "gauntlet", "-repeat", "-concurrency", "48", "-engine", "conf=mantissa-plus", "tc='10+0.1'", "-engine", "conf=mantissa-minus", "tc='30+0.3'", "-ratinginterval", "1", "-recover", "-event", "TISSA_TUNING", "-resultformat", "per-color", "-each", "book=/home/jtwright/books/gm2001.bin", "bookdepth=10", "proto=uci", "option.Hash=256", "option.Threads=1", "-games", str(NUM_VERIFICATION_GAMES)]
+def run_verification_games():
+    cmd = ["cutechess-cli", "-tournament", "gauntlet", "-repeat", "-concurrency", "12", "-engine", "conf=mantissa-inter", "tc=30+0.3", "-engine", "conf=mantissa-reference", "tc=30+0.3", "-ratinginterval", "1", "-recover", "-event", "TISSA_TUNING", "-resultformat", "per-color", "-each", "book=/home/jtwright/books/gm2001.bin", "bookdepth=10", "proto=uci", "option.Hash=256", "option.Threads=1", "-games", str(NUM_VERIFICATION_GAMES)]
     result = subprocess.run(cmd, capture_output=True)
-    log = result.stdout
+    log = result.stdout.decode('utf-8')
+
     idx = log.rfind("Elo difference: ")
     tail = log[idx:]
     start = tail.find(":")
@@ -262,7 +263,6 @@ def compile_engine(params):
         f.write(PARAMS_FILE_TEMPLATE.format(**params))
     os.chdir(MANTISSA_DIR)
     result = subprocess.run(os.path.join(MANTISSA_DIR, "build"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    assert result.returncode == 0
 
 
 def setup_engines_for_step(params, delta):
@@ -358,5 +358,8 @@ GRADIENT:
         param_history.append(params)
         write_params_history(param_history)
 
+        if (n+1) % 500 == 0:
+            verify_engine_strength(normalize_params(params), n)
+
 if __name__ == "__main__":
-    tune(num_games=10000)
+    tune(num_games=50000)
