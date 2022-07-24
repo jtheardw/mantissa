@@ -524,6 +524,256 @@ impl Bitboard {
         }
     }
 
+    pub fn do_move_legal(&mut self, mv: &Move) -> bool {
+        // check legality before doing any sort of expensive stuff
+        // move piece
+        let start_point: u64 = idx_to_bb(mv.start);
+        let end_point: u64 = idx_to_bb(mv.end);
+        let me = self.side_to_move as usize;
+        let them = !self.side_to_move as usize;
+
+        // determine captured piece for all non-ep captures
+        let mut captured_piece: u8 = self.piece_at_square(mv.end, !self.side_to_move);
+        let mut is_ep = false;
+        let mut ep_idx = 0;
+
+        // check ep first
+        if captured_piece == 0 && mv.is_pawn_cap() {
+            captured_piece = b'p';
+            let actual_pawn_idx = if self.side_to_move == Color::White {
+                coord_to_idx((self.ep_file, 4))
+            } else {
+                coord_to_idx((self.ep_file, 3))
+            };
+
+            // remove enemy pawn
+            self.pawn[them] ^= idx_to_bb(actual_pawn_idx);
+            is_ep = true;
+            ep_idx = actual_pawn_idx;
+        } else if captured_piece != 0 {
+            match captured_piece {
+                b'p' => {self.pawn[them] ^= end_point;},
+                b'n' => {self.knight[them] ^= end_point;},
+                b'b' => {self.bishop[them] ^= end_point;},
+                b'r' => {self.rook[them] ^= end_point;},
+                b'q' => {self.queen[them] ^= end_point;},
+                _ => {println!("{}", bb_str(self.king[them])); panic!("captured uncapturable piece {}!", captured_piece)}
+            };
+        }
+
+        // castling
+        if mv.piece == b'k' && (mv.end - mv.start).abs() == 2 {
+            let old_rook_idx: i8 = if mv.end > mv.start { mv.start + 3 } else { mv.start - 4 };
+            let new_rook_idx: i8 = if mv.end > mv.start { mv.start + 1 } else { mv.start - 1 };
+            // move the rook
+            let rook_mask = idx_to_bb(old_rook_idx) | idx_to_bb(new_rook_idx);
+            self.rook[me] ^= rook_mask;
+        }
+
+        let mut promo_num = 0;
+        let mut piece_num = 0;
+        // move piece
+        if mv.piece == b'p' && mv.promote_to != 0 {
+            self.pawn[me] ^= start_point;
+            match mv.promote_to {
+                b'q' => { self.queen[me] |= end_point; promo_num = QUEEN; },
+                b'r' => { self.rook[me] |= end_point; promo_num = ROOK; },
+                b'b' => { self.bishop[me] |= end_point; promo_num = BISHOP; },
+                b'n' => { self.knight[me] |= end_point; promo_num = KNIGHT; },
+                _ => { panic!("illegal promotion on mv {}", mv); }
+            }
+        } else {
+            let move_mask = start_point | end_point;
+            match mv.piece {
+                b'k' => {
+                    self.king[me] ^= move_mask;
+                    piece_num = KING;
+                },
+                b'q' => {
+                    self.queen[me] ^= move_mask;
+                    piece_num = QUEEN;
+                },
+                b'r' => {
+                    self.rook[me] ^= move_mask;
+                    piece_num = ROOK;
+                },
+                b'b' => {
+                    self.bishop[me] ^= move_mask;
+                    piece_num = BISHOP;
+                },
+                b'n' => {
+                    self.knight[me] ^= move_mask;
+                    piece_num = KNIGHT;
+                },
+                b'p' => {
+                    self.pawn[me] ^= move_mask;
+                    piece_num = PAWN;
+                },
+                _ => { panic!("moved nonexistent piece {} in mv {}", mv.piece, mv); }
+            }
+        }
+
+        // update composite
+        self.composite[me] = self.pawn[me] | self.knight[me] | self.bishop[me] |
+            self.rook[me] | self.queen[me] | self.king[me];
+
+        self.composite[them] = self.pawn[them] | self.knight[them] | self.bishop[them] |
+            self.rook[them] | self.queen[them] | self.king[them];
+
+        if self.is_check(self.side_to_move) {
+            // undo
+            if is_ep {
+                let actual_pawn_idx = ep_idx;
+
+                // replace enemy pawn
+                self.pawn[them] ^= idx_to_bb(actual_pawn_idx);
+            } else if captured_piece != 0 {
+                match captured_piece {
+                    b'p' => { self.pawn[them] ^= end_point; },
+                    b'n' => { self.knight[them] ^= end_point; },
+                    b'b' => { self.bishop[them] ^= end_point; },
+                    b'r' => { self.rook[them] ^= end_point; },
+                    b'q' => { self.queen[them] ^= end_point; },
+                    _ => panic!("Captured uncapturable piece {}!", captured_piece)
+                };
+            }
+
+            // castling
+            if mv.piece == b'k' && (mv.end - mv.start).abs() == 2 {
+                let old_rook_idx: i8 = if mv.end > mv.start { mv.start + 3 } else { mv.start - 4 };
+                let new_rook_idx: i8 = if mv.end > mv.start { mv.start + 1 } else { mv.start - 1 };
+
+                // move the rook
+                let rook_mask = idx_to_bb(old_rook_idx) | idx_to_bb(new_rook_idx);
+                self.rook[me] ^= rook_mask;
+            }
+
+            // move piece
+            if mv.piece == b'p' && mv.promote_to != 0 {
+                self.pawn[me] ^= start_point;
+                match mv.promote_to {
+                    b'q' => { self.queen[me] ^= end_point; },
+                    b'r' => { self.rook[me] ^= end_point; },
+                    b'b' => { self.bishop[me] ^= end_point; },
+                    b'n' => { self.knight[me] ^= end_point; },
+                    _ => { panic!("illegal promotion on mv {}", mv); }
+                }
+            } else {
+                let move_mask = start_point | end_point;
+                match mv.piece {
+                    b'k' => { self.king[me] ^= move_mask; },
+                    b'q' => { self.queen[me] ^= move_mask; },
+                    b'r' => { self.rook[me] ^= move_mask; },
+                    b'b' => { self.bishop[me] ^= move_mask; },
+                    b'n' => { self.knight[me] ^= move_mask; },
+                    b'p' => { self.pawn[me] ^= move_mask; },
+                    _ => { panic!("moved nonexistent piece {} in mv {}", mv.piece, mv); }
+                }
+            }
+
+            // update composite
+            self.composite[me] = self.pawn[me] | self.knight[me] | self.bishop[me] |
+                self.rook[me] | self.queen[me] | self.king[me];
+
+            self.composite[them] = self.pawn[them] | self.knight[them] | self.bishop[them] |
+                self.rook[them] | self.queen[them] | self.king[them];
+
+            return false;
+        }
+
+        // now all the more expensive stuff
+        self.history.push(self.hash);
+        self.ep_stack.push(self.ep_file);
+        self.castling_rights_stack.push(self.castling_rights);
+        self.activation_stack.push(self.net.hidden_activations);
+
+        // capture
+        // check ep first
+        if is_ep {
+            self.hash ^= en_passant_hash(ep_idx as i32, !self.side_to_move);
+            self.net.deactivate(PAWN, !self.side_to_move, ep_idx);
+        } else if captured_piece != 0 {
+            match captured_piece {
+                b'p' => {
+                    self.net.deactivate(PAWN, !self.side_to_move, mv.end);
+                },
+                b'n' => {
+                    self.net.deactivate(KNIGHT, !self.side_to_move, mv.end);
+                },
+                b'b' => {
+                    self.net.deactivate(BISHOP, !self.side_to_move, mv.end);
+                },
+                b'r' => {
+                    self.net.deactivate(ROOK, !self.side_to_move, mv.end);
+                },
+                b'q' => {
+                    self.net.deactivate(QUEEN, !self.side_to_move, mv.end);
+                },
+                _ => panic!("Captured uncapturable piece {}!", captured_piece)
+            };
+        }
+        self.cap_stack.push(captured_piece);
+
+        // castling
+        if mv.piece == b'k' && (mv.end - mv.start).abs() == 2 {
+            let old_rook_idx: i8 = if mv.end > mv.start { mv.start + 3 } else { mv.start - 4 };
+            let new_rook_idx: i8 = if mv.end > mv.start { mv.start + 1 } else { mv.start - 1 };
+
+            self.net.move_piece(ROOK, self.side_to_move, old_rook_idx, new_rook_idx);
+            self.hash ^= simple_move_hash(b'r', old_rook_idx as i32, new_rook_idx as i32, self.side_to_move);
+        }
+
+        // piece move
+        if mv.piece == b'p' && mv.promote_to != 0 {
+            self.net.deactivate(PAWN, self.side_to_move, mv.start);
+            self.net.activate(promo_num, self.side_to_move, mv.end);
+        } else {
+            self.net.move_piece(piece_num, self.side_to_move, mv.start, mv.end);
+        }
+
+        let old_castling_rights = self.castling_rights;
+        // update castling rights
+        self.void_castling_rights(mv.start, mv.end);
+
+        self.hash ^= update_hash(
+            mv.piece,
+            mv.start,
+            mv.end,
+            captured_piece,
+            mv.promote_to,
+            self.ep_file,
+            mv.ep_file(),
+            old_castling_rights,
+            self.castling_rights,
+            self.side_to_move
+        );
+
+        // update ep_file
+        self.ep_file = mv.ep_file();
+
+        // update composite
+        // self.composite[me] = self.pawn[me] | self.knight[me] | self.bishop[me] |
+        //     self.rook[me] | self.queen[me] | self.king[me];
+
+        // self.composite[them] = self.pawn[them] | self.knight[them] | self.bishop[them] |
+        //     self.rook[them] | self.queen[them] | self.king[them];
+
+        if captured_piece != 0 || mv.piece == b'p' {
+            self.halfmove_stack.push(self.halfmove);
+            self.halfmove = 0;
+        } else {
+            self.halfmove += 1;
+        }
+
+        if self.side_to_move == Color::White {
+            self.net.black_turn();
+        } else {
+            self.net.white_turn();
+        }
+        self.side_to_move = !self.side_to_move;
+        return true;
+    }
+
     pub fn do_move(&mut self, mv: &Move) {
         // push stacks
 
@@ -802,6 +1052,33 @@ impl Bitboard {
 
     pub fn is_repetition(&self) -> bool {
         self.history.iter().filter(|&n| *n == self.hash).count() > 0
+    }
+
+    pub fn biggest_gain(&self) -> i32 {
+        // get biggest material on other side
+        let mut biggest_score = 0;
+        let me = self.side_to_move as usize;
+        let them = !self.side_to_move as usize;
+        if self.queen[them] != 0 {
+            biggest_score = 16000;
+        } else if self.rook[them] != 0 {
+            biggest_score = 8000;
+        } else if self.bishop[them] != 0 {
+            biggest_score = 6000;
+        } else if self.knight[them] != 0 {
+            biggest_score = 6000;
+        } else if self.pawn[them] != 0 {
+            biggest_score = 1700;
+        }
+
+        let pawn_promotions = if self.side_to_move == Color::White {
+            self.pawn[me] & RANK_MASKS[6]
+        } else {
+            self.pawn[me] & RANK_MASKS[1]
+        };
+        if pawn_promotions != 0 { biggest_score += 16000; }
+
+        return biggest_score + 2000;
     }
 
     pub fn is_quiet(&self) -> bool {

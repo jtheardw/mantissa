@@ -179,11 +179,16 @@ impl ThreadInfo {
         }
     }
 
+    pub fn clear_history(&mut self) {
+        self.move_history = [[0; 64]; 12];
+        self.followup_history = vec![[[[0; 64]; 12]; 64]; 12];
+        self.countermove_history = vec![[[[0; 64]; 12]; 64]; 12];
+    }
+
     pub fn clear(&mut self) {
         self.killers = [[Move::null_move(); 2]; MAX_PLY];
         self.seldepth = 0;
         self.nodes_searched = 0;
-self.move_history = [[0; 64]; 12];
         self.move_history = [[0; 64]; 12];
         self.capture_history = [[[0; 6]; 64]; 12];
         self.countermove_table = [[Move::null_move(); 64]; 12];

@@ -30,6 +30,9 @@ pub static mut TT_VALID: u64 = 0;
 pub static mut STATIC_EVALS: u64 = 0;
 pub static mut MAIN_SEARCH_NODES: u64 = 0;
 
+pub static mut MOVES_APPLIED: u64 = 0;
+pub static mut ILLEGAL_MOVES_APPLIED: u64 = 0;
+
 pub fn get_time_millis() -> u128 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_millis(),
@@ -165,6 +168,9 @@ fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_
                 beta = best_val + aspiration_delta_high;
             }
 
+            // unsafe {
+            //     TI[thread_num].clear_history();
+            // }
             val = search(&mut node, alpha, beta, depth, 0, true, thread_num);
             if thread_killed() { return; }
 
@@ -429,6 +435,9 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             // unsafe {
             //     print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
             // }
+            unsafe {
+                println!("MOVES {} ILLEGAL {}", MOVES_APPLIED, ILLEGAL_MOVES_APPLIED);
+            }
             println!("bestmove {}", best_move);
         }
     }
@@ -793,12 +802,18 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             }
         }
 
-        node.do_move(&mv);
-        if node.is_check(!node.side_to_move) {
-            // Illegal
-            node.undo_move(&mv);
+        // node.do_move(&mv);
+        // unsafe {MOVES_APPLIED += 1;}
+        // if node.is_check(!node.side_to_move) {
+        //     // Illegal
+        //     unsafe {ILLEGAL_MOVES_APPLIED += 1;}
+        //     node.undo_move(&mv);
+        //     continue;
+        // }
+        if !node.do_move_legal(&mv) {
             continue;
         }
+
         if depth > 1 {
             // unsafe {x86_64::_mm_prefetch(TT.get_ptr(node.hash), x86_64::_MM_HINT_T0);}
             unsafe {TT.prefetch(node.hash);}
@@ -932,7 +947,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
     }
     ti.nodes_searched += 1;
     // unsafe {STATIC_EVALS += 1;}
-    if node.is_quiet() { return static_eval(node, &mut ti.pht); }
+    // if !is_check && node.is_quiet() { return static_eval(node, &mut ti.pht); }
     // unsafe {
     //     let tt_entry = TT.get(node.hash);
     //     if tt_entry.valid() {
@@ -953,24 +968,28 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
 
     let stand_pat = static_eval(node, &mut ti.pht);
 
+    let mut best_val = alpha - 1;
+
+    if stand_pat < alpha {//(taper_score(QUEEN_VALUE, phase) + 2000) {
+        if stand_pat + node.biggest_gain() < alpha {
+            return stand_pat;
+        }
+    }
+
     let is_check = node.is_check(node.side_to_move);
-    let phase = node.get_phase();
     // standing pat check so we *do* stop eventually
     if !is_check {
         if stand_pat >= beta {
             return stand_pat;
         } else if stand_pat > alpha {
             // raised_alpha = true;
+            best_val = stand_pat;
             alpha = stand_pat;
         }
     }
-    if !is_check && stand_pat < alpha - (taper_score(QUEEN_VALUE, phase) + 2000) {
-        return stand_pat;
-    }
 
-    let mut best_val = stand_pat;
 
-    let mut movepicker = MovePicker::q_new();
+    let mut movepicker = MovePicker::q_new(is_check);
     loop {
         let (mv, score) = movepicker.next(node);
         if mv.is_null() {
@@ -980,15 +999,17 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
         // delta pruning
         // if we're very behind of where we could be (alpha)
         // we should only accept exceptionally good captures
-        if !is_check && mv.promote_to == 0 && node.has_non_pawn_material() {
+        if mv.promote_to == 0 {
             let mut futile = false;
-            let capture = node.get_last_capture();
+            let capture = node.piece_at_square(mv.end, !node.side_to_move);
             if capture != 0 {
-                if stand_pat < alpha && score >= OK_CAPTURE_OFFSET {
-                    let see_score = score - OK_CAPTURE_OFFSET;
-                    // print!("sp {} alpha {} see_score {}", stand_pat, alpha, see_score);
-                    if stand_pat + 2 * see_score as i32 + 1000 < alpha {
-                        futile = true;
+                if score >= OK_CAPTURE_OFFSET {
+                    if stand_pat < alpha {
+                        let see_score = score - OK_CAPTURE_OFFSET;
+                        // print!("sp {} alpha {} see_score {}", stand_pat, alpha, see_score);
+                        if alpha > (stand_pat + 2 * see_score as i32 + 1000) {
+                            futile = true;
+                        }
                     }
                 } else {
                     futile = true;
@@ -1000,13 +1021,17 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
             }
         }
 
-        node.do_move(&mv);
-        if node.is_check(!node.side_to_move) { node.undo_move(&mv); continue; }
-
-        // if score < QUIET_OFFSET && mv.promote_to == 0 {
+        if !node.do_move_legal(&mv) {
+            continue;
+        }
+        // node.do_move(&mv);
+        // unsafe {MOVES_APPLIED += 1;}
+        // if node.is_check(!node.side_to_move) {
+        //     unsafe {ILLEGAL_MOVES_APPLIED += 1;}
         //     node.undo_move(&mv);
         //     continue;
         // }
+
         let val = -qsearch(node, -beta, -alpha, thread_num);
         node.undo_move(&mv);
         if val > best_val {

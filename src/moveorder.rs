@@ -41,6 +41,7 @@ pub const BAD_CAPTURE_OFFSET: u32 = 0;
 
 pub struct MovePicker {
     noisy_moves_only: bool,
+    is_q: bool,
     pub move_stage: u8,
     tt_move: Move,
     thread_num: usize,
@@ -59,6 +60,7 @@ impl MovePicker {
 
         MovePicker {
             noisy_moves_only: q_moves_only,
+            is_q: false,
             move_stage: stage,
             tt_move: tt_move,
             ply: ply,
@@ -72,9 +74,10 @@ impl MovePicker {
         }
     }
 
-    pub fn q_new() -> MovePicker {
+    pub fn q_new(is_check: bool) -> MovePicker {
         MovePicker {
-            noisy_moves_only: true,
+            noisy_moves_only: !is_check,
+            is_q: true,
             move_stage: GEN_NOISY,
             tt_move: Move::null_move(),
             ply: 0,
@@ -92,6 +95,7 @@ impl MovePicker {
     pub fn perft_new() -> MovePicker {
         MovePicker {
             noisy_moves_only: false,
+            is_q: false,
             move_stage: GEN_NOISY,
             tt_move: Move::null_move(),
             ply: 0,
@@ -139,7 +143,7 @@ impl MovePicker {
             if mv == self.tt_move {
                 continue;
             }
-            if captured == 0 && mv.promote_to == 0 {
+            if captured == 0 && mv.promote_to == 0 && !self.is_q {
                 // not a capture
                 if mv == self.killers[0] || mv == self.killers[1] {
                     // mv_score = KILLER_OFFSET;
@@ -179,6 +183,8 @@ impl MovePicker {
                     }
                     mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u32;
                 }
+            } else if captured == 0 && mv.promote_to == 0 && self.is_q {
+                mv_score = QUIET_OFFSET;
             } else if mv.promote_to == 0 {
                 let score = see(pos, mv.end, captured, mv.start, mv.piece);
                 if score >= 0 {
