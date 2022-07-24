@@ -964,7 +964,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
             alpha = stand_pat;
         }
     }
-    if stand_pat < alpha - (taper_score(QUEEN_VALUE, phase) + 2000) {
+    if !is_check && stand_pat < alpha - (taper_score(QUEEN_VALUE, phase) + 2000) {
         return stand_pat;
     }
 
@@ -977,33 +977,36 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
             break;
         }
 
-        node.do_move(&mv);
-        if node.is_check(!node.side_to_move) { node.undo_move(&mv); continue; }
-
         // delta pruning
         // if we're very behind of where we could be (alpha)
         // we should only accept exceptionally good captures
-
-        if node.has_non_pawn_material() {
+        if !is_check && mv.promote_to == 0 && node.has_non_pawn_material() {
             let mut futile = false;
-            match node.get_last_capture() {
-                b'p' => { if alpha > stand_pat + taper_score(PAWN_VALUE, phase) + 2000 { futile = true; }},
-                b'n' => { if alpha > stand_pat + taper_score(KNIGHT_VALUE, phase) + 2000 { futile = true; }},
-                b'b' => { if alpha > stand_pat + taper_score(BISHOP_VALUE, phase) + 2000 { futile = true; }},
-                b'r' => { if alpha > stand_pat + taper_score(ROOK_VALUE, phase) + 2000 { futile = true; }},
-                b'q' => { if alpha > stand_pat + taper_score(QUEEN_VALUE, phase) + 2000 { futile = true; }},
-                _ => {}
+            let capture = node.get_last_capture();
+            if capture != 0 {
+                if stand_pat < alpha && score >= OK_CAPTURE_OFFSET {
+                    let see_score = score - OK_CAPTURE_OFFSET;
+                    // print!("sp {} alpha {} see_score {}", stand_pat, alpha, see_score);
+                    if stand_pat + 2 * see_score as i32 + 1000 < alpha {
+                        futile = true;
+                    }
+                } else {
+                    futile = true;
+                }
             }
             if futile {
-                node.undo_move(&mv);
+                // node.undo_move(&mv);
                 continue;
             }
         }
 
-        if score < QUIET_OFFSET && mv.promote_to == 0 {
-            node.undo_move(&mv);
-            continue;
-        }
+        node.do_move(&mv);
+        if node.is_check(!node.side_to_move) { node.undo_move(&mv); continue; }
+
+        // if score < QUIET_OFFSET && mv.promote_to == 0 {
+        //     node.undo_move(&mv);
+        //     continue;
+        // }
         let val = -qsearch(node, -beta, -alpha, thread_num);
         node.undo_move(&mv);
         if val > best_val {
