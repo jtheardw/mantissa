@@ -171,7 +171,7 @@ fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_
             // unsafe {
             //     TI[thread_num].clear_history();
             // }
-            val = search(&mut node, alpha, beta, depth, 0, true, thread_num);
+            val = search(&mut node, alpha, beta, depth, 0, true, false, thread_num);
             if thread_killed() { return; }
 
             if val > alpha && val < beta {
@@ -292,7 +292,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
                 TI[0].seldepth = 0;
                 SS[0][0].pv = vec![best_move];
             }
-            val = search(node, alpha, beta, depth, 0, true, 0);
+            val = search(node, alpha, beta, depth, 0, true, false, 0);
             if search_aborted() {break;}
 
             if val > alpha && val < beta {
@@ -435,9 +435,9 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             // unsafe {
             //     print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
             // }
-            unsafe {
-                println!("MOVES {} ILLEGAL {}", MOVES_APPLIED, ILLEGAL_MOVES_APPLIED);
-            }
+            // unsafe {
+            //     println!("MOVES {} ILLEGAL {}", MOVES_APPLIED, ILLEGAL_MOVES_APPLIED);
+            // }
             println!("bestmove {}", best_move);
         }
     }
@@ -447,7 +447,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     }
 }
 
-fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_pv: bool, thread_num: usize) -> i32 {
+fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_pv: bool, is_cut: bool, thread_num: usize) -> i32 {
     if thread_killed() {
         return 0;
     }
@@ -623,7 +623,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
         sse.searching_null_move = true;
         node.do_null_move();
-        let val = -search(node, -beta, -beta + 1, depth - r, ply + 1, false, thread_num);
+        let val = -search(node, -beta, -beta + 1, depth - r, ply + 1, false, !is_cut, thread_num);
         node.undo_null_move();
         sse.searching_null_move = false;
 
@@ -673,7 +673,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         let target = sse.tt_val - margin;
 
         sse.excluded_move = sse.tt_move;
-        let val = search(node, target - 1, target, depth_to_search, ply, false, thread_num);
+        let val = search(node, target - 1, target, depth_to_search, ply, false, is_cut, thread_num);
         sse.excluded_move = Move::null_move();
 
         if val < target {
@@ -747,7 +747,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         let is_quiet = is_quiet_move(&mv, node);
 
         if !is_check && (depth + ply > 3) && !init_node && best_val > -MIN_MATE_SCORE && !futile {
-            let lmr_depth = depth - 1 - lmr_reduction(depth, moves_searched);
+            let lmr_depth = depth - 1 - lmr_reduction(depth, moves_searched, is_cut);
 
             // Basic form of late move pruning
             if depth <= 8 && moves_searched >= lmp_count(improving, depth) {
@@ -826,7 +826,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         moves_searched += 1;
         let mut val = LB;
         if moves_searched == 1 {
-            val = -search(node, -beta, -alpha, if sing_extend {depth} else {depth - 1}, ply + 1, is_pv, thread_num);
+            val = -search(node, -beta, -alpha, if sing_extend {depth} else {depth - 1}, ply + 1, is_pv, false, thread_num);
             if is_pv {
                 unsafe {
                     let child_ss = &mut SS[thread_num][(ply + 1) as usize];
@@ -842,7 +842,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 && is_quiet
             {
                 do_full_zw_search = false;
-                let mut r = lmr_reduction(depth, moves_searched);
+                let mut r = lmr_reduction(depth, moves_searched, is_cut);
 
                 if is_check { r -= 1; }
                 if !improving { r += 1; }
@@ -856,7 +856,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 r -= cmp::max(-2, cmp::min(2, hist / LMR_HISTORY_DENOMINATOR));
 
                 let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);
-                val = -search(node, -alpha - 1, -alpha, lmr_depth, ply + 1, false, thread_num);
+                val = -search(node, -alpha - 1, -alpha, lmr_depth, ply + 1, false, true, thread_num);
                 if val > alpha && lmr_depth < depth - 1 {
                     // if we raise alpha in the reduced search,
                     // we have to see if we can raise it in the full-depth
@@ -864,10 +864,10 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 }
             }
             if do_full_zw_search {
-                val = -search(node, -alpha - 1, -alpha, depth - 1, ply + 1, false, thread_num);
+                val = -search(node, -alpha - 1, -alpha, depth - 1, ply + 1, false, !is_cut, thread_num);
             }
             if is_pv && val > alpha && val < beta {
-                val = -search(node, -beta, -alpha, depth - 1, ply + 1, true, thread_num);
+                val = -search(node, -beta, -alpha, depth - 1, ply + 1, true, false, thread_num);
                 unsafe {
                     let child_ss = &mut SS[thread_num][(ply + 1) as usize];
                     sse.pv.clear();
@@ -1007,7 +1007,7 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
                     if stand_pat < alpha {
                         let see_score = score - OK_CAPTURE_OFFSET;
                         // print!("sp {} alpha {} see_score {}", stand_pat, alpha, see_score);
-                        if alpha > (stand_pat + 2 * see_score as i32 + 1000) {
+                        if alpha > (stand_pat + (DELTA_MARGIN_FACTOR * see_score as f64).floor() as i32 + DELTA_MARGIN_BASE) {
                             futile = true;
                         }
                     }

@@ -15,6 +15,7 @@ pub const NMP_DEPTH: i32 = 3;         // null-move pruning/reductions
 pub const LMR_DEPTH: i32 = 2;         // late move reductions
 
 static mut LMR_TABLE: [[i32; 64]; 64] = [[0; 64]; 64];
+static mut LMR_CUT_TABLE: [[i32; 64]; 64] = [[0; 64]; 64];
 
 pub fn efp_margin(depth: i32) -> i32 {
     if depth <= 0 { return 0; }
@@ -50,15 +51,22 @@ pub fn lmr_table_gen() {
             let r = (LMR_BASE + ((d as f64).ln() * (m as f64).ln()) * LMR_FACTOR).floor() as i32;
             // let r = (0.8 + ((d as f64).ln() * (m as f64).ln()) / 2.25).floor() as i32;
             unsafe {LMR_TABLE[d as usize][m as usize] = r;}
+
+            let r = (LMR_CUT_BASE + ((d as f64).ln() * (m as f64).ln()) * LMR_CUT_FACTOR).floor() as i32;
+            unsafe {LMR_CUT_TABLE[d as usize][m as usize] = r;}
         }
     }
 }
 
-pub fn lmr_reduction(depth: i32, moves_searched: i32) -> i32 {
+pub fn lmr_reduction(depth: i32, moves_searched: i32, is_cut: bool) -> i32 {
     let d = cmp::min(depth, 63) as usize;
     let m = cmp::min(moves_searched, 63) as usize;
     unsafe {
-        return LMR_TABLE[d][m];
+        if !is_cut {
+            return LMR_TABLE[d][m];
+        } else {
+            return LMR_CUT_TABLE[d][m];
+        }
     }
 }
 

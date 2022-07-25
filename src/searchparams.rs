@@ -18,6 +18,8 @@ pub const RAZORING_MARGIN: i32 = 2569;
 pub const LMR_BASE: f64 = 0.585;
 pub const LMR_FACTOR: f64 = 0.5036;
 pub const LMR_HISTORY_DENOMINATOR: i32 = 7780;
+pub const LMR_CUT_BASE: f64 = 0.585;
+pub const LMR_CUT_FACTOR: f64 = 0.5036;
 
 pub const LMP_IMPROVING_BASE: f64 = 4.23555;
 pub const LMP_IMPROVING_FACTOR: f64 = 1.02456;
@@ -32,3 +34,6 @@ pub const COUNTERMOVE_PRUNING_FACTOR: i32 = -799;
 pub const FOLLOWUP_PRUNING_FACTOR: i32 = -1753;
 
 pub const SINGULAR_MARGIN_FACTOR: i32 = 35;
+
+pub const DELTA_MARGIN_FACTOR: f64 = 2.0;
+pub const DELTA_MARGIN_BASE: i32 = 1000;
