@@ -88,7 +88,7 @@ impl Move {
         }
     }
 
-    pub fn null_move() -> Move {
+    pub const fn null_move() -> Move {
         // technically there are a lot
         // of "null moves" valid in this scheme
         // (i.e. any move with is_null set to true)

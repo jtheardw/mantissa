@@ -1,3 +1,4 @@
+#![feature(portable_simd)]
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unreachable_code)]
@@ -18,6 +19,7 @@ mod pgn;
 mod pht;
 mod psqt;
 mod search;
+mod searchparams;
 mod searchutil;
 mod see;
 mod time;
@@ -49,5 +51,12 @@ fn init() {
 
 fn main() {
     init();
+    // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
+    // n.print();
     uci_loop();
+    // let n = SlowNetwork::load("/home/jtwright/chess/zahak/default.nn").unwrap();
+    // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
+    // let n = SlowNetwork::load("/home/jtwright/nets_wide/epoch-300.nnue").unwrap();
+    // n.print();
+    // n.save_image("mantissa");
 }

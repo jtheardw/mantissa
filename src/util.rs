@@ -91,7 +91,7 @@ pub fn get_piece_num(piece: u8, side: Color) -> usize {
         b'b'=> 3,
         b'n'=> 4,
         b'p'=> 5,
-        _ => panic!("bad piece for getting num")
+        _ => panic!("bad piece for getting num {}", piece)
     };
     if side == Color::Black {
         return piece_offset + 6;

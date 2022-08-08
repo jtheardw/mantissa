@@ -1,3 +1,5 @@
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64;
 use std::mem;
 use std::sync::Mutex;
 
@@ -41,7 +43,8 @@ pub struct TTEntry {
 } // 8 + 4 + 1 + 1 + 4 + 1 = 19 bytes
 
 pub struct TT {
-    pub tt: Vec<(TTEntry, TTEntry)>,
+    // pub tt: Vec<(TTEntry, TTEntry)>,
+    pub tt: Vec<[TTEntry; 2]>,
     pub bits: usize,
     pub mask: u64,
     locks: Vec<Mutex<u64>>
@@ -86,13 +89,13 @@ impl TTEntry {
 
 impl TT {
     pub fn new(bits: usize) -> TT {
-        let mut v: Vec<(TTEntry, TTEntry)> = Vec::new();
+        let mut v: Vec<[TTEntry; 2]> = Vec::new();
         for _ in 0..(1 << bits) {
-            v.push((TTEntry::invalid_entry(), TTEntry::invalid_entry()));
+            v.push([TTEntry::invalid_entry(), TTEntry::invalid_entry()]);
         }
 
         let mut locks: Vec<Mutex<u64>> = Vec::new();
-        for _ in 0..2048 {
+        for _ in 0..4096 {
             locks.push(Mutex::new(0));
         }
         TT {
@@ -103,14 +106,22 @@ impl TT {
         }
     }
 
-    pub fn get(&self, hash: u64) -> TTEntry {
-        let mut l = self.locks[(hash % 2048) as usize].lock().unwrap();
+    pub fn get_ptr(&self, hash: u64) -> * const i8 {
         let idx: usize = (hash & self.mask) as usize;
-        let (e1, e2) = self.tt[idx];
-        *l = hash | e1.hash | e2.hash;
+        return &self.tt[idx] as *const [TTEntry; 2] as *const i8;
+    }
+
+    pub fn get(&self, hash: u64) -> TTEntry {
+        let mut l = self.locks[(hash % 4096) as usize].lock().unwrap();
+        let idx: usize = (hash & self.mask) as usize;
+        // let (e1, e2) = self.tt[idx];
+        let row = self.tt[idx];
+        *l = hash;
+        let e1 = row[0];
         if e1.valid() && e1.hash == hash {
             return e1;
         }
+        let e2 = row[1];
         if e2.valid() && e2.hash == hash {
             return e2
         }
@@ -121,9 +132,9 @@ impl TT {
         let idx: usize = (hash & self.mask) as usize;
         let depth = depth as i8;
         let ply = ply as i8;
-        let mut l = self.locks[(hash % 2048) as usize].lock().unwrap();
-        let (e1, e2) = self.tt[idx];
-        let to_insert;
+        let mut l = self.locks[(hash % 4096) as usize].lock().unwrap();
+        let row = &mut self.tt[idx];
+        // let (e1, e2) = self.tt[idx];
 
         let entry = TTEntry {
             hash: hash,
@@ -134,24 +145,44 @@ impl TT {
             ply: ply as i8,
         };
 
+        let e1 = row[0];
         if e1.valid() && e1.hash == hash {
             // always replace with more recent search of the same position
-            to_insert = (entry, e2);
-        } else if e2.valid() && e2.hash == hash {
-            to_insert = (e1, entry);
-        } else if !e1.valid() || e1.depth <= depth || (ply - e1.ply) as i32 > age_threshold(e1.depth, depth) {
-            // first bucket is depth-preferred (though ages out)
-            to_insert = (entry, e2);
+            // to_insert = (entry, e2);
+            row[0] = entry;
+            return;
         } else {
-            to_insert = (e1, entry);
+            let e2 = row[1];
+            if e2.valid() && e2.hash == hash {
+                row[1] = entry;
+                return;
+            } else if !e1.valid() || e1.depth <= depth || (ply - e1.ply) as i32 > age_threshold(e1.depth, depth) {
+                row[0] = entry;
+                return;
+            } else {
+                row[1] = entry;
+            }
         }
-        self.tt[idx] = to_insert;
-        *l = hash | to_insert.0.hash | to_insert.1.hash;
+        // else if e2.valid() && e2.hash == hash {
+        //     to_insert = (e1, entry);
+        // } else if !e1.valid() || e1.depth <= depth || (ply - e1.ply) as i32 > age_threshold(e1.depth, depth) {
+        //     // first bucket is depth-preferred (though ages out)
+        //     to_insert = (entry, e2);
+        // } else {
+        //     to_insert = (e1, entry);
+        // }
+        // self.tt[idx] = to_insert;
+        *l = hash;
+    }
+
+    pub fn prefetch(&self, hash: u64) {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {x86_64::_mm_prefetch(self.get_ptr(hash), x86_64::_MM_HINT_T0);}
     }
 
     pub fn clear(&mut self) {
         for i in 0..self.tt.len() {
-            self.tt[i] = (TTEntry::invalid_entry(), TTEntry::invalid_entry());
+            self.tt[i] = [TTEntry::invalid_entry(), TTEntry::invalid_entry()];
         }
     }
 }
