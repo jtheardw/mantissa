@@ -96,14 +96,14 @@ fn uci_go(board: &Bitboard, options: UCIOptions, params: &mut SplitWhitespace) {
     if moves_to_go >= 0 {
         // moves to go move
         search_limit = SearchLimits::moves_to_go(clock_time, moves_to_go, options.move_overhead);
+    } else if depth > 0 {
+        search_limit = SearchLimits::depth(depth);
     } else if movetime > 0 {
         search_limit = SearchLimits::movetime(movetime);
     } else if clock_time > 0 {
         let ply = board.history.len() as i32;
         let mat = mg_score(simple_material_score(board)) / 1000;
         search_limit = SearchLimits::clock_with_inc(clock_time, inc, options.move_overhead, ply, mat);
-    } else if depth > 0 {
-        search_limit = SearchLimits::depth(depth);
     } else if infinite {
         search_limit = SearchLimits::infinite();
     }

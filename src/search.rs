@@ -435,9 +435,9 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             // unsafe {
             //     print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
             // }
-            unsafe {
-                println!("MOVES {} ILLEGAL {}", MOVES_APPLIED, ILLEGAL_MOVES_APPLIED);
-            }
+            // unsafe {
+            //     println!("MOVES {} ILLEGAL {}", MOVES_APPLIED, ILLEGAL_MOVES_APPLIED);
+            // }
             println!("bestmove {}", best_move);
         }
     }
