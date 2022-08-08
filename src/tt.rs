@@ -95,7 +95,7 @@ impl TT {
         }
 
         let mut locks: Vec<Mutex<u64>> = Vec::new();
-        for _ in 0..1024 {
+        for _ in 0..4096 {
             locks.push(Mutex::new(0));
         }
         TT {
@@ -112,11 +112,11 @@ impl TT {
     }
 
     pub fn get(&self, hash: u64) -> TTEntry {
-        // let mut l = self.locks[(hash % 1024) as usize].lock().unwrap();
+        let mut l = self.locks[(hash % 4096) as usize].lock().unwrap();
         let idx: usize = (hash & self.mask) as usize;
         // let (e1, e2) = self.tt[idx];
         let row = self.tt[idx];
-        // *l = hash | e1.hash | e2.hash;
+        *l = hash;
         let e1 = row[0];
         if e1.valid() && e1.hash == hash {
             return e1;
@@ -132,7 +132,7 @@ impl TT {
         let idx: usize = (hash & self.mask) as usize;
         let depth = depth as i8;
         let ply = ply as i8;
-        // let mut l = self.locks[(hash % 1024) as usize].lock().unwrap();
+        let mut l = self.locks[(hash % 4096) as usize].lock().unwrap();
         let row = &mut self.tt[idx];
         // let (e1, e2) = self.tt[idx];
 
@@ -172,7 +172,7 @@ impl TT {
         //     to_insert = (e1, entry);
         // }
         // self.tt[idx] = to_insert;
-        // *l = hash | to_insert.0.hash | to_insert.1.hash;
+        *l = hash;
     }
 
     pub fn prefetch(&self, hash: u64) {

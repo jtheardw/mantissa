@@ -254,15 +254,15 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     }
 
     let mut depth: i32 = 1;
-    let mut current_time: u128 = 0;
+    let mut current_time: u128;
 
     let mut best_move_changes = 0;
     let mut last_best_move_change = 0;
     let mut best_move: Move = Move::null_move();
     let mut val: i32;
     let mut best_val: i32 = LB;
-    let mut pv: &Vec<Move> = &vec![Move::null_move()];
-    let mut nodes_searched = 0;
+    let mut pv: &Vec<Move>;
+    let mut nodes_searched;
 
 
     allow_threads();

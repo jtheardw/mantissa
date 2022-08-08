@@ -289,10 +289,10 @@ pub fn uci_loop() {
         if cmd == "quit" {
             break;
         } else if cmd == "uci" {
-            println!("id name Mantissa v3.3.5");
+            println!("id name Mantissa v3.7.0-dev");
             println!("id author jtwright");
-            println!("option name Hash type spin default 64 min 1 max 32768");
-            println!("option name Threads type spin default 1 min 1 max 64");
+            println!("option name Hash type spin default 64 min 1 max 65536");
+            println!("option name Threads type spin default 1 min 1 max 128");
             println!("option name Move Overhead type spin default 10 min 1 max 1000");
             println!("uciok");
         } else if cmd == "ucinewgame" {
