@@ -640,7 +640,7 @@ impl Network {
         let relu_zeros = all_zeros();
         for i in 0..64 {
             let idx = if self.flip { i ^ 32 } else { i };
-            let relud = self.hidden_activations[idx].max(relu_zeros);
+            let relud = self.hidden_activations[idx].simd_max(relu_zeros);
 
             total += relud * self.hidden_weights[i];
         }
