@@ -368,27 +368,32 @@ impl Bitboard {
         // king
         // normally irrelevant for check, but might be relevant for other
         // uses, e.g. castling, SEE
-        if (king_normal_moves_board(idx) & self.king[enemy_side]) != 0 { return true; }
+        // if (king_normal_moves_board(idx) & self.king[enemy_side]) != 0 { return true; }
 
-        // knights
-        if (knight_moves_board(idx) & self.knight[enemy_side]) != 0 { return true; }
+        // // knights
+        // if (knight_moves_board(idx) & self.knight[enemy_side]) != 0 { return true; }
 
-        // pawns
-        if (pawn_attack_board(idx, side_to_move) & self.pawn[enemy_side]) != 0 {
-            return true;
-        }
+        // // pawns
+        // if (pawn_attack_board(idx, side_to_move) & self.pawn[enemy_side]) != 0 {
+        //     return true;
+        // }
 
-        // bishops + queens
-        if (bishop_moves_board(idx, all_composite) & (self.bishop[enemy_side] | self.queen[enemy_side])) != 0 {
-            return true;
-        }
+        // // bishops + queens
+        // if (bishop_moves_board(idx, all_composite) & (self.bishop[enemy_side] | self.queen[enemy_side])) != 0 {
+        //     return true;
+        // }
 
-        // rooks + queens
-        if (rook_moves_board(idx, all_composite) & (self.rook[enemy_side] | self.queen[enemy_side])) != 0 {
-            return true;
-        }
+        // // rooks + queens
+        // if (rook_moves_board(idx, all_composite) & (self.rook[enemy_side] | self.queen[enemy_side])) != 0 {
+        //     return true;
+        // }
 
-        return false;
+        return (pawn_attack_board(idx, side_to_move) & self.pawn[enemy_side]) != 0
+            || (self.knight[enemy_side] != 0 && (knight_moves_board(idx) & self.knight[enemy_side]) != 0)
+            || ((self.bishop[enemy_side] | self.queen[enemy_side] != 0) && (bishop_moves_board(idx, all_composite) & (self.bishop[enemy_side] | self.queen[enemy_side])) != 0)
+            || ((self.rook[enemy_side] | self.queen[enemy_side] != 0) && (rook_moves_board(idx, all_composite) & (self.rook[enemy_side] | self.queen[enemy_side])) != 0)
+            || (king_normal_moves_board(idx) & self.king[enemy_side]) != 0;
+
     }
 
     pub fn is_check(&self, side: Color) -> bool {
