@@ -422,14 +422,14 @@ pub fn king_normal_moves_board(idx: i8) -> u64 {
     //     let new_idx = coord_to_idx((nx, ny));
     //     bb |= 1 << new_idx;
     // }
-    let mut bb = idx_to_bb(idx);
-    bb |= (bb << 1) | (bb >> 1);
-    bb |= (bb << 8) | (bb >> 8);
-    bb ^= idx_to_bb(idx);
-    return bb;
-    // unsafe {
-    //     return KING_MASK[idx as usize];
-    // };
+    // let mut bb = idx_to_bb(idx);
+    // bb |= (bb << 1) | (bb >> 1);
+    // bb |= (bb << 8) | (bb >> 8);
+    // bb ^= idx_to_bb(idx);
+    // return bb;
+    unsafe {
+        return KING_MASK[idx as usize];
+    }
 }
 
 pub fn king_captures(pos: &Bitboard, idx: i8) -> Vec<Move> {
