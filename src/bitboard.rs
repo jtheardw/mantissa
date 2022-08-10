@@ -388,6 +388,7 @@ impl Bitboard {
         //     return true;
         // }
 
+        // return false;
         return (pawn_attack_board(idx, side_to_move) & self.pawn[enemy_side]) != 0
             || (self.knight[enemy_side] != 0 && (knight_moves_board(idx) & self.knight[enemy_side]) != 0)
             || ((self.bishop[enemy_side] | self.queen[enemy_side] != 0) && (bishop_moves_board(idx, all_composite) & (self.bishop[enemy_side] | self.queen[enemy_side])) != 0)
