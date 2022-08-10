@@ -409,19 +409,23 @@ pub fn queen_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
 
 pub fn king_normal_moves_board(idx: i8) -> u64 {
     // let (kx, ky) = idx_to_coord(idx);
-    let mut bb = 0;
-    let (kx, ky) = idx_to_coord(idx);
-    for (dx, dy) in [
-        (-1, 1), (1, 1), (-1, -1), (1, -1),
-        (0, 1), (0, -1), (-1, 0), (1, 0)
-    ].iter() {
-        let (nx, ny) = (kx + dx, ky + dy);
-        if (nx < 0 || nx >= 8) || (ny < 0 || ny >= 8) {
-            continue;
-        }
-        let new_idx = coord_to_idx((nx, ny));
-        bb |= 1 << new_idx;
-    }
+    // let mut bb = 0;
+    // let (kx, ky) = idx_to_coord(idx);
+    // for (dx, dy) in [
+    //     (-1, 1), (1, 1), (-1, -1), (1, -1),
+    //     (0, 1), (0, -1), (-1, 0), (1, 0)
+    // ].iter() {
+    //     let (nx, ny) = (kx + dx, ky + dy);
+    //     if (nx < 0 || nx >= 8) || (ny < 0 || ny >= 8) {
+    //         continue;
+    //     }
+    //     let new_idx = coord_to_idx((nx, ny));
+    //     bb |= 1 << new_idx;
+    // }
+    let mut bb = idx_to_bb(idx);
+    bb |= (bb << 1) | (bb >> 1);
+    bb |= (bb << 8) | (bb >> 8);
+    bb ^= idx_to_bb(idx);
     return bb;
     // unsafe {
     //     return KING_MASK[idx as usize];
