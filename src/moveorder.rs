@@ -116,6 +116,12 @@ impl MovePicker {
         let mut i = cur_i + 1;
         let len = mvs.len();
 
+        // for x in (cur_i+1)..len {
+        //     if mvs[x].1 > highest {
+        //         highest = mvs[x].1;
+        //         highest_i = x;
+        //     }
+        // }
         while i < len {
             let score = mvs[i].1;
             if score > highest {
@@ -130,7 +136,7 @@ impl MovePicker {
     }
 
     fn score_moves(&self, pos: &Bitboard, movelist: Vec<Move>) -> Vec<(Move, u32)> {
-        let mut scored_moves: Vec<(Move, u32)> = Vec::new();
+        let mut scored_moves: Vec<(Move, u32)> = Vec::with_capacity(movelist.len());
         let mut prev_mv = Move::null_move();
         let mut my_prev_mv = Move::null_move();
         let mut prev_piece_num = 0;

@@ -710,7 +710,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     let mut futile = false;
 
     let mut found_legal_move = false;
-    let mut searched_moves: Vec<Move> = Vec::new();
+    let mut searched_moves: Vec<Move> = Vec::with_capacity(8);
 
     let mut move_idx = 0;
 

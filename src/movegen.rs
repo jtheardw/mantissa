@@ -456,7 +456,7 @@ pub fn king_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
 }
 
 pub fn moves(pos: &Bitboard) -> Vec<Move> {
-    let mut moves: Vec<Move> = Vec::new();
+    let mut moves: Vec<Move> = Vec::with_capacity(24);
     let me = pos.side_to_move as usize;
     let mut pawns = pos.pawn[me];
     let mut knights = pos.knight[me];
@@ -505,7 +505,7 @@ pub fn moves(pos: &Bitboard) -> Vec<Move> {
 }
 
 pub fn quiet_moves(pos: &Bitboard) -> Vec<Move> {
-    let mut moves: Vec<Move> = Vec::new();
+    let mut moves: Vec<Move> = Vec::with_capacity(24);
 
     let me = pos.side_to_move as usize;
     let mut pawns = pos.pawn[me];
@@ -555,7 +555,7 @@ pub fn quiet_moves(pos: &Bitboard) -> Vec<Move> {
 }
 
 pub fn noisy_moves(pos: &Bitboard) -> Vec<Move> {
-    let mut moves: Vec<Move> = Vec::new();
+    let mut moves: Vec<Move> = Vec::with_capacity(24);
 
     let me = pos.side_to_move as usize;
     let mut pawns = pos.pawn[me];
