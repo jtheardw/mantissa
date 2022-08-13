@@ -28,7 +28,6 @@ pub struct Bitboard {
 
     pub history: Vec<u64>,
 
-    pawn_history: Vec<u64>,
     ep_stack: Vec<i32>,
     cap_stack: Vec<u8>,
     castling_rights_stack: Vec<u8>,
@@ -75,7 +74,6 @@ impl Bitboard {
             ep_file: -1,
 
             history: Vec::new(),
-            pawn_history: Vec::new(),
             ep_stack: Vec::new(),
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),
@@ -224,7 +222,6 @@ impl Bitboard {
             ep_file: ep_file,
 
             history: Vec::new(),
-            pawn_history: Vec::new(),
             ep_stack: Vec::new(),
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),
@@ -342,7 +339,6 @@ impl Bitboard {
 
             history: history,
 
-            pawn_history: Vec::new(),
             ep_stack: Vec::new(),
             cap_stack: Vec::new(),
             castling_rights_stack: Vec::new(),

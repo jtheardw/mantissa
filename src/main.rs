@@ -15,6 +15,7 @@ mod movegen;
 mod moveorder;
 mod moveutil;
 mod nnue;
+mod perft;
 mod pgn;
 mod pht;
 mod psqt;
@@ -34,6 +35,7 @@ use crate::evalutil::*;
 use crate::magic::*;
 use crate::movegen::*;
 use crate::nnue::*;
+use crate::perft::*;
 use crate::pgn::*;
 use crate::pht::*;
 // use crate::syzygy::*;
@@ -55,6 +57,14 @@ fn main() {
     init();
     // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
     // n.print();
+    // let mut board = Bitboard::default_board();
+    // perft(&mut board, 5, 0);
+
+    // for i in 0..10 {
+    //     unsafe {
+    //         println!("PERFT NODES DEPTH {}: {}", i + 1, PERFT_NODES[i]);
+    //     }
+    // }
     uci_loop();
     // let n = SlowNetwork::load("/home/jtwright/chess/zahak/default.nn").unwrap();
     // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
