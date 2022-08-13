@@ -21,16 +21,9 @@ pub struct SlowNetwork {
     pub activations: Vec<Matrix>,
 }
 
-pub const PAWN: i32 = 0;
-pub const KNIGHT: i32 = 1;
-pub const BISHOP: i32 = 2;
-pub const ROOK: i32 = 3;
-pub const QUEEN: i32 = 4;
-pub const KING: i32 = 5;
-
-fn input_number(piece: i32, white: bool, idx: i32) -> usize {
+fn input_number(piece: u8, white: bool, idx: i32) -> usize {
     let piece_num = if white { piece } else { 6 + piece };
-    let num = (piece_num * 64 + idx) as i16;
+    let num = (piece_num as i32 * 64 + idx) as i16;
     return num as usize;
 }
 
@@ -105,7 +98,7 @@ impl SlowNetwork {
     }
 
     pub fn print(&self) {
-        println!("pub const DEFAULT_NNUE_FEATURE_WEIGHTS: [f32; 196864] = [");
+        println!("pub static DEFAULT_NNUE_FEATURE_WEIGHTS: [f32; 196864] = [");
         for i in 0..769 {
             for j in 0..32 {
                 print!("\t");
@@ -246,7 +239,7 @@ impl SlowNetwork {
         }
     }
 
-    fn set_bb_activations(&mut self, bb: u64, piece_num: i32, is_white: bool) {
+    fn set_bb_activations(&mut self, bb: u64, piece_num: u8, is_white: bool) {
         let mut bb = bb;
         while bb != 0 {
             let idx = bb.trailing_zeros() as i32;
@@ -285,21 +278,24 @@ impl SlowNetwork {
         }
     }
 
-    pub fn activate(&mut self, piece: i32, color: Color, idx: i8) {
+    #[inline]
+    pub fn activate(&mut self, piece: u8, color: Color, idx: i8) {
         let feature_idx = input_number(piece, color == Color::White, idx as i32);
         for j in 0..self.activations[0].size() {
             self.activations[0].data[j] += self.weights[0].get(j, feature_idx);
         }
     }
 
-    pub fn deactivate(&mut self, piece: i32, color: Color, idx: i8) {
+    #[inline]
+    pub fn deactivate(&mut self, piece: u8, color: Color, idx: i8) {
         let feature_idx = input_number(piece, color == Color::White, idx as i32);
         for j in 0..self.activations[0].size() {
             self.activations[0].data[j] -= self.weights[0].get(j, feature_idx);
         }
     }
 
-    pub fn move_piece(&mut self, piece: i32, color: Color, start: i8, end: i8) {
+    #[inline]
+    pub fn move_piece(&mut self, piece: u8, color: Color, start: i8, end: i8) {
         self.deactivate(piece, color, start);
         self.activate(piece, color, end);
     }
@@ -397,6 +393,7 @@ impl SlowNetwork {
     }
 }
 
+#[repr(align(32))]
 pub struct Network {
     pub feature_weights: Vec<[f32x8; 64]>,
     pub hidden_weights: [f32x8; 64],
@@ -573,21 +570,24 @@ impl Network {
         return Ok(network);
     }
 
-    pub fn activate(&mut self, piece: i32, color: Color, idx: i8) {
+    #[inline]
+    pub fn activate(&mut self, piece: u8, color: Color, idx: i8) {
         let feature_idx = input_number(piece, color == Color::White, idx as i32);
         for j in 0..64 {
             self.hidden_activations[j] += self.feature_weights[feature_idx][j];
         }
     }
 
-    pub fn deactivate(&mut self, piece: i32, color: Color, idx: i8) {
+    #[inline]
+    pub fn deactivate(&mut self, piece: u8, color: Color, idx: i8) {
         let feature_idx = input_number(piece, color == Color::White, idx as i32);
         for j in 0..64 {
             self.hidden_activations[j] -= self.feature_weights[feature_idx][j];
         }
     }
 
-    pub fn move_piece(&mut self, piece: i32, color: Color, start: i8, end: i8) {
+    #[inline]
+    pub fn move_piece(&mut self, piece: u8, color: Color, start: i8, end: i8) {
         self.deactivate(piece, color, start);
         self.activate(piece, color, end);
     }
@@ -600,7 +600,7 @@ impl Network {
         self.flip = false;
     }
 
-    fn set_bb_activations(&mut self, bb: u64, piece_num: i32, is_white: bool) {
+    fn set_bb_activations(&mut self, bb: u64, piece_num: u8, is_white: bool) {
         let mut bb = bb;
         while bb != 0 {
             let idx = bb.trailing_zeros() as i8;

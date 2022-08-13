@@ -111,7 +111,7 @@ pub const ROOK_ON_OPEN: Score = S!(118, 90);
 
 pub fn static_eval(pos: &mut Bitboard, pht: &mut PHT) -> i32 {
     let score = if pos.net.is_valid() {
-            pos.net.nnue_eval()
+        pos.net.nnue_eval()
     } else {
         evaluate_position(pos, pht)
     };
@@ -298,9 +298,33 @@ pub fn print_eval(board: &mut Bitboard) {
 
 // }
 
+pub fn material(pos: &Bitboard) -> i32 {
+    let mut score: Score = make_score(0, 0);
+    let white = Color::White as usize;
+    let black = Color::Black as usize;
+
+    score += QUEEN_VALUE * pos.queen[white].count_ones() as Score;
+    score += QUEEN_VALUE * pos.queen[black].count_ones() as Score;
+
+    score += ROOK_VALUE * pos.rook[white].count_ones() as Score;
+    score += ROOK_VALUE * pos.rook[black].count_ones() as Score;
+
+    score += BISHOP_VALUE * pos.bishop[white].count_ones() as Score;
+    score += BISHOP_VALUE * pos.bishop[black].count_ones() as Score;
+
+    score += KNIGHT_VALUE * pos.knight[white].count_ones() as Score;
+    score += KNIGHT_VALUE * pos.knight[black].count_ones() as Score;
+
+    score += PAWN_VALUE * pos.pawn[white].count_ones() as Score;
+    score += PAWN_VALUE * pos.pawn[black].count_ones() as Score;
+
+    return mg_score(score);
+}
+
+
 pub fn material_score(pos: &Bitboard) -> Score {
     let mut score: Score = make_score(0, 0);
-    if pawnless_endgame_drawish(pos) { return score; }
+    // if pawnless_endgame_drawish(pos) { return score; }
     let white = Color::White as usize;
     let black = Color::Black as usize;
 

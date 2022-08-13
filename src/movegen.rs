@@ -105,12 +105,11 @@ pub fn initialize_masks() {
     gen_rook_mask();
 }
 
-fn get_piece_movelist(pos: &Bitboard, idx: i8, piece: u8, move_board: u64) -> Vec<Move> {
+fn get_piece_movelist(pos: &Bitboard, idx: i8, piece: u8, move_board: u64, moves: &mut Vec<Move>) {
     // gets *all* pseudo-legal moves from the moveboard (not just quiet ones)
     // this should appropriately filter out capturing own pieces, etc.
     let own_occ = pos.composite[pos.side_to_move as usize];
     let mut move_board = move_board & !own_occ;
-    let mut moves: Vec<Move> = Vec::new();
 
     while move_board != 0 {
         let end_idx = move_board.trailing_zeros() as i8;
@@ -118,38 +117,31 @@ fn get_piece_movelist(pos: &Bitboard, idx: i8, piece: u8, move_board: u64) -> Ve
         move_board &= move_board - 1; // cute trick I learned from Expositor code
     }
 
-    return moves;
 }
 
-fn get_piece_quiets(pos: &Bitboard, idx: i8, piece: u8, move_board: u64) -> Vec<Move> {
+fn get_piece_quiets(pos: &Bitboard, idx: i8, piece: u8, move_board: u64, moves: &mut Vec<Move>) {
     // gets *all* pseudo-legal moves from the moveboard (not just quiet ones)
     // this should appropriately filter out capturing own pieces, etc.
     let occ = pos.composite[0] | pos.composite[1];
     let mut move_board = move_board & !occ;
-    let mut moves: Vec<Move> = Vec::new();
 
     while move_board != 0 {
         let end_idx = move_board.trailing_zeros() as i8;
         moves.push(Move::piece_move(idx, end_idx, piece));
         move_board &= move_board - 1; // cute trick I learned from Expositor code
     }
-
-    return moves;
 }
 
-fn get_piece_captures(pos: &Bitboard, idx: i8, piece: u8, move_board: u64) -> Vec<Move> {
+fn get_piece_captures(pos: &Bitboard, idx: i8, piece: u8, move_board: u64, moves: &mut Vec<Move>) {
     // this should appropriately filter out capturing own pieces, etc.
     let enemy_occ = pos.composite[!pos.side_to_move as usize];
     let mut move_board = move_board & enemy_occ;
-    let mut captures: Vec<Move> = Vec::new();
 
     while move_board != 0 {
         let end_idx = move_board.trailing_zeros() as i8;
-        captures.push(Move::piece_move(idx, end_idx, piece));
+        moves.push(Move::piece_move(idx, end_idx, piece));
         move_board &= move_board - 1;
     }
-
-    return captures;
 }
 
 pub fn pawn_walk_board(occ: u64, idx: i8, side_to_move: Color) -> u64 {
@@ -203,8 +195,7 @@ pub fn pawn_capture_board(enemy_occ: u64, idx: i8, ep_file: i32, side_to_move: C
 }
 
 // captures and promotions
-pub fn pawn_qmoves(pos: &Bitboard, idx: i8) -> Vec<Move> {
-    let mut moves: Vec<Move> = Vec::new();
+pub fn pawn_qmoves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let enemy_occ = pos.composite[!pos.side_to_move as usize];
     let mut promotions = 0;
@@ -241,11 +232,9 @@ pub fn pawn_qmoves(pos: &Bitboard, idx: i8) -> Vec<Move> {
         }
         promotions &= promotions - 1;
     }
-    return moves;
 }
 
-pub fn pawn_quiet_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
-    let mut moves: Vec<Move> = Vec::new();
+pub fn pawn_quiet_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
 
     let mut walks = pawn_walk_board(occ, idx, pos.side_to_move);
@@ -261,12 +250,10 @@ pub fn pawn_quiet_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
         moves.push(Move::pawn_move(idx, end_idx));
         walks &= walks - 1;
     }
-    return moves;
 }
 
 // all moves
-pub fn pawn_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
-    let mut moves: Vec<Move> = Vec::new();
+pub fn pawn_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let enemy_occ = pos.composite[!pos.side_to_move as usize];
 
@@ -308,8 +295,6 @@ pub fn pawn_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
         }
         promotions &= promotions - 1;
     }
-
-    return moves;
 }
 
 pub fn knight_moves_board(idx: i8) -> u64 {
@@ -318,19 +303,19 @@ pub fn knight_moves_board(idx: i8) -> u64 {
     }
 }
 
-pub fn knight_captures(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn knight_captures(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let move_board = knight_moves_board(idx);
-    return get_piece_captures(pos, idx, b'n', move_board);
+    get_piece_captures(pos, idx, b'n', move_board, moves);
 }
 
-pub fn knight_quiet_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn knight_quiet_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let move_board = knight_moves_board(idx);
-    return get_piece_quiets(pos, idx, b'n', move_board);
+    get_piece_quiets(pos, idx, b'n', move_board, moves);
 }
 
-pub fn knight_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn knight_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let move_board = knight_moves_board(idx);
-    return get_piece_movelist(pos, idx, b'n', move_board);
+    get_piece_movelist(pos, idx, b'n', move_board, moves);
 }
 
 pub fn bishop_moves_board(idx: i8, occ: u64) -> u64 {
@@ -341,22 +326,22 @@ pub fn bishop_moves_board(idx: i8, occ: u64) -> u64 {
     }
 }
 
-pub fn bishop_captures(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn bishop_captures(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let move_board = bishop_moves_board(idx, occ);
-    return get_piece_captures(pos, idx, b'b', move_board);
+    get_piece_captures(pos, idx, b'b', move_board, moves);
 }
 
-pub fn bishop_quiet_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn bishop_quiet_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let move_board = bishop_moves_board(idx, occ);
-    return get_piece_quiets(pos, idx, b'b', move_board);
+    get_piece_quiets(pos, idx, b'b', move_board, moves);
 }
 
-pub fn bishop_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn bishop_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let move_board = bishop_moves_board(idx, occ);
-    return get_piece_movelist(pos, idx, b'b', move_board);
+    get_piece_movelist(pos, idx, b'b', move_board, moves);
 }
 
 pub fn rook_moves_board(idx: i8, occ: u64) -> u64 {
@@ -367,44 +352,44 @@ pub fn rook_moves_board(idx: i8, occ: u64) -> u64 {
     }
 }
 
-pub fn rook_captures(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn rook_captures(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let move_board = rook_moves_board(idx, occ);
-    return get_piece_captures(pos, idx, b'r', move_board);
+    get_piece_captures(pos, idx, b'r', move_board, moves);
 }
 
-pub fn rook_quiet_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn rook_quiet_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let move_board = rook_moves_board(idx, occ);
-    return get_piece_quiets(pos, idx, b'r', move_board);
+    get_piece_quiets(pos, idx, b'r', move_board, moves);
 }
 
-pub fn rook_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn rook_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let move_board = rook_moves_board(idx, occ);
-    return get_piece_movelist(pos, idx, b'r', move_board);
+    get_piece_movelist(pos, idx, b'r', move_board, moves);
 }
 
 pub fn queen_moves_board(idx: i8, occ: u64) -> u64 {
     return bishop_moves_board(idx, occ) | rook_moves_board(idx, occ);
 }
 
-pub fn queen_captures(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn queen_captures(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let move_board = queen_moves_board(idx, occ);
-    return get_piece_captures(pos, idx, b'q', move_board);
+    get_piece_captures(pos, idx, b'q', move_board, moves);
 }
 
-pub fn queen_quiet_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn queen_quiet_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let move_board = queen_moves_board(idx, occ);
-    return get_piece_quiets(pos, idx, b'q', move_board);
+    get_piece_quiets(pos, idx, b'q', move_board, moves);
 }
 
-pub fn queen_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn queen_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let occ = pos.composite[0] | pos.composite[1];
     let move_board = queen_moves_board(idx, occ);
-    return get_piece_movelist(pos, idx, b'q', move_board);
+    get_piece_movelist(pos, idx, b'q', move_board, moves);
 }
 
 pub fn king_normal_moves_board(idx: i8) -> u64 {
@@ -433,14 +418,14 @@ pub fn king_normal_moves_board(idx: i8) -> u64 {
     // }
 }
 
-pub fn king_captures(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn king_captures(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let move_board = king_normal_moves_board(idx);
-    return get_piece_captures(pos, idx, b'k', move_board);
+   get_piece_captures(pos, idx, b'k', move_board, moves);
 }
 
-pub fn king_quiet_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn king_quiet_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let move_board = king_normal_moves_board(idx);
-    let mut moves = get_piece_quiets(pos, idx, b'k', move_board);
+    get_piece_quiets(pos, idx, b'k', move_board, moves);
 
     // kingside castle
     if pos.can_castle(pos.side_to_move, false) {
@@ -452,13 +437,11 @@ pub fn king_quiet_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
         let end_idx = idx - 2;
         moves.push(Move::piece_move(idx, end_idx, b'k'));
     }
-
-    return moves;
 }
 
-pub fn king_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
+pub fn king_moves(pos: &Bitboard, idx: i8, moves: &mut Vec<Move>) {
     let move_board = king_normal_moves_board(idx);
-    let mut moves = get_piece_movelist(pos, idx, b'k', move_board);
+    get_piece_movelist(pos, idx, b'k', move_board, moves);
 
     // kingside castle
     if pos.can_castle(pos.side_to_move, false) {
@@ -470,13 +453,10 @@ pub fn king_moves(pos: &Bitboard, idx: i8) -> Vec<Move> {
         let end_idx = idx - 2;
         moves.push(Move::piece_move(idx, end_idx, b'k'));
     }
-
-    return moves;
 }
 
 pub fn moves(pos: &Bitboard) -> Vec<Move> {
     let mut moves: Vec<Move> = Vec::new();
-
     let me = pos.side_to_move as usize;
     let mut pawns = pos.pawn[me];
     let mut knights = pos.knight[me];
@@ -487,37 +467,37 @@ pub fn moves(pos: &Bitboard) -> Vec<Move> {
 
     while pawns != 0 {
         let idx = pawns.trailing_zeros() as i8;
-        moves.append(&mut pawn_moves(pos, idx));
+        pawn_moves(pos, idx, &mut moves);
         pawns &= pawns - 1;
     }
 
     while knights != 0 {
         let idx = knights.trailing_zeros() as i8;
-        moves.append(&mut knight_moves(pos, idx));
+        knight_moves(pos, idx, &mut moves);
         knights &= knights - 1;
     }
 
     while bishops != 0 {
         let idx = bishops.trailing_zeros() as i8;
-        moves.append(&mut bishop_moves(pos, idx));
+        bishop_moves(pos, idx, &mut moves);
         bishops &= bishops - 1;
     }
 
     while rooks != 0 {
         let idx = rooks.trailing_zeros() as i8;
-        moves.append(&mut rook_moves(pos, idx));
+        rook_moves(pos, idx, &mut moves);
         rooks &= rooks - 1;
     }
 
     while queens != 0 {
         let idx = queens.trailing_zeros() as i8;
-        moves.append(&mut queen_moves(pos, idx));
+        queen_moves(pos, idx, &mut moves);
         queens &= queens - 1;
     }
 
     while kings != 0 {
         let idx = kings.trailing_zeros() as i8;
-        moves.append(&mut king_moves(pos, idx));
+        king_moves(pos, idx, &mut moves);
         kings &= kings - 1;
     }
 
@@ -537,37 +517,37 @@ pub fn quiet_moves(pos: &Bitboard) -> Vec<Move> {
 
     while pawns != 0 {
         let idx = pawns.trailing_zeros() as i8;
-        moves.append(&mut pawn_quiet_moves(pos, idx));
+        pawn_quiet_moves(pos, idx, &mut moves);
         pawns &= pawns - 1;
     }
 
     while knights != 0 {
         let idx = knights.trailing_zeros() as i8;
-        moves.append(&mut knight_quiet_moves(pos, idx));
+        knight_quiet_moves(pos, idx, &mut moves);
         knights &= knights - 1;
     }
 
     while bishops != 0 {
         let idx = bishops.trailing_zeros() as i8;
-        moves.append(&mut bishop_quiet_moves(pos, idx));
+        bishop_quiet_moves(pos, idx, &mut moves);
         bishops &= bishops - 1;
     }
 
     while rooks != 0 {
         let idx = rooks.trailing_zeros() as i8;
-        moves.append(&mut rook_quiet_moves(pos, idx));
+        rook_quiet_moves(pos, idx, &mut moves);
         rooks &= rooks - 1;
     }
 
     while queens != 0 {
         let idx = queens.trailing_zeros() as i8;
-        moves.append(&mut queen_quiet_moves(pos, idx));
+        queen_quiet_moves(pos, idx, &mut moves);
         queens &= queens - 1;
     }
 
     while kings != 0 {
         let idx = kings.trailing_zeros() as i8;
-        moves.append(&mut king_quiet_moves(pos, idx));
+        king_quiet_moves(pos, idx, &mut moves);
         kings &= kings - 1;
     }
 
@@ -587,37 +567,38 @@ pub fn noisy_moves(pos: &Bitboard) -> Vec<Move> {
 
     while pawns != 0 {
         let idx = pawns.trailing_zeros() as i8;
-        moves.append(&mut pawn_qmoves(pos, idx));
+        // moves.append(&mut pawn_qmoves(pos, idx));
+        pawn_qmoves(pos, idx, &mut moves);
         pawns &= pawns - 1;
     }
 
     while knights != 0 {
         let idx = knights.trailing_zeros() as i8;
-        moves.append(&mut knight_captures(pos, idx));
+        knight_captures(pos, idx, &mut moves);
         knights &= knights - 1;
     }
 
     while bishops != 0 {
         let idx = bishops.trailing_zeros() as i8;
-        moves.append(&mut bishop_captures(pos, idx));
+        bishop_captures(pos, idx, &mut moves);
         bishops &= bishops - 1;
     }
 
     while rooks != 0 {
         let idx = rooks.trailing_zeros() as i8;
-        moves.append(&mut rook_captures(pos, idx));
+        rook_captures(pos, idx, &mut moves);
         rooks &= rooks - 1;
     }
 
     while queens != 0 {
         let idx = queens.trailing_zeros() as i8;
-        moves.append(&mut queen_captures(pos, idx));
+        queen_captures(pos, idx, &mut moves);
         queens &= queens - 1;
     }
 
     while kings != 0 {
         let idx = kings.trailing_zeros() as i8;
-        moves.append(&mut king_captures(pos, idx));
+        king_captures(pos, idx, &mut moves);
         kings &= kings - 1;
     }
 

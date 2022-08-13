@@ -376,9 +376,8 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     stop_threads();
     for t in threads {
         let res = t.join();
-        match res {
-            Err(_) => panic!("Error encountered in thread!"),
-            _ => {}
+        if let Err(_) = res {
+            panic!("Error encountered in thread!")
         }
     }
 

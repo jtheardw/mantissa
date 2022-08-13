@@ -22,6 +22,7 @@ mod search;
 mod searchparams;
 mod searchutil;
 mod see;
+// mod syzygy;
 mod time;
 mod tt;
 mod uci;
@@ -35,6 +36,7 @@ use crate::movegen::*;
 use crate::nnue::*;
 use crate::pgn::*;
 use crate::pht::*;
+// use crate::syzygy::*;
 use crate::searchutil::*;
 use crate::tt::*;
 use crate::uci::*;
@@ -57,6 +59,7 @@ fn main() {
     // let n = SlowNetwork::load("/home/jtwright/chess/zahak/default.nn").unwrap();
     // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
     // let n = SlowNetwork::load("/home/jtwright/nets_wide/epoch-300.nnue").unwrap();
+    // let n = SlowNetwork::load("/home/jtwright/august_nets/epoch-151.nnue").unwrap();
     // n.print();
     // n.save_image("mantissa");
 }

@@ -136,6 +136,10 @@ impl MovePicker {
         let mut prev_piece_num = 0;
         let mut my_prev_piece_num = 0;
         let mut seen_quiet = false;
+        let thread_info;
+        unsafe {
+            thread_info = &TI[self.thread_num];
+        }
 
         for mv in movelist {
             let mv_score: u32;
@@ -173,12 +177,12 @@ impl MovePicker {
                             }
                             seen_quiet = true;
                         }
-                        history_score = TI[self.thread_num].move_history[piece_num][mv.end as usize];
+                        history_score = thread_info.move_history[piece_num][mv.end as usize];
                         if !prev_mv.is_null() {
-                            history_score += TI[self.thread_num].countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
+                            history_score += thread_info.countermove_history[prev_piece_num][prev_mv.end as usize][piece_num][mv.end as usize];
                         }
                         if !my_prev_mv.is_null() {
-                            history_score += TI[self.thread_num].followup_history[my_prev_piece_num][my_prev_mv.end as usize][piece_num][mv.end as usize];
+                            history_score += thread_info.followup_history[my_prev_piece_num][my_prev_mv.end as usize][piece_num][mv.end as usize];
                         }
                     }
                     mv_score = (QUIET_OFFSET as i64 + history_score as i64) as u32;
