@@ -3,5 +3,21 @@
 version = 3
 
 [[package]]
+name = "cc"
+version = "1.0.73"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fff2a6927b3bb87f9595d67196a70493f627687a71d87a0d692242c33f58c11"
+
+[[package]]
+name = "libc"
+version = "0.2.131"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04c3b4822ccebfa39c02fc03d1534441b22ead323fa0f48bb7ddd8e6ba076a40"
+
+[[package]]
 name = "mantissa"
 version = "3.7.0-dev"
+dependencies = [
+ "cc",
+ "libc",
+]

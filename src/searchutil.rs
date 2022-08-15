@@ -143,6 +143,7 @@ impl SearchLimits {
 
 pub struct ThreadInfo {
     pub nodes_searched: u64,
+    pub tb_hits: u64,
     pub seldepth: i32,
     pub killers: [[Move; 2]; MAX_PLY],
     pub move_history: [[i32; 64]; 12],
@@ -166,6 +167,7 @@ impl ThreadInfo {
         let pht = PHT::get_pht(14);
         ThreadInfo {
             nodes_searched: 0,
+            tb_hits: 0,
             seldepth: 0,
             killers: killers,
             move_history: move_history,
@@ -189,6 +191,7 @@ impl ThreadInfo {
         self.killers = [[Move::null_move(); 2]; MAX_PLY];
         self.seldepth = 0;
         self.nodes_searched = 0;
+        self.tb_hits = 0;
         self.move_history = [[0; 64]; 12];
         self.capture_history = [[[0; 6]; 64]; 12];
         self.countermove_table = [[Move::null_move(); 64]; 12];

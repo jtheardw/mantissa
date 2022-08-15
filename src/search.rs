@@ -9,6 +9,7 @@ use crate::moveorder::*;
 use crate::moveutil::*;
 use crate::searchparams::*;
 use crate::searchutil::*;
+use crate::syzygy::*;
 use crate::see::*;
 use crate::tt::*;
 use crate::util::*;
@@ -81,7 +82,7 @@ fn get_val_str(val: i32) -> String {
     return format!("mate {}", mate_score);
 }
 
-fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, nodes: u64) {
+fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, nodes: u64, tb_hits: u64) {
     let pv_str = get_pv_str(pv);
     let val_str = get_val_str(val);
     let nps = (nodes * 1000) as u128 / time;
@@ -89,8 +90,8 @@ fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, n
     //     LAST_INFO = fmt!("info depth {} seldepth {} score {} time {} nodes {} nps {} pv {} multipv 1",
     //          depth, seldepth, val_str, time, nodes, nps, pv_str).to_str();
     // }
-    println!("info depth {} seldepth {} score {} time {} nodes {} nps {} multipv 1 pv {}",
-             depth, seldepth, val_str, time, nodes, nps, pv_str
+    println!("info depth {} seldepth {} score {} time {} nodes {} nps {} tbhits {} multipv 1 pv {}",
+             depth, seldepth, val_str, time, nodes, nps, tb_hits, pv_str
     );
     // eprintln!("info depth {} seldepth {} score {} time {} nodes {} nps {} multipv 1 pv {}",
     //          depth, seldepth, val_str, time, nodes, nps, pv_str
@@ -253,6 +254,16 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         }
     }
 
+    if tb_active() && node.num_pieces() <= max_tb_pieces() && max_time > 0 {
+        if let Some((mv, score)) = probe_root(&node) {
+            abort_search();
+            print_info(1, 1, &vec![mv], score, 1, 1, 1);
+            println!("bestmove {}", mv);
+            unsafe {SEARCH_IN_PROGRESS = false;}
+            return;
+        }
+    }
+
     let mut depth: i32 = 1;
     let mut current_time: u128;
 
@@ -263,6 +274,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     let mut best_val: i32 = LB;
     let mut pv: &Vec<Move>;
     let mut nodes_searched;
+    let mut tb_hits;
 
 
     allow_threads();
@@ -308,6 +320,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
         let elapsed_time;
         nodes_searched = 0;
+        tb_hits = 0;
         unsafe {
             if depth > 4 {
                 SEARCH_LIMITS.maximum_time = max_time;
@@ -328,10 +341,11 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
             for t_num in 0..num_threads {
                 nodes_searched += TI[t_num as usize].nodes_searched;
+                tb_hits += TI[t_num as usize].tb_hits;
             }
 
             if bh_mode == OFF {
-                print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
+                print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched, tb_hits);
             } else {
                 println!("Thinking... depth {}", depth);
             }
@@ -542,6 +556,39 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         depth -= 1;
     }
 
+    // Syzygy probe
+    // We only do this if we are either above max_probe depth or have
+    // strictly fewer pieces on the board than the max.  We also only engage this
+    // after zeroing moves (e.g. pawn push), similar to Ethereal, Asymptote, and others
+    if node.halfmove == 0
+        && node.ep_file == -1
+        && node.castling_rights == 0
+        && sse.excluded_move.is_null()
+        && tb_active() {
+            let num_pieces = node.num_pieces();
+            let max_pieces = max_tb_pieces();
+            if num_pieces < max_pieces || (num_pieces <= max_pieces && depth >= 2) {
+                if let Some(score) = probe_wdl(&node) {
+                    ti.tb_hits += 1;
+                    let (node_score, node_type) = if score == 0 {
+                        (0, PV_NODE)
+                    } else if score > 0 {
+                        (score - ply, CUT_NODE)
+                    } else {
+                        (score + ply, ALL_NODE)
+                    };
+                    if node_type == PV_NODE
+                        || (node_type == CUT_NODE && score >= beta)
+                        || (node_type == ALL_NODE && score <= alpha) {
+                            unsafe {
+                                TT.set(node.hash, Move::null_move(), TTEntry::make_tt_score(score, ply), node_type, depth, node.history.len() as i32);
+                            }
+                            return score;
+                        }
+                }
+            }
+        }
+
     if is_check {
         // We won't do any pruning based on static eval here
         // so this is for the improving flag.  Set the eval prohibitively high
@@ -663,7 +710,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         && !is_check
         && sse.tt_hit
         && sse.excluded_move.is_null()
-        && sse.tt_val.abs() < MIN_MATE_SCORE
+        && sse.tt_val.abs() < MIN_TB_WIN_SCORE
         && (sse.tt_node_type & CUT_NODE) != 0
         && sse.tt_depth >= depth - 3
     {
@@ -745,7 +792,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         let is_tactical = is_tactical_move(&mv, node);
         let is_quiet = is_quiet_move(&mv, node);
 
-        if !is_check && (depth + ply > 3) && !init_node && best_val > -MIN_MATE_SCORE && !futile {
+        if !is_check && (depth + ply > 3) && !init_node && best_val > -MIN_TB_WIN_SCORE && !futile {
             let lmr_depth = depth - 1 - lmr_reduction(depth, moves_searched);
 
             // Basic form of late move pruning

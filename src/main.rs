@@ -23,7 +23,7 @@ mod search;
 mod searchparams;
 mod searchutil;
 mod see;
-// mod syzygy;
+mod syzygy;
 mod time;
 mod tt;
 mod uci;
@@ -38,7 +38,7 @@ use crate::nnue::*;
 use crate::perft::*;
 use crate::pgn::*;
 use crate::pht::*;
-// use crate::syzygy::*;
+use crate::syzygy::*;
 use crate::searchutil::*;
 use crate::tt::*;
 use crate::uci::*;
@@ -65,6 +65,9 @@ fn main() {
     //         println!("PERFT NODES DEPTH {}: {}", i + 1, PERFT_NODES[i]);
     //     }
     // }
+    unsafe {
+        setup_tb("/home/jtwright/chess/tablebase/3-4-5/");
+    }
     uci_loop();
     // let n = SlowNetwork::load("/home/jtwright/chess/zahak/default.nn").unwrap();
     // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();

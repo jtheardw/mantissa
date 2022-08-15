@@ -1266,4 +1266,8 @@ impl Bitboard {
 
         return moves_board & end_bb != 0;
     }
+
+    pub fn num_pieces(&self) -> u32 {
+        return (self.composite[0] | self.composite[1]).count_ones();
+    }
 }
