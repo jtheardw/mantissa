@@ -15,12 +15,7 @@ cc = "1.0"
 opt-level = 3
 debug = true
 codegen-units = 256
-panic = "abort"
 
 [profile.dev]
 opt-level = 3
 overflow-checks = true
-
-# [features]
-# default = ["fathom"]
-# fathom = ["cc", "libc"]

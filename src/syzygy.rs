@@ -61,7 +61,7 @@ pub fn max_tb_pieces() -> u32 {
 fn tb_result_to_move(pos: &Bitboard, result: u32) -> Move {
     let from = (result & TB_RESULT_FROM_MASK) >> TB_RESULT_FROM_SHIFT;
     let to = (result & TB_RESULT_TO_MASK) >> TB_RESULT_TO_SHIFT;
-    let tb_promote = ((result & TB_RESULT_PROMOTES_MASK) >> TB_RESULT_PROMOTES_SHIFT);
+    let tb_promote = (result & TB_RESULT_PROMOTES_MASK) >> TB_RESULT_PROMOTES_SHIFT;
     let promote_to = match tb_promote {
         TB_KNIGHT => b'n',
         TB_BISHOP => b'b',

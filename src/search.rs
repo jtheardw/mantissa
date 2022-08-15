@@ -581,7 +581,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                         || (node_type == CUT_NODE && score >= beta)
                         || (node_type == ALL_NODE && score <= alpha) {
                             unsafe {
-                                TT.set(node.hash, Move::null_move(), TTEntry::make_tt_score(score, ply), node_type, depth, node.history.len() as i32);
+                                TT.set(node.hash, Move::null_move(), TTEntry::make_tt_score(node_score, ply), node_type, depth, node.history.len() as i32);
                             }
                             return score;
                         }
