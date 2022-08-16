@@ -57,22 +57,8 @@ fn main() {
     init();
     // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
     // n.print();
-    // let mut board = Bitboard::default_board();
-    // perft(&mut board, 5, 0);
-
-    // for i in 0..10 {
-    //     unsafe {
-    //         println!("PERFT NODES DEPTH {}: {}", i + 1, PERFT_NODES[i]);
-    //     }
+    // unsafe {
+    //     setup_tb("/home/jtwright/chess/tablebase/3-4-5/");
     // }
-    unsafe {
-        setup_tb("/home/jtwright/chess/tablebase/3-4-5/");
-    }
     uci_loop();
-    // let n = SlowNetwork::load("/home/jtwright/chess/zahak/default.nn").unwrap();
-    // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
-    // let n = SlowNetwork::load("/home/jtwright/nets_wide/epoch-300.nnue").unwrap();
-    // let n = SlowNetwork::load("/home/jtwright/august_nets/epoch-151.nnue").unwrap();
-    // n.print();
-    // n.save_image("mantissa");
 }

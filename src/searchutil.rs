@@ -5,6 +5,7 @@ use crate::searchparams::*;
 use crate::pht::*;
 use crate::time::*;
 use crate::tt::*;
+use crate::uci::*;
 use crate::util::*;
 
 pub const EFP_DEPTH: i32 = 8;         // extended futility pruning
@@ -152,12 +153,13 @@ pub struct ThreadInfo {
     pub countermove_history: Vec<[[[i32; 64]; 12]; 64]>,
     pub followup_history: Vec<[[[i32; 64]; 12]; 64]>,
     pub pht: PHT,
+    pub probe_depth: i32,
     pub root_moves: Vec<Move>,
     pub bh_piece: i8
 }
 
 impl ThreadInfo {
-    pub fn new() -> ThreadInfo {
+    pub fn new(options: UCIOptions) -> ThreadInfo {
         let killers = [[Move::null_move(); 2]; MAX_PLY];
         let move_history = [[0; 64]; 12];
         let capture_history = [[[0; 6]; 64]; 12];
@@ -175,6 +177,7 @@ impl ThreadInfo {
             countermove_table: countermove_table,
             countermove_history: countermove_history,
             followup_history: followup_history,
+            probe_depth: options.probe_depth,
             pht: pht,
             root_moves: Vec::new(),
             bh_piece: -1
