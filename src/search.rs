@@ -754,14 +754,14 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 futile = true;
             }
 
-            if depth < EFP_DEPTH && eval + efp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE && !futile {
+            if depth < EFP_DEPTH && eval + efp_margin(depth) <= alpha && alpha.abs() < MIN_TB_WIN_SCORE && !futile {
                 futile = true;
             }
 
             // History-leaf pruning
             // Slightly more lenient on eval margin than futility pruning
             // but won't kick in until we've tried all moves with good history scores
-            if lmr_depth <= 6 && is_quiet && eval + fp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE && movepicker.move_stage > GEN_QUIET && !futile {
+            if lmr_depth <= 6 && is_quiet && eval + fp_margin(depth) <= alpha && alpha.abs() < MIN_TB_WIN_SCORE && movepicker.move_stage > GEN_QUIET && !futile {
                 let hist = (score as i32) - QUIET_OFFSET as i32;
                 if hist < HISTORY_LEAF_PRUNING_MARGIN {
                     futile = true
