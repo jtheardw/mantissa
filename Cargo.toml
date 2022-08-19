@@ -1,6 +1,6 @@
 [package]
 name = "mantissa"
-version = "3.7.0-dev"
+version = "3.7.2"
 authors = ["Jeremy Wright <jtheardw@gmail.com>"]
 edition = "2018"
 
@@ -9,7 +9,6 @@ edition = "2018"
 opt-level = 3
 debug = true
 codegen-units = 256
-panic = "abort"
 
 [profile.dev]
 opt-level = 3
