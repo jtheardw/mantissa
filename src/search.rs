@@ -85,16 +85,9 @@ fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, n
     let pv_str = get_pv_str(pv);
     let val_str = get_val_str(val);
     let nps = (nodes * 1000) as u128 / time;
-    // unsafe {
-    //     LAST_INFO = fmt!("info depth {} seldepth {} score {} time {} nodes {} nps {} pv {} multipv 1",
-    //          depth, seldepth, val_str, time, nodes, nps, pv_str).to_str();
-    // }
     println!("info depth {} seldepth {} score {} time {} nodes {} nps {} multipv 1 pv {}",
              depth, seldepth, val_str, time, nodes, nps, pv_str
     );
-    // eprintln!("info depth {} seldepth {} score {} time {} nodes {} nps {} multipv 1 pv {}",
-    //          depth, seldepth, val_str, time, nodes, nps, pv_str
-    // );
 }
 
 pub fn abort_search() {
@@ -168,9 +161,6 @@ fn thread_handler(mut node: Bitboard, thread_depth: i32, max_depth: i32, thread_
                 beta = best_val + aspiration_delta_high;
             }
 
-            // unsafe {
-            //     TI[thread_num].clear_history();
-            // }
             val = search(&mut node, alpha, beta, depth, 0, true, thread_num);
             if thread_killed() { return; }
 
@@ -196,8 +186,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     let mut search_limits = search_limits;
     let max_time = search_limits.maximum_time;
     search_limits.maximum_time = 10000;
-    // println!("key {}", node.hash);
-    // println!("position repetition {}", (node.history.iter().filter(|&n| *n == node.hash).count() + 1));
     // loop {
     //     let mv = root_movepicker.next(node).0;
     //     if mv.is_null() { break; }
@@ -226,7 +214,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
     if bh_mode == HAND {
         if bh_piece == -1 {
-            println!("You didn't tell me which piece to move!");
+            eprintln!("You didn't tell me which piece to move!");
             unsafe {
                 SEARCH_IN_PROGRESS = false;
             }
@@ -239,7 +227,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
                 unsafe {
                     SEARCH_IN_PROGRESS = false;
                 }
-                println!("There are no moves for that piece!");
+                eprintln!("There are no moves for that piece!");
                 return;
             }
             if mv.start == bh_piece {
@@ -335,9 +323,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             } else {
                 println!("Thinking... depth {}", depth);
             }
-            // for i in 0..MAX_PLY {
-            //     SS[0][i].pv = Vec::new();
-            // }
         }
 
         // we've obviously run out of time
@@ -428,15 +413,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         if bh_mode != OFF {
             println!("bestmove {} {}", best_move, emoji);
         } else {
-            // unsafe {
-            //     println!("MS NODES {} MAIN SEARCH EVALS {} TT_VALID {}", MAIN_SEARCH_NODES, STATIC_EVALS, TT_VALID);
-            // }
-            // unsafe {
-            //     print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
-            // }
-            // unsafe {
-            //     println!("MOVES {} ILLEGAL {}", MOVES_APPLIED, ILLEGAL_MOVES_APPLIED);
-            // }
             println!("bestmove {}", best_move);
         }
     }
@@ -455,7 +431,6 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
     let ss: &SearchStats;
     let mut sse: &mut SearchStatsEntry;
     unsafe {
-        // x86_64::_mm_prefetch(TT.get_ptr(node.hash), x86_64::_MM_HINT_T0);
         ti = &mut TI[thread_num];
         ss = &SS[thread_num];
         sse = &mut SS[thread_num][ply as usize];
@@ -628,17 +603,6 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
         if val >= beta {
             return beta;
-            // if depth < 14 {
-            //     return val;
-            // } else {
-            //     // super duper jank verification jank hack adventure
-            //     sse.searching_null_move = true;
-            //     let verification_val = search(node, beta-1, beta, cmp::max(depth / 2, depth - r - 2), ply, false, thread_num);
-            //     sse.searching_null_move = false;
-            //     if verification_val >= beta {
-            //         return val;
-            //     }
-            // }
         }
     }
 
@@ -801,20 +765,11 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             }
         }
 
-        // node.do_move(&mv);
-        // unsafe {MOVES_APPLIED += 1;}
-        // if node.is_check(!node.side_to_move) {
-        //     // Illegal
-        //     unsafe {ILLEGAL_MOVES_APPLIED += 1;}
-        //     node.undo_move(&mv);
-        //     continue;
-        // }
         if !node.do_move_legal(&mv) {
             continue;
         }
 
         if depth > 1 {
-            // unsafe {x86_64::_mm_prefetch(TT.get_ptr(node.hash), x86_64::_MM_HINT_T0);}
             unsafe {TT.prefetch(node.hash);}
         }
 
