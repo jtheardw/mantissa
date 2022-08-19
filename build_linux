@@ -1,2 +1,4 @@
+#! /usr/bin/env sh
+
 RUSTFLAGS='-C target-feature=+popcnt,+avx2' cargo rustc --target=x86_64-unknown-linux-gnu
-RUSTFLAGS='-C target-feature=+popcnt,+avx2' cargo rustc --release --target=x86_64-unknown-linux-gnu
+RUSTFLAGS='-C target-cpu=+popcnt, +avx2' cargo rustc --release --target=x86_64-unknown-linux-gnu

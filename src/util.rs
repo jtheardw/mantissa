@@ -12,6 +12,13 @@ pub const DRAW_SCORE: i32 = 0;
 pub const MAX_DEPTH: usize = 64;
 pub const MAX_PLY: usize = 128;
 
+pub const PAWN: u8 = 0;
+pub const KNIGHT: u8 = 1;
+pub const BISHOP: u8 = 2;
+pub const ROOK: u8 = 3;
+pub const QUEEN: u8 = 4;
+pub const KING: u8 = 5;
+
 #[derive(Copy, Clone, PartialEq)]
 pub enum Color {
     Black = 0,
@@ -91,7 +98,7 @@ pub fn get_piece_num(piece: u8, side: Color) -> usize {
         b'b'=> 3,
         b'n'=> 4,
         b'p'=> 5,
-        _ => panic!("bad piece for getting num")
+        _ => panic!("bad piece for getting num {}", piece)
     };
     if side == Color::Black {
         return piece_offset + 6;

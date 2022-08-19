@@ -78,6 +78,18 @@ fn idx_attacks(pos: &Bitboard, idx: i8, occ: u64) -> u64 {
     return attackers_bb;
 }
 
+fn idx_diag_attacks(pos: &Bitboard, idx: i8, occ: u64) -> u64 {
+    // bishops & queens
+    let virt_bishop_bb = bishop_moves_board(idx, occ);
+    return virt_bishop_bb & (pos.bishop[0] | pos.bishop[1] | pos.queen[0] | pos.queen[1]);
+}
+
+fn idx_cardinal_attacks(pos: &Bitboard, idx: i8, occ: u64) -> u64 {
+    // rooks & queens
+    let virt_rook_bb = rook_moves_board(idx, occ);
+    return virt_rook_bb & (pos.rook[0] | pos.rook[1] | pos.queen[0] | pos.queen[1]);
+}
+
 pub fn see(pos: &Bitboard, to_idx: i8, target_piece: u8, from_idx: i8, atk_piece: u8) -> i32 {
     let white = Color::White as usize;
     let black = Color::Black as usize;
@@ -101,7 +113,12 @@ pub fn see(pos: &Bitboard, to_idx: i8, target_piece: u8, from_idx: i8, atk_piece
         done_atks |= from_sq;
         if (from_sq & xrayable_bb) != 0 {
             // gotta add xrays to the board
-            attack_bb = idx_attacks(pos, to_idx, occ);
+            if atk_piece == b'p' || atk_piece == b'b' || atk_piece == b'q' {
+                attack_bb |= idx_diag_attacks(pos, to_idx, occ);
+            }
+            if atk_piece == b'p' || atk_piece == b'r' || atk_piece == b'q' {
+                attack_bb |= idx_cardinal_attacks(pos, to_idx, occ);
+            }
         }
         attack_bb &= !done_atks;
 
