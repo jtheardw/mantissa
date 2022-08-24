@@ -188,6 +188,13 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     let max_time = search_limits.maximum_time;
     search_limits.maximum_time = 10000;
 
+    // loop {
+    //     let mv = root_movepicker.next(node).0;
+    //     if mv.is_null() { break; }
+    //     node.do_move(&mv);
+    //     if !node.is_check(!node.side_to_move) { root_moves.push(mv); }
+    //     node.undo_move(&mv);
+    // }
     unsafe {
         SEARCH_IN_PROGRESS = true;
         ABORT = false;
@@ -209,7 +216,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
     if options.bh_mode == HAND {
         if bh_piece == -1 {
-            println!("You didn't tell me which piece to move!");
+            eprintln!("You didn't tell me which piece to move!");
             unsafe {
                 SEARCH_IN_PROGRESS = false;
             }
@@ -222,7 +229,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
                 unsafe {
                     SEARCH_IN_PROGRESS = false;
                 }
-                println!("There are no moves for that piece!");
+                eprintln!("There are no moves for that piece!");
                 return;
             }
             if mv.start == bh_piece {
@@ -331,7 +338,6 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             } else {
                 println!("Thinking... depth {}", depth);
             }
-
         }
 
         // we've obviously run out of time

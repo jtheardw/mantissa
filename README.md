@@ -19,19 +19,19 @@ She accepts challenges from humans and bots in any time format except ultrabulle
 ## Strength
 
 ### Lichess
-As of this writing, Mantissa is currently between 2150 and 2450 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however.
+As of this writing, Mantissa is currently between 2200 and 2450 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however.
 
 ### CCRL
 
-Mantissa currently holds a blitz ELO rating of 2999 on CCRL (as of version 3.0.0).  This score may fluctuate in the future, as this is its first entry on the list.
+Mantissa 3.3.0 currently holds a blitz ELO rating of 3119 on CCRL 40/4 and 3099 on CCRL 40/15.
 
 ### CEDR
 
-Mantissa 3.0.0 has 2933 Rating points on the CEDR (Chess Engines Diary) System.
+Mantissa 3.3.0 has 3125 Rating points on the CEDR (Chess Engines Diary) System.
 
 ### CEGT
 
-Mantissa 3.0.0 has a 2877 rating on CEGT Blitz.
+Mantissa 3.3.0 has a 3025 rating on CEGT 40/20.
 
 ## Features
 
@@ -61,7 +61,7 @@ In terms of search, Mantissa uses some form of the following ideas:
 - Tapered Evaluation
 
 ### NNUE
-- 768 -> 128 x 2 -> 1 Simple architecture trained on Mantissa self-play games based on a combination of Zahak and Koivisto topologies
+- 768 -> 256 x 2 -> 1 Simple architecture trained on Mantissa self-play games based on a combination of Zahak and Koivisto topologies
 
 ### Search Basics
 - Negamax search with alpha-beta pruning
@@ -86,13 +86,13 @@ In terms of search, Mantissa uses some form of the following ideas:
 - Victim-Attacker relative value
 - Killer heuristic
 - History tables
+- Countermove History
+- Followup History
 - Countermove heuristic
 
 ## Build
 
-**For the current version (3.3.0), Mantissa is only compatible with `x86_64` hardware.  This is my first experience working with NNUE so my ability to have it be efficient is fairly limited.  I'll be researching ways to increase portability while keeping strength as I become more familiar.  For now, if you're trying to run Mantissa on non `x86_64` hardware, consider the 2.5.0 release.  I apologize for any inconvenience**
-
-In order to build Mantissa, you'll need rust installed.  From there, you can use whatever build method is easiest for you.  Typically, this is navigating to the directory of the project (in this case, Mantissa), and running `RUSTFLAGS='-C target-cpu=native' cargo build --release`.
+In order to build Mantissa, you'll need rust nightly > 1.63.0 installed.  From there, you can use whatever build method is easiest for you.  Typically, this is navigating to the directory of the project (in this case, Mantissa), and running `RUSTFLAGS='-C target-cpu=native' cargo build --release`.
 
 ## Credit
 
@@ -105,18 +105,19 @@ I am not very good at chess and am still relatively new to chess programming, so
 - [CPW-Engine](https://www.chessprogramming.org/CPW-Engine)
 - [Cheng-4](https://github.com/kmar/cheng4)
 - [Zahak](https://github.com/amanjpro/zahak)
+- [Asymptote](https://github.com/malu/asymptote)
 
 ### Data
 
 - Andrew Grant for some of the positions used in the tuning process for Mantissa's handwritten evaluator.
-- Kade Phillips and Thomas Ahle for their two analyses of data to model moves remaining in a game.
+- Kade and Thomas Ahle for their two analyses of data to model moves remaining in a game.
 
 ### NNUE
 
-- Amanj was incredibly helpful in getting me started with NNUE.  `tissa-trainer`, which is the program I wrote to be able to train Mantissa nets, is basically a port of `zahak-trainer` to rust with some slight modifications.  He also helped explain a lot of the resources and information needed to understand the process.
+- Amanj was incredibly helpful in getting me started with NNUE.  `tissa-trainer`, which is the program I wrote to be able to train Mantissa nets, is basically a port of `zahak-trainer` to rust with some slight modifications.  He also helped explain a lot of the resources and information needed to understand the process.  `tissa-trainer` has since been changed ot train a different type of net, but still has many roots there.
 - Koivisto's authors, as I found a way to improve my NNUE topology from what I found in Koivisto's source.
-- Kade Phillips for net visualization code and the NNUE-derived piece value display
+- Kade for net visualization code and the NNUE-derived piece value display
 
 ### Other
 
-- Kade Phillips for his work on Mantissa's logos.
+- Kade for his work on Mantissa's logos.

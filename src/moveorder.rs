@@ -116,12 +116,6 @@ impl MovePicker {
         let mut i = cur_i + 1;
         let len = mvs.len();
 
-        // for x in (cur_i+1)..len {
-        //     if mvs[x].1 > highest {
-        //         highest = mvs[x].1;
-        //         highest_i = x;
-        //     }
-        // }
         while i < len {
             let score = mvs[i].1;
             if score > highest {
@@ -198,31 +192,6 @@ impl MovePicker {
             } else if mv.promote_to == 0 {
                 let score = see(pos, mv.end, captured, mv.start, mv.piece);
                 if score >= 0 {
-                    // let victim_val = match captured {
-                    //     b'p' => 1,
-                    //     b'n' => 3,
-                    //     b'b' => 3,
-                    //     b'r' => 5,
-                    //     b'q' => 9,
-                    //     _ => panic!("illegal capture!")
-                    // };
-                    // let atk_val = match mv.piece {
-                    //     b'p' => 9,
-                    //     b'n' => 7,
-                    //     b'b' => 7,
-                    //     b'r' => 5,
-                    //     b'q' => 1,
-                    //     b'k' => 0,
-                    //     _ => 0
-                    // };
-                    // if self.noisy_moves_only {
-                    //     mv_score = OK_CAPTURE_OFFSET + (victim_val << 4) + atk_val;//(score as u64);
-                    // } else {
-                    //     let piece_num = get_piece_num(mv.piece, pos.side_to_move);
-                    //     let cap_piece_num = get_piece_num(captured, pos.side_to_move) % 6;
-                    //     mv_score = OK_CAPTURE_OFFSET + (victim_val << 4) + atk_val;//(score as u64);
-                    //     // mv_score = (OK_CAPTURE_OFFSET as i64 + (victim_val as i32 * 1000 + self.capture_history[piece_num][mv.end as usize][cap_piece_num]) as i64) as u64;
-                    // }
                     mv_score = OK_CAPTURE_OFFSET + score as u32;
                 } else {
                     mv_score = QUIET_OFFSET - cmp::min(score.abs() as u32, QUIET_OFFSET);

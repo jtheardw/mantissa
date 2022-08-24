@@ -1,6 +1,6 @@
 [package]
 name = "mantissa"
-version = "3.7.0-dev"
+version = "3.7.2"
 authors = ["Jeremy Wright <jtheardw@gmail.com>"]
 edition = "2018"
 
