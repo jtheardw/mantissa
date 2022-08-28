@@ -25,9 +25,9 @@ As of this writing, Mantissa is currently between 2300 and 2550 lichess ELO in m
 
 All ratings listed her are for the 1CPU version.
 
-| **Version** | **CCRL Blitz (40/4)** | **CCRL 40/40** | **CEGT 40/2** | **CEGT 40/20** |
+| **Version** | **CCRL Blitz (40/4)** | **CCRL 40/40** | **CEGT 40/4** | **CEGT 40/20** |
 |-------------|-----------------------|----------------|---------------|----------------|
-| 3.7.2       | 3270                  | N/a            | N/a           | 3193           |
+| 3.7.2       | 3270                  | N/a            | ~3186         | 3193           |
 | 3.3.0       | 3115                  | 3093           | 2993          | 3044           |
 | 3.0.0       | 2999                  | 2996           | 2877          | N/a            |
 | 2.5.0       | N/a                   | N/a            | N/a           | N/a            |
