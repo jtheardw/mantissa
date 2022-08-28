@@ -19,19 +19,19 @@ She accepts challenges from humans and bots in any time format except ultrabulle
 ## Strength
 
 ### Lichess
-As of this writing, Mantissa is currently between 2200 and 2450 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however.
+As of this writing, Mantissa is currently between 2300 and 2550 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however, due to several reasons, most notably the wall of Stockfish Clones around 2600 Elo.
 
-### CCRL
+### Rating Lists
 
-Mantissa 3.3.0 currently holds a blitz ELO rating of 3119 on CCRL 40/4 and 3099 on CCRL 40/15.
+All ratings listed her are for the 1CPU version.
 
-### CEDR
-
-Mantissa 3.3.0 has 3125 Rating points on the CEDR (Chess Engines Diary) System.
-
-### CEGT
-
-Mantissa 3.3.0 has a 3025 rating on CEGT 40/20.
+| **version** | **CCRL Blitz (40/4)** | **CCRL 40/40** | **CEGT 40/2** | **CEGT 40/20** |
+|-------------|-----------------------|----------------|---------------|----------------|
+| 3.7.2       | 3270                  | N/a            | N/a           | 3193           |
+| 3.3.0       | 3115                  | 3093           | 2993          | 3044           |
+| 3.0.0       | 2999                  | 2996           | 2877          | N/a            |
+| 2.5.0       | N/a                   | N/a            | N/a           | N/a            |
+| 2.1.x       | 2685                  | N/a            | N/a           | N/a            |
 
 ## Features
 
