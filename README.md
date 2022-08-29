@@ -19,7 +19,7 @@ She accepts challenges from humans and bots in any time format except ultrabulle
 ## Strength
 
 ### Lichess
-As of this writing, Mantissa is currently between 2300 and 2550 lichess ELO in most formats and is slowly getting stronger.  Lichess ELO does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however, due to several reasons, most notably the wall of Stockfish Clones around 2600 Elo.
+As of this writing, Mantissa is currently between 2300 and 2550 lichess Elo in most formats and is slowly getting stronger.  Lichess Elo does not seem to have a straightforward conversion into CCRL/CEGT/etc ratings, however, due to several reasons, most notably the wall of Stockfish Clones around 2600 Elo.
 
 ### Rating Lists
 
