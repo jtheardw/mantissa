@@ -651,7 +651,17 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         sse.searching_null_move = false;
 
         if val >= beta {
-            return beta;
+            // if depth > 14 {
+            //     // verification search
+            //     sse.searching_null_move = true;
+            //     let val = search(node, beta - 1, beta, depth / 2, ply, false, thread_num);
+            //     sse.searching_null_move = false;
+            //     if val >= beta {
+            //         return beta;
+            //     }
+            // } else {
+                return beta;
+            // }
         }
     }
 
