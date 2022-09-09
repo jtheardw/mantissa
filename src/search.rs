@@ -467,6 +467,8 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     let mut alpha = alpha;
     let mut beta = beta;
+    let mut best_val = LB;
+    let mut max_val = UB;
     if !init_node {
         if node.is_repetition() || node.is_fifty_move() || node.insufficient_material() {
             ti.nodes_searched += 1;
@@ -555,13 +557,21 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                         (score + ply, ALL_NODE)
                     };
                     if node_type == PV_NODE
-                        || (node_type == CUT_NODE && score >= beta)
-                        || (node_type == ALL_NODE && score <= alpha) {
+                        || (node_type == CUT_NODE && node_score >= beta)
+                        || (node_type == ALL_NODE && node_score <= alpha) {
                             unsafe {
                                 TT.set(node.hash, Move::null_move(), TTEntry::make_tt_score(node_score, ply), node_type, depth, node.history.len() as i32);
                             }
                             return node_score;
                         }
+                    if is_pv {
+                        if node_type == CUT_NODE {
+                            best_val = node_score;
+                            alpha = cmp::max(alpha, node_score);
+                        } else {
+                            max_val = node_score
+                        }
+                    }
                 }
             }
         }
@@ -707,7 +717,6 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     let mut raised_alpha = false;
     let mut best_move = Move::null_move();
-    let mut best_val = LB;
     let mut moves_searched: i32 = 0;
     let prev_mv = if !init_node {ss[(ply - 1) as usize].current_move} else {Move::null_move()};
     let my_prev_mv = if ply >= 2 {ss[(ply - 2) as usize].current_move} else {Move::null_move()};
@@ -931,6 +940,8 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             return alpha;
         }
     }
+
+    best_val = cmp::min(best_val, max_val);
 
     unsafe {
         if sse.excluded_move.is_null() && !thread_killed() {
