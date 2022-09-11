@@ -37,7 +37,6 @@ const TB_RESULT_DTZ_SHIFT: u32 = 20;
 pub static mut TB_ENABLED: bool = false;
 
 pub unsafe fn setup_tb(path: &str) -> bool {
-    println!("init with {}", path);
     let c_str = match CString::new(path) {
         Ok(s) => s,
         Err(_) => {TB_ENABLED = false; return false;}
