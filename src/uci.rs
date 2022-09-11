@@ -13,13 +13,14 @@ use crate::syzygy::*;
 use crate::util::*;
 use crate::tt::*;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct UCIOptions {
     pub num_threads: u16,
     pub move_overhead: i32,
     pub hash: i32,
     pub bh_mode: u8,
-    pub probe_depth: i32
+    pub probe_depth: i32,
+    pub syzygy_path: String
 }
 
 impl UCIOptions {
@@ -29,7 +30,8 @@ impl UCIOptions {
             move_overhead: 10,
             hash: 64,
             bh_mode: OFF,
-            probe_depth: 0
+            probe_depth: 0,
+            syzygy_path: ("").to_string()
         }
     }
 }
@@ -208,6 +210,7 @@ fn set_position(params: &mut SplitWhitespace) -> Bitboard {
     return board;
 }
 
+
 fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
     match params.next() {
         Some(p) => match p {
@@ -279,6 +282,7 @@ fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
                 else if option_name.as_str() == "SyzygyPath" {
                     let path: String = format!("{}", value_str.trim());
                     if !path.starts_with("<empty>") {
+                        options.syzygy_path = path.clone();
                         unsafe {
                             let success = setup_tb(path.as_str());
                             if success {
@@ -314,7 +318,7 @@ const HAND: u8 = 2;
 
 pub fn uci_loop() {
     let mut board = Bitboard::default_board();
-    let mut options = UCIOptions {num_threads: 1, move_overhead: 10, hash: 64, bh_mode: OFF, probe_depth: 0};
+    let mut options = UCIOptions::default();// {num_threads: 1, move_overhead: 10, hash: 64, bh_mode: OFF, probe_depth: 0};
 
     loop {
         let mut inp: String = String::new();
@@ -343,6 +347,9 @@ pub fn uci_loop() {
             board = Bitboard::default_board();
             clear_tt();
             clear_info();
+            unsafe {
+                setup_tb(options.syzygy_path.as_str());
+            }
         } else if cmd == "isready" {
             println!("readyok");
         } else if cmd == "setoption" {
@@ -350,7 +357,7 @@ pub fn uci_loop() {
         } else if cmd == "position" {
             board = set_position(&mut params);
         } else if cmd == "go" {
-            uci_go(&mut board, options, &mut params);
+            uci_go(&mut board, options.clone(), &mut params);
         } else if cmd == "stop" {
             stop();
         } else if cmd == "eval" {

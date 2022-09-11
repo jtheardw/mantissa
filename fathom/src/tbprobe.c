@@ -360,7 +360,7 @@ static void *map_file(FD fd, map_t *mapping)
 static void unmap_file(void *data, map_t size)
 {
   if (!data) return;
-  if (!munmap(data, size)) {
+  if (munmap(data, size)) {
 	  perror("munmap");
   }
 }

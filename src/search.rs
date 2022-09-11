@@ -208,7 +208,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         TI = Vec::new();
         for i in 0..num_threads {
             SS.push(new_searchstats());
-            TI.push(ThreadInfo::new(options));
+            TI.push(ThreadInfo::new(options.clone()));
             // TI[i as usize].root_moves = root_moves.clone();
             TI[i as usize].bh_piece = bh_piece;
         }
