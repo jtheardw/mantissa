@@ -55,7 +55,7 @@ fn init() {
 
 fn main() {
     init();
-    // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
+    // let n = SlowNetwork::load("/home/jtwright/chess/mantissa/epoch-220.nnue").unwrap();
     // n.print();
     // unsafe {
     //     setup_tb("/home/jtwright/chess/tablebase/3-4-5/");
