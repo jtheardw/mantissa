@@ -111,7 +111,7 @@ impl SlowNetwork {
                 for k in 0..8 {
                     let idx = j * 8 + k;
                     print!("{}", self.weights[0].get(idx, i));
-                    if i != 768*4 || j != 31 || k != 7 {
+                    if i != (768*4 - 1) || j != 31 || k != 7 {
                         print!(", ");
                     }
                 }
@@ -680,7 +680,7 @@ impl Network {
         output += total.reduce_sum();
 
         if self.flip {output *= -1.0;}
-        return (output * 8.0).floor() as i32;
+        return (output * 9.0).floor() as i32;
     }
 
     pub fn print_eval(&mut self, board: &Bitboard) {
