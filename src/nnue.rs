@@ -444,7 +444,7 @@ impl Network {
         for k in 0..4 {
             for j in 0..768 {
                 for i in 0..256 {
-                    let weight = DEFAULT_NNUE_FEATURE_WEIGHTS[j*256 + i] as f32;
+                    let weight = DEFAULT_NNUE_FEATURE_WEIGHTS[(k * 768 + j)*256 + i] as f32;
                     weights[k * 768 + j][i] = weight;
                     weights[k * 768 + flip_input(j as i16) as usize][i + 256] = weight;
                 }
@@ -585,9 +585,16 @@ impl Network {
         // TODO note to self: make sure that flipping happens _within_ each kr
         let feature_idx = inp + wkr as usize;
         let flipped_idx = inp + bkr as usize;
-        for j in 0..32 {
+        for j in 0..8 {
+            let j = j * 4;
             self.hidden_activations[j] += self.feature_weights[feature_idx][j];
+            self.hidden_activations[j+1] += self.feature_weights[feature_idx][j+1];
+            self.hidden_activations[j+2] += self.feature_weights[feature_idx][j+2];
+            self.hidden_activations[j+3] += self.feature_weights[feature_idx][j+3];
             self.hidden_activations[j+32] += self.feature_weights[flipped_idx][j+32];
+            self.hidden_activations[j+33] += self.feature_weights[flipped_idx][j+33];
+            self.hidden_activations[j+34] += self.feature_weights[flipped_idx][j+34];
+            self.hidden_activations[j+35] += self.feature_weights[flipped_idx][j+35];
         }
     }
 
@@ -597,9 +604,16 @@ impl Network {
         // TODO note to self: make sure that flipping happens _within_ each kr
         let feature_idx = inp + wkr as usize;
         let flipped_idx = inp + bkr as usize;
-        for j in 0..32 {
+        for j in 0..8 {
+            let j = j * 4;
             self.hidden_activations[j] -= self.feature_weights[feature_idx][j];
+            self.hidden_activations[j+1] -= self.feature_weights[feature_idx][j+1];
+            self.hidden_activations[j+2] -= self.feature_weights[feature_idx][j+2];
+            self.hidden_activations[j+3] -= self.feature_weights[feature_idx][j+3];
             self.hidden_activations[j+32] -= self.feature_weights[flipped_idx][j+32];
+            self.hidden_activations[j+33] -= self.feature_weights[flipped_idx][j+33];
+            self.hidden_activations[j+34] -= self.feature_weights[flipped_idx][j+34];
+            self.hidden_activations[j+35] -= self.feature_weights[flipped_idx][j+35];
         }
     }
 
