@@ -496,7 +496,7 @@ impl Bitboard {
         self.ep_file = -1;
         self.hash ^= null_move_hash();
 
-        self.activation_stack.push(self.net.hidden_activations);
+        // self.activation_stack.push(self.net.hidden_activations);
         if self.side_to_move == Color::White {
             self.net.white_turn();
         } else {
@@ -514,10 +514,10 @@ impl Bitboard {
             Some(p) => p,
             None => panic!("empty ep stack!")
         };
-        self.net.hidden_activations = match self.activation_stack.pop() {
-            Some(p) => p,
-            None => panic!("empty activation stack!")
-        };
+        // self.net.hidden_activations = match self.activation_stack.pop() {
+        //     Some(p) => p,
+        //     None => panic!("empty activation stack!")
+        // };
 
         if self.side_to_move == Color::White {
             self.net.white_turn();
@@ -689,27 +689,31 @@ impl Bitboard {
         self.castling_rights_stack.push(self.castling_rights);
         self.activation_stack.push(self.net.hidden_activations);
 
+        let wkr = region(self.king[1].trailing_zeros() as i8) as usize * 768;
+        let bkr = region((self.king[0].trailing_zeros() ^ 56) as i8) as usize * 768;
+        // let wkr = region(self.king[1].trailing_zeros() as i8);
+        // let bkr = region((self.king[0].trailing_zeros() ^ 56) as i8);
         // capture
         // check ep first
         if is_ep {
             self.hash ^= en_passant_hash(ep_idx as i32, !self.side_to_move);
-            self.net.deactivate(PAWN, !self.side_to_move, ep_idx);
+            self.net.deactivate(PAWN, !self.side_to_move, ep_idx, wkr, bkr);
         } else if captured_piece != 0 {
             match captured_piece {
                 b'p' => {
-                    self.net.deactivate(PAWN, !self.side_to_move, mv.end);
+                    self.net.deactivate(PAWN, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 b'n' => {
-                    self.net.deactivate(KNIGHT, !self.side_to_move, mv.end);
+                    self.net.deactivate(KNIGHT, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 b'b' => {
-                    self.net.deactivate(BISHOP, !self.side_to_move, mv.end);
+                    self.net.deactivate(BISHOP, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 b'r' => {
-                    self.net.deactivate(ROOK, !self.side_to_move, mv.end);
+                    self.net.deactivate(ROOK, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 b'q' => {
-                    self.net.deactivate(QUEEN, !self.side_to_move, mv.end);
+                    self.net.deactivate(QUEEN, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 _ => panic!("Captured uncapturable piece {}!", captured_piece)
             };
@@ -721,16 +725,16 @@ impl Bitboard {
             let old_rook_idx: i8 = if mv.end > mv.start { mv.start + 3 } else { mv.start - 4 };
             let new_rook_idx: i8 = if mv.end > mv.start { mv.start + 1 } else { mv.start - 1 };
 
-            self.net.move_piece(ROOK, self.side_to_move, old_rook_idx, new_rook_idx);
+            self.net.move_piece(ROOK, self.side_to_move, old_rook_idx, new_rook_idx, wkr, bkr);
             self.hash ^= simple_move_hash(b'r', old_rook_idx as i32, new_rook_idx as i32, self.side_to_move);
         }
 
         // piece move
         if mv.piece == b'p' && mv.promote_to != 0 {
-            self.net.deactivate(PAWN, self.side_to_move, mv.start);
-            self.net.activate(promo_num, self.side_to_move, mv.end);
+            self.net.deactivate(PAWN, self.side_to_move, mv.start, wkr, bkr);
+            self.net.activate(promo_num, self.side_to_move, mv.end, wkr, bkr);
         } else {
-            self.net.move_piece(piece_num, self.side_to_move, mv.start, mv.end);
+            self.net.move_piece(piece_num, self.side_to_move, mv.start, mv.end, wkr, bkr);
         }
 
         let old_castling_rights = self.castling_rights;
@@ -773,7 +777,45 @@ impl Bitboard {
             self.net.white_turn();
         }
         self.side_to_move = !self.side_to_move;
+
+        if mv.piece == b'k' {
+            if self.side_to_move != Color::White {
+                if region(mv.start) != region(mv.end) {
+                    self.set_activations();
+                }
+            } else {
+                if region(mv.start ^ 56) != region(mv.end ^ 56) {
+                    self.set_activations();
+                }
+            }
+        }
         return true;
+    }
+
+    pub fn set_activations(&mut self) {
+        for i in 0..64 {
+            self.net.hidden_activations[i] = self.net.hidden_biases[i];
+        }
+
+        let wkr = region(self.king[1].trailing_zeros() as i8) as usize * 768;
+        let bkr = region((self.king[0].trailing_zeros() ^ 56) as i8) as usize * 768;
+        for side in [Color::White, Color::Black] {
+            let is_white = side == Color::White;
+            let me = side as usize;
+
+            self.net.set_bb_activations(self.pawn[me], PAWN, is_white, wkr, bkr);
+            self.net.set_bb_activations(self.knight[me], KNIGHT, is_white, wkr, bkr);
+            self.net.set_bb_activations(self.bishop[me], BISHOP, is_white, wkr, bkr);
+            self.net.set_bb_activations(self.rook[me], ROOK, is_white, wkr, bkr);
+            self.net.set_bb_activations(self.queen[me], QUEEN, is_white, wkr, bkr);
+            self.net.set_bb_activations(self.king[me], KING, is_white, wkr, bkr);
+        }
+
+        if self.side_to_move == Color::White {
+            self.net.white_turn();
+        } else {
+            self.net.black_turn();
+        }
     }
 
     pub fn do_move(&mut self, mv: &Move) {
@@ -794,6 +836,11 @@ impl Bitboard {
         self.ep_stack.push(self.ep_file);
         self.castling_rights_stack.push(self.castling_rights);
         self.activation_stack.push(self.net.hidden_activations);
+
+        let wkr = region(self.king[1].trailing_zeros() as i8) as usize * 768;
+        let bkr = region((self.king[0].trailing_zeros() ^ 56) as i8) as usize * 768;
+        // let wkr = region(self.king[1].trailing_zeros() as i8);
+        // let bkr = region((self.king[0].trailing_zeros() ^ 56) as i8);
 
         let start_point: u64 = idx_to_bb(mv.start);
         let end_point: u64 = idx_to_bb(mv.end);
@@ -816,28 +863,28 @@ impl Bitboard {
             self.pawn[them] ^= idx_to_bb(actual_pawn_idx);
             self.hash ^= en_passant_hash(actual_pawn_idx as i32, !self.side_to_move);
 
-            self.net.deactivate(PAWN, !self.side_to_move, actual_pawn_idx);
+            self.net.deactivate(PAWN, !self.side_to_move, actual_pawn_idx, wkr, bkr);
         } else if captured_piece != 0 {
             match captured_piece {
                 b'p' => {
                     self.pawn[them] ^= end_point;
-                    self.net.deactivate(PAWN, !self.side_to_move, mv.end);
+                    self.net.deactivate(PAWN, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 b'n' => {
                     self.knight[them] ^= end_point;
-                    self.net.deactivate(KNIGHT, !self.side_to_move, mv.end);
+                    self.net.deactivate(KNIGHT, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 b'b' => {
                     self.bishop[them] ^= end_point;
-                    self.net.deactivate(BISHOP, !self.side_to_move, mv.end);
+                    self.net.deactivate(BISHOP, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 b'r' => {
                     self.rook[them] ^= end_point;
-                    self.net.deactivate(ROOK, !self.side_to_move, mv.end);
+                    self.net.deactivate(ROOK, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 b'q' => {
                     self.queen[them] ^= end_point;
-                    self.net.deactivate(QUEEN, !self.side_to_move, mv.end);
+                    self.net.deactivate(QUEEN, !self.side_to_move, mv.end, wkr, bkr);
                 },
                 _ => panic!("Captured uncapturable piece {}!", captured_piece)
             };
@@ -852,14 +899,14 @@ impl Bitboard {
             // move the rook
             let rook_mask = idx_to_bb(old_rook_idx) | idx_to_bb(new_rook_idx);
             self.rook[me] ^= rook_mask;
-            self.net.move_piece(ROOK, self.side_to_move, old_rook_idx, new_rook_idx);
+            self.net.move_piece(ROOK, self.side_to_move, old_rook_idx, new_rook_idx, wkr, bkr);
             self.hash ^= simple_move_hash(b'r', old_rook_idx as i32, new_rook_idx as i32, self.side_to_move);
         }
 
         // move piece
         if mv.piece == b'p' && mv.promote_to != 0 {
             self.pawn[me] ^= start_point;
-            self.net.deactivate(PAWN, self.side_to_move, mv.start);
+            self.net.deactivate(PAWN, self.side_to_move, mv.start, wkr, bkr);
             let promo_num;
             match mv.promote_to {
                 b'q' => { self.queen[me] |= end_point; promo_num = QUEEN; },
@@ -868,33 +915,33 @@ impl Bitboard {
                 b'n' => { self.knight[me] |= end_point; promo_num = KNIGHT; },
                 _ => { panic!("illegal promotion on mv {}", mv); }
             }
-            self.net.activate(promo_num, self.side_to_move, mv.end);
+            self.net.activate(promo_num, self.side_to_move, mv.end, wkr, bkr);
         } else {
             let move_mask = start_point | end_point;
             match mv.piece {
                 b'k' => {
                     self.king[me] ^= move_mask;
-                    self.net.move_piece(KING, self.side_to_move, mv.start, mv.end);
+                    self.net.move_piece(KING, self.side_to_move, mv.start, mv.end, wkr, bkr);
                 },
                 b'q' => {
                     self.queen[me] ^= move_mask;
-                    self.net.move_piece(QUEEN, self.side_to_move, mv.start, mv.end);
+                    self.net.move_piece(QUEEN, self.side_to_move, mv.start, mv.end, wkr, bkr);
                 },
                 b'r' => {
                     self.rook[me] ^= move_mask;
-                    self.net.move_piece(ROOK, self.side_to_move, mv.start, mv.end);
+                    self.net.move_piece(ROOK, self.side_to_move, mv.start, mv.end, wkr, bkr);
                 },
                 b'b' => {
                     self.bishop[me] ^= move_mask;
-                    self.net.move_piece(BISHOP, self.side_to_move, mv.start, mv.end);
+                    self.net.move_piece(BISHOP, self.side_to_move, mv.start, mv.end, wkr, bkr);
                 },
                 b'n' => {
                     self.knight[me] ^= move_mask;
-                    self.net.move_piece(KNIGHT, self.side_to_move, mv.start, mv.end);
+                    self.net.move_piece(KNIGHT, self.side_to_move, mv.start, mv.end, wkr, bkr);
                 },
                 b'p' => {
                     self.pawn[me] ^= move_mask;
-                    self.net.move_piece(PAWN, self.side_to_move, mv.start, mv.end);
+                    self.net.move_piece(PAWN, self.side_to_move, mv.start, mv.end, wkr, bkr);
                 },
                 _ => { panic!("moved nonexistent piece {} in mv {}", mv.piece, mv); }
             }
@@ -940,6 +987,18 @@ impl Bitboard {
             self.net.white_turn();
         }
         self.side_to_move = !self.side_to_move;
+
+        if mv.piece == b'k' {
+            if self.side_to_move != Color::White {
+                if region(mv.start) != region(mv.end) {
+                    self.set_activations();
+                }
+            } else {
+                if region(mv.start ^ 56) != region(mv.end ^ 56) {
+                    self.set_activations();
+                }
+            }
+        }
     }
 
     pub fn undo_move(&mut self, mv: &Move) {

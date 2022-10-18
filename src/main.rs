@@ -55,6 +55,10 @@ fn init() {
 
 fn main() {
     init();
+    // let n = SlowNetwork::load("/home/jtwright/chess/mantissa/epoch-46.nnue").unwrap();
+    // n.save_image("net");
+    // n.print();
+
     // let n = SlowNetwork::load("/home/jtwright/nets_50_50/epoch-235.nnue").unwrap();
     // n.print();
     // unsafe {
