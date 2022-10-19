@@ -55,7 +55,7 @@ fn init() {
 
 fn main() {
     init();
-    // let n = SlowNetwork::load("/home/jtwright/chess/mantissa/epoch-49.nnue").unwrap();
+    // let n = SlowNetwork::load("/home/jtwright/chess/mantissa/epoch-65.nnue").unwrap();
     // n.save_image("net");
     // n.print();
 

@@ -496,7 +496,7 @@ impl Bitboard {
         self.ep_file = -1;
         self.hash ^= null_move_hash();
 
-        // self.activation_stack.push(self.net.hidden_activations);
+        self.activation_stack.push(self.net.hidden_activations);
         if self.side_to_move == Color::White {
             self.net.white_turn();
         } else {
@@ -514,10 +514,10 @@ impl Bitboard {
             Some(p) => p,
             None => panic!("empty ep stack!")
         };
-        // self.net.hidden_activations = match self.activation_stack.pop() {
-        //     Some(p) => p,
-        //     None => panic!("empty activation stack!")
-        // };
+        self.net.hidden_activations = match self.activation_stack.pop() {
+            Some(p) => p,
+            None => panic!("empty activation stack!")
+        };
 
         if self.side_to_move == Color::White {
             self.net.white_turn();
