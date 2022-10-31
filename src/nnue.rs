@@ -443,8 +443,13 @@ impl Network {
         let mut weights: Vec<[f32; 512]> = vec![[0.0; 512]; 3072];
         for k in 0..4 {
             for j in 0..768 {
-                for i in 0..256 {
+                for i in 0..128 {
                     let weight = DEFAULT_NNUE_FEATURE_WEIGHTS[(k * 768 + j)*256 + i] as f32;
+                    weights[k * 768 + j][i] = weight;
+                    weights[k * 768 + flip_input(j as i16) as usize][i + 256] = weight;
+                }
+                for i in 128..256 {
+                    let weight = DEFAULT_NNUE_FEATURE_WEIGHTS[j * 256 + i] as f32;
                     weights[k * 768 + j][i] = weight;
                     weights[k * 768 + flip_input(j as i16) as usize][i + 256] = weight;
                 }
@@ -605,6 +610,62 @@ impl Network {
         let feature_idx = inp + wkr as usize;
         let flipped_idx = inp + bkr as usize;
         for j in 0..8 {
+            let j = j * 4;
+            self.hidden_activations[j] -= self.feature_weights[feature_idx][j];
+            self.hidden_activations[j+1] -= self.feature_weights[feature_idx][j+1];
+            self.hidden_activations[j+2] -= self.feature_weights[feature_idx][j+2];
+            self.hidden_activations[j+3] -= self.feature_weights[feature_idx][j+3];
+            self.hidden_activations[j+32] -= self.feature_weights[flipped_idx][j+32];
+            self.hidden_activations[j+33] -= self.feature_weights[flipped_idx][j+33];
+            self.hidden_activations[j+34] -= self.feature_weights[flipped_idx][j+34];
+            self.hidden_activations[j+35] -= self.feature_weights[flipped_idx][j+35];
+        }
+    }
+
+    pub fn clear_kr(&mut self) {
+        for i in 0..16 {
+            self.hidden_activations[i] = self.hidden_biases[i];
+        }
+        for i in 32..48 {
+            self.hidden_activations[i] = self.hidden_biases[i];
+        }
+    }
+
+    pub fn set_kr_bb_activations(&mut self, bb: u64, piece_num: u8, is_white: bool, wkr: usize, bkr: usize) {
+        let mut bb = bb;
+        while bb != 0 {
+            let idx = bb.trailing_zeros() as i8;
+            bb &= bb - 1;
+            self.activate_kr(piece_num, if is_white {Color::White} else {Color::Black}, idx, wkr, bkr);
+        }
+    }
+
+    #[inline]
+    pub fn activate_kr(&mut self, piece: u8, color: Color, idx: i8, wkr: usize, bkr: usize) {
+        let inp = input_number(piece, color == Color::White, idx as i32);
+        // TODO note to self: make sure that flipping happens _within_ each kr
+        let feature_idx = inp + wkr as usize;
+        let flipped_idx = inp + bkr as usize;
+        for j in 0..4 {
+            let j = j * 4;
+            self.hidden_activations[j] += self.feature_weights[feature_idx][j];
+            self.hidden_activations[j+1] += self.feature_weights[feature_idx][j+1];
+            self.hidden_activations[j+2] += self.feature_weights[feature_idx][j+2];
+            self.hidden_activations[j+3] += self.feature_weights[feature_idx][j+3];
+            self.hidden_activations[j+32] += self.feature_weights[flipped_idx][j+32];
+            self.hidden_activations[j+33] += self.feature_weights[flipped_idx][j+33];
+            self.hidden_activations[j+34] += self.feature_weights[flipped_idx][j+34];
+            self.hidden_activations[j+35] += self.feature_weights[flipped_idx][j+35];
+        }
+    }
+
+    #[inline]
+    pub fn deactivate_kr(&mut self, piece: u8, color: Color, idx: i8, wkr: usize, bkr: usize) {
+        let inp = input_number(piece, color == Color::White, idx as i32);
+        // TODO note to self: make sure that flipping happens _within_ each kr
+        let feature_idx = inp + wkr as usize;
+        let flipped_idx = inp + bkr as usize;
+        for j in 0..4 {
             let j = j * 4;
             self.hidden_activations[j] -= self.feature_weights[feature_idx][j];
             self.hidden_activations[j+1] -= self.feature_weights[feature_idx][j+1];

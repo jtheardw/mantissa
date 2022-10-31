@@ -781,11 +781,11 @@ impl Bitboard {
         if mv.piece == b'k' {
             if self.side_to_move != Color::White {
                 if region(mv.start) != region(mv.end) {
-                    self.set_activations();
+                    self.set_kr_activations();
                 }
             } else {
                 if region(mv.start ^ 56) != region(mv.end ^ 56) {
-                    self.set_activations();
+                    self.set_kr_activations();
                 }
             }
         }
@@ -809,6 +809,33 @@ impl Bitboard {
             self.net.set_bb_activations(self.rook[me], ROOK, is_white, wkr, bkr);
             self.net.set_bb_activations(self.queen[me], QUEEN, is_white, wkr, bkr);
             self.net.set_bb_activations(self.king[me], KING, is_white, wkr, bkr);
+        }
+
+        if self.side_to_move == Color::White {
+            self.net.white_turn();
+        } else {
+            self.net.black_turn();
+        }
+    }
+
+    pub fn set_kr_activations(&mut self) {
+        // for i in 0..64 {
+        //     self.net.hidden_activations[i] = self.net.hidden_biases[i];
+        // }
+        self.net.clear_kr();
+
+        let wkr = region(self.king[1].trailing_zeros() as i8) as usize * 768;
+        let bkr = region((self.king[0].trailing_zeros() ^ 56) as i8) as usize * 768;
+        for side in [Color::White, Color::Black] {
+            let is_white = side == Color::White;
+            let me = side as usize;
+
+            self.net.set_kr_bb_activations(self.pawn[me], PAWN, is_white, wkr, bkr);
+            self.net.set_kr_bb_activations(self.knight[me], KNIGHT, is_white, wkr, bkr);
+            self.net.set_kr_bb_activations(self.bishop[me], BISHOP, is_white, wkr, bkr);
+            self.net.set_kr_bb_activations(self.rook[me], ROOK, is_white, wkr, bkr);
+            self.net.set_kr_bb_activations(self.queen[me], QUEEN, is_white, wkr, bkr);
+            self.net.set_kr_bb_activations(self.king[me], KING, is_white, wkr, bkr);
         }
 
         if self.side_to_move == Color::White {
@@ -991,11 +1018,11 @@ impl Bitboard {
         if mv.piece == b'k' {
             if self.side_to_move != Color::White {
                 if region(mv.start) != region(mv.end) {
-                    self.set_activations();
+                    self.set_kr_activations();
                 }
             } else {
                 if region(mv.start ^ 56) != region(mv.end ^ 56) {
-                    self.set_activations();
+                    self.set_kr_activations();
                 }
             }
         }
