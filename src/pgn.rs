@@ -7,6 +7,7 @@ use crate::movegen::*;
 use crate::moveutil::*;
 use crate::search::*;
 use crate::searchutil::*;
+use crate::uci::*;
 use crate::util::*;
 
 pub fn san_to_move(pos: &mut Bitboard, san: String) -> Move {
@@ -175,7 +176,7 @@ fn extract_positions(pos: &mut Bitboard, buf: &String) {
 
 pub fn convert_pgn(fname: &str) {
     unsafe {
-        TI = vec![ThreadInfo::new()];
+        TI = vec![ThreadInfo::new(UCIOptions::default())];
     }
 
     let f = match File::open(fname) {

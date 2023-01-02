@@ -9,15 +9,31 @@ use crate::moveutil::*;
 use crate::pht::*;
 use crate::search::*;
 use crate::searchutil::*;
+use crate::syzygy::*;
 use crate::util::*;
 use crate::tt::*;
 
-#[derive(Copy, Clone)]
-struct UCIOptions {
+#[derive(Clone)]
+pub struct UCIOptions {
     pub num_threads: u16,
     pub move_overhead: i32,
     pub hash: i32,
-    pub bh_mode: u8
+    pub bh_mode: u8,
+    pub probe_depth: i32,
+    pub syzygy_path: String
+}
+
+impl UCIOptions {
+    pub fn default() -> UCIOptions {
+        UCIOptions {
+            num_threads: 1,
+            move_overhead: 10,
+            hash: 64,
+            bh_mode: OFF,
+            probe_depth: 0,
+            syzygy_path: ("").to_string()
+        }
+    }
 }
 
 fn uci_go(board: &Bitboard, options: UCIOptions, params: &mut SplitWhitespace) {
@@ -110,7 +126,7 @@ fn uci_go(board: &Bitboard, options: UCIOptions, params: &mut SplitWhitespace) {
 
     let mut thread_board = board.thread_copy();
     thread::spawn(move || {
-        best_move(&mut thread_board, options.num_threads, search_limit, options.bh_mode, bh_piece);
+        best_move(&mut thread_board, options.num_threads, search_limit, options, bh_piece);
     });
 }
 
@@ -194,6 +210,7 @@ fn set_position(params: &mut SplitWhitespace) -> Bitboard {
     return board;
 }
 
+
 fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
     match params.next() {
         Some(p) => match p {
@@ -217,7 +234,7 @@ fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
                 // Hash
                 if option_name.as_str() == "Hash" {
                     if ongoing_search() {
-                        println!("ERR: Cannot resize hash table during search");
+                        eprintln!("ERR: Cannot resize hash table during search");
                         return;
                     }
                     let hash_size = match value_str.trim().parse() {
@@ -225,7 +242,7 @@ fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
                         Err(_) => {println!("ERR: invalid value provided for Hash"); return;}
                     };
                     if hash_size > 65536 || hash_size < 1 {
-                        println!("ERR: invalid value provided for Hash");
+                        eprintln!("ERR: invalid value provided for Hash");
                         return;
                     }
                     allocate_tt(hash_size as usize);
@@ -240,7 +257,7 @@ fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
                         Err(_) => {println!("ERR: invalid value provided for Threads"); return;}
                     };
                     if num_threads > 256 || num_threads < 1 {
-                        println!("ERR: invalid value provided for Threads");
+                        eprintln!("ERR: invalid value provided for Threads");
                         return;
                     }
                     options.num_threads = num_threads as u16;
@@ -254,11 +271,39 @@ fn setoption(params: &mut SplitWhitespace, options: &mut UCIOptions) {
                         Err(_) => {println!("ERR: invalid value provided for Move Overhead"); return;}
                     };
                     if overhead > 1000 || overhead < 0 {
-                        println!("ERR: invalid value provided for Move Overhead");
+                        eprintln!("ERR: invalid value provided for Move Overhead");
                         return;
                     }
                     options.move_overhead = overhead;
                     return;
+                }
+
+                // Syzygy
+                else if option_name.as_str() == "SyzygyPath" {
+                    let path: String = format!("{}", value_str.trim());
+                    if !path.starts_with("<empty>") {
+                        options.syzygy_path = path.clone();
+                        unsafe {
+                            let success = setup_tb(path.as_str());
+                            if success {
+                                println!("info string successfully read in TB that supports {} pieces", max_tb_pieces());
+                            } else {
+                                println!("info string failed to initialize TB.")
+                            }
+                        }
+                    }
+                }
+
+                else if option_name.as_str() == "SyzygyProbeDepth" {
+                    let depth: i32 = match value_str.trim().parse() {
+                        Ok(num) => num,
+                        Err(_) => {eprintln!("ERR: invalide value provided for SyzygyProbeDepth"); return;}
+                    };
+                    if depth > 64 || depth < 0 {
+                        eprintln!("ERR: invalid value provided for SyzygyProbeDepth");
+                        return;
+                    }
+                    options.probe_depth = depth;
                 }
             },
             _ => { return; }
@@ -273,7 +318,7 @@ const HAND: u8 = 2;
 
 pub fn uci_loop() {
     let mut board = Bitboard::default_board();
-    let mut options = UCIOptions {num_threads: 1, move_overhead: 10, hash: 64, bh_mode: OFF};
+    let mut options = UCIOptions::default();// {num_threads: 1, move_overhead: 10, hash: 64, bh_mode: OFF, probe_depth: 0};
 
     loop {
         let mut inp: String = String::new();
@@ -284,22 +329,27 @@ pub fn uci_loop() {
         let mut params = inp.trim().split_whitespace();
         let cmd = match params.next() {
             Some(p) => p,
-            None => {continue;}
+            None => {break;}
         };
         if cmd == "quit" {
             break;
         } else if cmd == "uci" {
-            println!("id name Mantissa v3.7.2-dev-3");
+            println!("id name Mantissa v4.0.0-dev-0");
             println!("id author jtwright");
             println!("option name Hash type spin default 64 min 1 max 65536");
             println!("option name Threads type spin default 1 min 1 max 256");
             println!("option name Move Overhead type spin default 10 min 1 max 1000");
+            println!("option name SyzygyPath type string default <empty>");
+            println!("option name SyzygyProbeDepth type spin default 0 min 0 max 64");
             println!("uciok");
         } else if cmd == "ucinewgame" {
             // clear the transposition table
             board = Bitboard::default_board();
             clear_tt();
             clear_info();
+            unsafe {
+                setup_tb(options.syzygy_path.as_str());
+            }
         } else if cmd == "isready" {
             println!("readyok");
         } else if cmd == "setoption" {
@@ -307,7 +357,7 @@ pub fn uci_loop() {
         } else if cmd == "position" {
             board = set_position(&mut params);
         } else if cmd == "go" {
-            uci_go(&mut board, options, &mut params);
+            uci_go(&mut board, options.clone(), &mut params);
         } else if cmd == "stop" {
             stop();
         } else if cmd == "eval" {
@@ -318,16 +368,16 @@ pub fn uci_loop() {
                 None => {println!("You didn't say a mode"); continue;}
             };
             if mode == "brain" {
-                println!("Alright, I can be take the reins.");
+                eprintln!("Brain mode.");
                 options.bh_mode = BRAIN;
             } else if mode == "hand" {
-                println!("Okay... I'll try to trust you.");
+                eprintln!("Hand mode.");
                 options.bh_mode = HAND;
             } else if mode == "off" {
-                println!("Alright, I'll do this myself.");
+                eprintln!("Normal mode.");
                 options.bh_mode = OFF;
             } else {
-                println!("What kind of mode is {}?", mode);
+                println!("Err: Invalid mode {}?", mode);
             }
         } else if cmd == "nnue" {
             let b = board.thread_copy();

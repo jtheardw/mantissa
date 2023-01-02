@@ -67,9 +67,9 @@ impl TTEntry {
     }
 
     pub fn make_tt_score(score: i32, ply: i32) -> i32 {
-        if score > MATE_SCORE - 100000 {
+        if score > MIN_TB_WIN_SCORE {
             return score + ply;
-        } else if score < (-MATE_SCORE + 100000) {
+        } else if score < -MIN_TB_WIN_SCORE {
             return score - ply;
         } else {
             return score;
@@ -77,9 +77,9 @@ impl TTEntry {
     }
 
     pub fn read_tt_score(score: i32, ply: i32) -> i32 {
-        if score > MATE_SCORE - 100000 {
+        if score > MIN_TB_WIN_SCORE {
             return score - ply;
-        } else if score < (-MATE_SCORE + 100000) {
+        } else if score < -MIN_TB_WIN_SCORE {
             return score + ply;
         } else {
             return score

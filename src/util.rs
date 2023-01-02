@@ -5,6 +5,8 @@ pub const ALL_NODE: u8 = 1;
 pub const CUT_NODE: u8 = 2;
 pub const PV_NODE: u8 = 3;
 
+pub const TB_WIN_SCORE: i32 = 700000;
+pub const MIN_TB_WIN_SCORE: i32 = 600000;
 pub const MATE_SCORE: i32 = 1000000;
 pub const MIN_MATE_SCORE: i32 = MATE_SCORE - 100000;
 pub const DRAW_SCORE: i32 = 0;
