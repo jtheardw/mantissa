@@ -9,8 +9,10 @@ use crate::moveorder::*;
 use crate::moveutil::*;
 use crate::searchparams::*;
 use crate::searchutil::*;
+use crate::syzygy::*;
 use crate::see::*;
 use crate::tt::*;
+use crate::uci::*;
 use crate::util::*;
 
 static mut SEARCH_IN_PROGRESS: bool = false;
@@ -42,7 +44,6 @@ pub fn get_time_millis() -> u128 {
 
 pub fn emit_last_bestmove() {
     unsafe {
-        // println!("{}", LAST_INFO);
         println!("bestmove {}", LAST_BESTMOVE)
     }
 }
@@ -81,12 +82,12 @@ fn get_val_str(val: i32) -> String {
     return format!("mate {}", mate_score);
 }
 
-fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, nodes: u64) {
+fn print_info(depth: i32, seldepth: i32, pv: &Vec<Move>, val: i32, time: u128, nodes: u64, tb_hits: u64) {
     let pv_str = get_pv_str(pv);
     let val_str = get_val_str(val);
     let nps = (nodes * 1000) as u128 / time;
-    println!("info depth {} seldepth {} score {} time {} nodes {} nps {} multipv 1 pv {}",
-             depth, seldepth, val_str, time, nodes, nps, pv_str
+    println!("info depth {} seldepth {} score {} time {} nodes {} nps {} tbhits {} multipv 1 pv {}",
+             depth, seldepth, val_str, time, nodes, nps, tb_hits, pv_str
     );
 }
 
@@ -181,11 +182,12 @@ const OFF: u8 = 0;
 const BRAIN: u8 = 1;
 const HAND: u8 = 2;
 
-pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLimits, bh_mode: u8, bh_piece: i8) {
+pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLimits, options: UCIOptions, bh_piece: i8) {
     let start_time = get_time_millis();
     let mut search_limits = search_limits;
     let max_time = search_limits.maximum_time;
     search_limits.maximum_time = 10000;
+
     // loop {
     //     let mv = root_movepicker.next(node).0;
     //     if mv.is_null() { break; }
@@ -206,13 +208,13 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         TI = Vec::new();
         for i in 0..num_threads {
             SS.push(new_searchstats());
-            TI.push(ThreadInfo::new());
+            TI.push(ThreadInfo::new(options.clone()));
             // TI[i as usize].root_moves = root_moves.clone();
             TI[i as usize].bh_piece = bh_piece;
         }
     }
 
-    if bh_mode == HAND {
+    if options.bh_mode == HAND {
         if bh_piece == -1 {
             eprintln!("You didn't tell me which piece to move!");
             unsafe {
@@ -241,6 +243,16 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         }
     }
 
+    if tb_active() && node.num_pieces() <= max_tb_pieces() && max_time > 0 {
+        if let Some((mv, score)) = probe_root(&node) {
+            abort_search();
+            print_info(1, 1, &vec![mv], score, 1, 1, 1);
+            println!("bestmove {}", mv);
+            unsafe {SEARCH_IN_PROGRESS = false;}
+            return;
+        }
+    }
+
     let mut depth: i32 = 1;
     let mut current_time: u128;
 
@@ -251,6 +263,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
     let mut best_val: i32 = LB;
     let mut pv: &Vec<Move>;
     let mut nodes_searched;
+    let mut tb_hits;
 
 
     allow_threads();
@@ -296,6 +309,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
         let elapsed_time;
         nodes_searched = 0;
+        tb_hits = 0;
         unsafe {
             if depth > 4 {
                 SEARCH_LIMITS.maximum_time = max_time;
@@ -316,10 +330,11 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
 
             for t_num in 0..num_threads {
                 nodes_searched += TI[t_num as usize].nodes_searched;
+                tb_hits += TI[t_num as usize].tb_hits;
             }
 
-            if bh_mode == OFF {
-                print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched);
+            if options.bh_mode == OFF {
+                print_info(depth, TI[0].seldepth, &pv, best_val, current_time - start_time, nodes_searched, tb_hits);
             } else {
                 println!("Thinking... depth {}", depth);
             }
@@ -395,7 +410,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
             }
         }
     }
-    if bh_mode == BRAIN {
+    if options.bh_mode == BRAIN {
         let piece = match best_move.piece {
             b'k' => {"king"},
             b'q' => {"queen"},
@@ -410,7 +425,7 @@ pub fn best_move(node: &mut Bitboard, num_threads: u16, search_limits: SearchLim
         // -4  -1  0  1  4
         eprintln!("Hey, you should move the {} on {} {}", piece, idx_to_str(best_move.start), emoji);
     } else {
-        if bh_mode != OFF {
+        if options.bh_mode != OFF {
             println!("bestmove {} {}", best_move, emoji);
         } else {
             println!("bestmove {}", best_move);
@@ -452,6 +467,8 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     let mut alpha = alpha;
     let mut beta = beta;
+    let mut best_val = LB;
+    let mut max_val = UB;
     if !init_node {
         if node.is_repetition() || node.is_fifty_move() || node.insufficient_material() {
             ti.nodes_searched += 1;
@@ -516,6 +533,48 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         // to the tune of about 20 self-ply Elo
         depth -= 1;
     }
+
+    // Syzygy probe
+    // We only do this if we are either above max_probe depth or have
+    // strictly fewer pieces on the board than the max.  We also only engage this
+    // after zeroing moves (e.g. pawn push), similar to Ethereal, Asymptote, and others
+    if node.halfmove == 0
+        && !init_node
+        && node.ep_file == -1
+        && node.castling_rights == 0
+        && sse.excluded_move.is_null()
+        && tb_active() {
+            let num_pieces = node.num_pieces();
+            let max_pieces = max_tb_pieces();
+            if num_pieces < max_pieces || (num_pieces <= max_pieces && depth >= ti.probe_depth) {
+                if let Some(score) = probe_wdl(&node) {
+                    ti.tb_hits += 1;
+                    let (node_score, node_type) = if score == 0 {
+                        (0, PV_NODE)
+                    } else if score > 0 {
+                        (score - ply, CUT_NODE)
+                    } else {
+                        (score + ply, ALL_NODE)
+                    };
+                    if node_type == PV_NODE
+                        || (node_type == CUT_NODE && node_score >= beta)
+                        || (node_type == ALL_NODE && node_score <= alpha) {
+                            unsafe {
+                                TT.set(node.hash, Move::null_move(), TTEntry::make_tt_score(node_score, ply), node_type, depth, node.history.len() as i32);
+                            }
+                            return node_score;
+                        }
+                    if is_pv {
+                        if node_type == CUT_NODE {
+                            best_val = node_score;
+                            alpha = cmp::max(alpha, node_score);
+                        } else {
+                            max_val = node_score
+                        }
+                    }
+                }
+            }
+        }
 
     if is_check {
         // We won't do any pruning based on static eval here
@@ -602,7 +661,17 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         sse.searching_null_move = false;
 
         if val >= beta {
-            return beta;
+            // if depth > 14 {
+            //     // verification search
+            //     sse.searching_null_move = true;
+            //     let val = search(node, beta - 1, beta, depth / 2, ply, false, thread_num);
+            //     sse.searching_null_move = false;
+            //     if val >= beta {
+            //         return beta;
+            //     }
+            // } else {
+                return beta;
+            // }
         }
     }
 
@@ -627,7 +696,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         && !is_check
         && sse.tt_hit
         && sse.excluded_move.is_null()
-        && sse.tt_val.abs() < MIN_MATE_SCORE
+        && sse.tt_val.abs() < MIN_TB_WIN_SCORE
         && (sse.tt_node_type & CUT_NODE) != 0
         && sse.tt_depth >= depth - 3
     {
@@ -648,22 +717,15 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
     let mut raised_alpha = false;
     let mut best_move = Move::null_move();
-    let mut best_val = LB;
     let mut moves_searched: i32 = 0;
     let prev_mv = if !init_node {ss[(ply - 1) as usize].current_move} else {Move::null_move()};
     let my_prev_mv = if ply >= 2 {ss[(ply - 2) as usize].current_move} else {Move::null_move()};
 
-    // Countermove Heuristic
+    // Countermove Heuristic (Inside movepicker)
     // The idea here is that many moves have a natural response
     // i.e. a counter. When a quiet move causes a fail high
     // we may consider that move a potential "counter" to the move
     // that preceded it, so we give it a bonus in move ordering
-    // let countermove = if prev_mv.is_null() {
-    //     Move::null_move()
-    // } else {
-    //     let piece_num = get_piece_num(prev_mv.piece, !node.side_to_move);
-    //     ti.countermove_table[piece_num][prev_mv.end as usize]
-    // };
 
     let mut movepicker = MovePicker::new(sse.tt_move, ply, thread_num, false);
 
@@ -709,7 +771,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         let is_tactical = is_tactical_move(&mv, node);
         let is_quiet = is_quiet_move(&mv, node);
 
-        if !is_check && (depth + ply > 3) && !init_node && best_val > -MIN_MATE_SCORE && !futile {
+        if !is_check && (depth + ply > 3) && !init_node && best_val > -MIN_TB_WIN_SCORE && !futile {
             let lmr_depth = depth - 1 - lmr_reduction(depth, moves_searched);
 
             // Basic form of late move pruning
@@ -717,14 +779,14 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
                 futile = true;
             }
 
-            if depth < EFP_DEPTH && eval + efp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE && !futile {
+            if depth < EFP_DEPTH && eval + efp_margin(depth) <= alpha && alpha.abs() < MIN_TB_WIN_SCORE && !futile {
                 futile = true;
             }
 
             // History-leaf pruning
             // Slightly more lenient on eval margin than futility pruning
             // but won't kick in until we've tried all moves with good history scores
-            if lmr_depth <= 6 && is_quiet && eval + fp_margin(depth) <= alpha && alpha.abs() < MIN_MATE_SCORE && movepicker.move_stage > GEN_QUIET && !futile {
+            if lmr_depth <= 6 && is_quiet && eval + fp_margin(depth) <= alpha && alpha.abs() < MIN_TB_WIN_SCORE && movepicker.move_stage > GEN_QUIET && !futile {
                 let hist = (score as i32) - QUIET_OFFSET as i32;
                 if hist < HISTORY_LEAF_PRUNING_MARGIN {
                     futile = true
@@ -732,12 +794,10 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             }
 
             if lmr_depth < 4 && movepicker.move_stage > GEN_QUIET && is_quiet && !futile {
-                // let mut move_hist = 0;
                 let countermove_hist;
                 let followup_hist;
 
                 let piece_num = get_piece_num(mv.piece, node.side_to_move);
-                // move_hist = ti.move_history[piece_num][mv.end as usize];
 
                 // Continuation history pruning
                 // As we near the leaves, quiet moves which have particularly bad
@@ -758,9 +818,7 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
         }
 
         if futile {
-            // found_legal_move = true;
             if !is_tactical && movepicker.move_stage > GEN_QUIET {
-                // node.undo_move(&mv);
                 continue;
             }
         }
@@ -806,7 +864,6 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
 
                 // adjust r based on history of other quiet moves
                 let hist = (score as i32) - QUIET_OFFSET as i32;
-                // let hist = move_hist + countermove_hist + followup_hist;
                 r -= cmp::max(-2, cmp::min(2, hist / LMR_HISTORY_DENOMINATOR));
 
                 let lmr_depth = cmp::min(cmp::max(1, depth - 1 - r), depth - 1);
@@ -883,6 +940,8 @@ fn search(node: &mut Bitboard, alpha: i32, beta: i32, depth: i32, ply: i32, is_p
             return alpha;
         }
     }
+
+    best_val = cmp::min(best_val, max_val);
 
     unsafe {
         if sse.excluded_move.is_null() && !thread_killed() {
@@ -978,13 +1037,6 @@ pub fn qsearch(node: &mut Bitboard, alpha: i32, beta: i32, thread_num: usize) ->
         if !node.do_move_legal(&mv) {
             continue;
         }
-        // node.do_move(&mv);
-        // unsafe {MOVES_APPLIED += 1;}
-        // if node.is_check(!node.side_to_move) {
-        //     unsafe {ILLEGAL_MOVES_APPLIED += 1;}
-        //     node.undo_move(&mv);
-        //     continue;
-        // }
 
         let val = -qsearch(node, -beta, -alpha, thread_num);
         node.undo_move(&mv);
