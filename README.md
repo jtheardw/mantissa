@@ -116,8 +116,8 @@ I am not very good at chess and am still relatively new to chess programming, so
 
 - Amanj was incredibly helpful in getting me started with NNUE.  `tissa-trainer`, which is the program I wrote to be able to train Mantissa nets, is basically a port of `zahak-trainer` to rust with some slight modifications.  He also helped explain a lot of the resources and information needed to understand the process.  `tissa-trainer` has since been changed ot train a different type of net, but still has many roots there.
 - Koivisto's authors, as I found a way to improve my NNUE topology from what I found in Koivisto's source.
-- Kade for net visualization code and the NNUE-derived piece value display
+- Kade for net visualization code and the NNUE derived piece value display.
 
 ### Other
 
-- Kade for his work on Mantissa's logos.
+- Kade for their work on Mantissa's logos.

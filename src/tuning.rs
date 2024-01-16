@@ -722,9 +722,9 @@ pub fn neighbor(param_vec: &Vec<i32>, reach: f64) -> Vec<i32> {
     }
 
     let mut delta = [0f64; 728];
-    let axes = (rand() % 5) + 1;
+    let axes = (u32::rand() % 5) + 1;
     for _ in 0..axes {
-        let axis = (rand() % 728);
+        let axis = u32::rand() % 728;
         delta[axis as usize] = symunif();
     }
 

@@ -2,7 +2,7 @@
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::prelude::*;
-use std::simd::*;
+use std::simd::{num::SimdFloat, *};
 
 use crate::bitboard::Bitboard;
 use crate::default_nnue::*;
